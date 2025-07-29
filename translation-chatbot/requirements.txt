@@ -1,0 +1,4 @@
+python-dotenv
+fastapi[all]
+pipecat-ai[cartesia,daily,deepgram,openai,silero]
+aiohttp
