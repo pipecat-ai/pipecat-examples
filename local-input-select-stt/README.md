@@ -1,7 +1,6 @@
-
 # Pipecat Audio Transcription Example 🚀🎙️
 
-Welcome to the **Pipecat Audio Transcription Example**! 
+Welcome to the **Pipecat Audio Transcription Example**!
 
 This project showcases how to integrate the awesome [pipecat](https://github.com/pipecat-ai/pipecat) library with a neat textual interface (powered by [Textual](https://github.com/Textualize/textual)) to select audio devices, perform real-time speech-to-text (STT) transcription using [Whisper](https://github.com/openai/whisper).
 
@@ -13,13 +12,10 @@ This project showcases how to integrate the awesome [pipecat](https://github.com
 
 - **Interactive Audio Device Selection:**  
   Choose your preferred audio input device using a cool, textual UI.
-  
 - **State-of-the-Art Transcription:**  
   Leverage Whisper's large model (running on CUDA) for high-quality, real-time STT.
-  
 - **Live Transcription Logging:**  
   Watch your spoken words transform into text on your console instantly.
-  
 - **Easy Setup:**  
   Everything you need is in the [`requirements.txt`](./requirements.txt).
 
@@ -28,7 +24,7 @@ This project showcases how to integrate the awesome [pipecat](https://github.com
 ## 🎥 Demo
 
 Get a quick glimpse of the app in action!  
-*(Don't worry – I'll be adding a GIF demo here soon!)*
+_(Don't worry – I'll be adding a GIF demo here soon!)_
 
 ![Demo GIF](demo.gif)
 
@@ -36,13 +32,11 @@ Get a quick glimpse of the app in action!
 
 ## 🔧 Installation
 
-
 Install Dependencies:
 
 ```bash
 pip install -r requirements.txt
 ```
-
 
 ---
 
@@ -60,16 +54,12 @@ When the app launches, you'll see a textual interface that lets you select your 
 
 ## ⚙️ How It Works
 
-
 1. **LocalAudioTransport:**  
    Captures audio from your chosen input device.
-   
 2. **WhisperSTTService:**  
    Processes the audio stream using Whisper's large model for speech-to-text conversion.
-   
 3. **TranscriptionLogger:**  
    Logs the transcribed text to the console as soon as it's processed.
-
 
 ---
 
