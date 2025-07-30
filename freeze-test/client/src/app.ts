@@ -14,8 +14,8 @@
  */
 
 import {
-  RTVIClient,
-  RTVIClientOptions,
+  PipecatClient,
+  PipecatClientOptions,
   RTVIEvent,
 } from '@pipecat-ai/client-js';
 import {
@@ -66,7 +66,7 @@ class WebsocketClientApp {
   private ENABLE_RECORDING_MODE = false;
   private RECORDING_TIME_MS = 10000;
 
-  private rtviClient: RTVIClient | null = null;
+  private rtviClient: PipecatClient | null = null;
   private connectBtn: HTMLButtonElement | null = null;
   private disconnectBtn: HTMLButtonElement | null = null;
   private statusSpan: HTMLElement | null = null;
@@ -215,7 +215,7 @@ class WebsocketClientApp {
         playerSampleRate: 8000,
       };
 
-      const RTVIConfig: RTVIClientOptions = {
+      const RTVIConfig: PipecatClientOptions = {
         transport: new WebSocketTransport(ws_opts),
         enableMic: true,
         enableCam: false,
@@ -245,8 +245,8 @@ class WebsocketClientApp {
           onError: (error) => console.error('Error:', error),
         },
       };
-      this.rtviClient = new RTVIClient(RTVIConfig);
-      this.websocketTransport = this.rtviClient.transport;
+      this.rtviClient = new PipecatClient(RTVIConfig);
+      this.websocketTransport = this.rtviClient.transport as WebSocketTransport;
       this.setupTrackListeners();
 
       this.log('Initializing devices...');
