@@ -1,29 +1,53 @@
-import { useRef, useCallback } from 'react';
+import { useRef, useCallback } from "react";
 import {
   Participant,
   RTVIEvent,
   TransportState,
   TranscriptData,
   BotLLMTextData,
-} from '@pipecat-ai/client-js';
-import { usePipecatClient, useRTVIClientEvent } from '@pipecat-ai/client-react';
-import './DebugDisplay.css';
+} from "@pipecat-ai/client-js";
+import { usePipecatClient, useRTVIClientEvent } from "@pipecat-ai/client-react";
+import "./DebugDisplay.css";
 
 export function DebugDisplay() {
   const debugLogRef = useRef<HTMLDivElement>(null);
   const client = usePipecatClient();
 
+  // Register function call handler for 'get_current_weather'
+  // This will listen for tool calls from the bot and respond with mock weather data
+  if (client) {
+    client.registerFunctionCallHandler("get_current_weather", async (fn) => {
+      // Log the function call and its arguments
+      if (fn && fn.arguments) {
+        const location = fn.arguments.location || "unknown location";
+        const format = fn.arguments.format || "fahrenheit";
+        const result = {
+          conditions: "sunny",
+          temperature: format === "celsius" ? "24" : "75",
+        };
+        log(
+          `FunctionCall: get_current_weather for ${location} (${format}) → ${JSON.stringify(
+            result
+          )}`
+        );
+        return result;
+      }
+      log("FunctionCall: get_current_weather called with no arguments");
+      return { conditions: "unknown", temperature: "unknown" };
+    });
+  }
+
   const log = useCallback((message: string) => {
     if (!debugLogRef.current) return;
 
-    const entry = document.createElement('div');
+    const entry = document.createElement("div");
     entry.textContent = `${new Date().toISOString()} - ${message}`;
 
     // Add styling based on message type
-    if (message.startsWith('User: ')) {
-      entry.style.color = '#2196F3'; // blue for user
-    } else if (message.startsWith('Bot: ')) {
-      entry.style.color = '#4CAF50'; // green for bot
+    if (message.startsWith("User: ")) {
+      entry.style.color = "#2196F3"; // blue for user
+    } else if (message.startsWith("Bot: ")) {
+      entry.style.color = "#4CAF50"; // green for bot
     }
 
     debugLogRef.current.appendChild(entry);
@@ -68,7 +92,7 @@ export function DebugDisplay() {
     useCallback(
       (track: MediaStreamTrack, participant?: Participant) => {
         log(
-          `Track started: ${track.kind} from ${participant?.name || 'unknown'}`
+          `Track started: ${track.kind} from ${participant?.name || "unknown"}`
         );
       },
       [log]
@@ -80,7 +104,7 @@ export function DebugDisplay() {
     useCallback(
       (track: MediaStreamTrack, participant?: Participant) => {
         log(
-          `Track stopped: ${track.kind} from ${participant?.name || 'unknown'}`
+          `Track stopped: ${track.kind} from ${participant?.name || "unknown"}`
         );
       },
       [log]

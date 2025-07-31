@@ -25,8 +25,8 @@ import aiohttp
 from dotenv import load_dotenv
 from loguru import logger
 from PIL import Image
-from runner import configure
-
+from pipecat.adapters.schemas.function_schema import FunctionSchema
+from pipecat.adapters.schemas.tools_schema import ToolsSchema
 from pipecat.audio.vad.silero import SileroVADAnalyzer
 from pipecat.frames.frames import (
     BotStartedSpeakingFrame,
@@ -42,8 +42,10 @@ from pipecat.processors.aggregators.openai_llm_context import OpenAILLMContext
 from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
 from pipecat.processors.frameworks.rtvi import RTVIConfig, RTVIObserver, RTVIProcessor
 from pipecat.services.elevenlabs.tts import ElevenLabsTTSService
+from pipecat.services.llm_service import FunctionCallParams
 from pipecat.services.openai.llm import OpenAILLMService
 from pipecat.transports.services.daily import DailyParams, DailyTransport
+from runner import configure
 
 load_dotenv(override=True)
 logger.remove(0)
@@ -59,7 +61,9 @@ for i in range(1, 26):
     # Get the filename without the extension to use as the dictionary key
     # Open the image and convert it to bytes
     with Image.open(full_path) as img:
-        sprites.append(OutputImageRawFrame(image=img.tobytes(), size=img.size, format=img.format))
+        sprites.append(
+            OutputImageRawFrame(image=img.tobytes(), size=img.size, format=img.format)
+        )
 
 # Create a smooth animation by adding reversed frames
 flipped = sprites[::-1]
@@ -67,7 +71,9 @@ sprites.extend(flipped)
 
 # Define static and animated states
 quiet_frame = sprites[0]  # Static frame for when bot is listening
-talking_frame = SpriteFrame(images=sprites)  # Animation sequence for when bot is talking
+talking_frame = SpriteFrame(
+    images=sprites
+)  # Animation sequence for when bot is talking
 
 
 class TalkingAnimation(FrameProcessor):
@@ -157,6 +163,34 @@ async def main():
         # Initialize LLM service
         llm = OpenAILLMService(api_key=os.getenv("OPENAI_API_KEY"))
 
+        # Define the weather tool function, delegating to RTVI for client-side handling
+        async def fetch_weather_from_api(params: FunctionCallParams):
+            # Delegate function call to RTVI, which will notify the client and await the result
+            await rtvi.handle_function_call(params)
+            await params.result_callback({"conditions": "nice", "temperature": "75"})
+
+        # Register the function with the LLM
+        llm.register_function("get_current_weather", fetch_weather_from_api)
+
+        # Define the weather tool schema
+        weather_function = FunctionSchema(
+            name="get_current_weather",
+            description="Get the current weather",
+            properties={
+                "location": {
+                    "type": "string",
+                    "description": "The city and state, e.g. San Francisco, CA",
+                },
+                "format": {
+                    "type": "string",
+                    "enum": ["celsius", "fahrenheit"],
+                    "description": "The temperature unit to use. Infer this from the user's location.",
+                },
+            },
+            required=["location", "format"],
+        )
+        tools = ToolsSchema(standard_tools=[weather_function])
+
         messages = [
             {
                 "role": "system",
@@ -173,7 +207,7 @@ async def main():
 
         # Set up conversation context and management
         # The context_aggregator will automatically collect conversation context
-        context = OpenAILLMContext(messages)
+        context = OpenAILLMContext(messages, tools=tools)
         context_aggregator = llm.create_context_aggregator(context)
 
         ta = TalkingAnimation()
