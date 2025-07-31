@@ -1,16 +1,16 @@
 import {
   usePipecatClient,
   usePipecatClientTransportState,
-} from '@pipecat-ai/client-react';
+} from "@pipecat-ai/client-react";
 
 export function ConnectButton() {
   const client = usePipecatClient();
   const transportState = usePipecatClientTransportState();
-  const isConnected = ['connected', 'ready'].includes(transportState);
+  const isConnected = ["connected", "ready"].includes(transportState);
 
   const handleClick = async () => {
     if (!client) {
-      console.error('Pipecat client is not initialized');
+      console.error("Pipecat client is not initialized");
       return;
     }
 
@@ -18,22 +18,23 @@ export function ConnectButton() {
       if (isConnected) {
         await client.disconnect();
       } else {
-        await client.connect({ endpoint: 'http://localhost:7860/connect' });
+        await client.connect({ endpoint: "http://localhost:7860/connect" });
       }
     } catch (error) {
-      console.error('Connection error:', error);
+      console.error("Connection error:", error);
     }
   };
 
   return (
     <div className="controls">
       <button
-        className={isConnected ? 'disconnect-btn' : 'connect-btn'}
+        className={isConnected ? "disconnect-btn" : "connect-btn"}
         onClick={handleClick}
         disabled={
-          !client || ['connecting', 'disconnecting'].includes(transportState)
-        }>
-        {isConnected ? 'Disconnect' : 'Connect'}
+          !client || ["connecting", "disconnecting"].includes(transportState)
+        }
+      >
+        {isConnected ? "Disconnect" : "Connect"}
       </button>
     </div>
   );
