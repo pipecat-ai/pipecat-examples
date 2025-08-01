@@ -5,7 +5,6 @@ from typing import Dict, Optional
 
 import aiohttp
 from dotenv import load_dotenv
-
 from pipecat.transports.services.helpers.daily_rest import (
     DailyRESTHelper,
     DailyRoomParams,

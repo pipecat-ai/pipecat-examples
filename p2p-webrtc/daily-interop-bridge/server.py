@@ -16,9 +16,8 @@ from dotenv import load_dotenv
 from fastapi import BackgroundTasks, FastAPI
 from fastapi.responses import RedirectResponse
 from loguru import logger
-from pipecat_ai_small_webrtc_prebuilt.frontend import SmallWebRTCPrebuiltUI
-
 from pipecat.transports.network.webrtc_connection import IceServer, SmallWebRTCConnection
+from pipecat_ai_small_webrtc_prebuilt.frontend import SmallWebRTCPrebuiltUI
 
 # Load environment variables
 load_dotenv(override=True)

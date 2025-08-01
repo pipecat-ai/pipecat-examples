@@ -13,8 +13,6 @@ from typing import Any, Dict
 import aiohttp
 from dotenv import load_dotenv
 from loguru import logger
-from pipecatcloud.agent import DailySessionArguments
-
 from pipecat.audio.vad.silero import SileroVADAnalyzer
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
@@ -28,6 +26,7 @@ from pipecat.processors.frameworks.rtvi import (
 )
 from pipecat.services.gemini_multimodal_live.gemini import GeminiMultimodalLiveLLMService
 from pipecat.transports.services.daily import DailyParams, DailyTransport
+from pipecatcloud.agent import DailySessionArguments
 
 load_dotenv(override=True)
 

@@ -9,7 +9,6 @@ import os
 from typing import Optional
 
 import aiohttp
-
 from pipecat.transports.services.helpers.daily_rest import DailyRESTHelper
 
 

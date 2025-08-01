@@ -12,8 +12,6 @@ import aiohttp
 import sentry_sdk
 from dotenv import load_dotenv
 from loguru import logger
-from runner import configure
-
 from pipecat.audio.vad.silero import SileroVADAnalyzer
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
@@ -23,6 +21,7 @@ from pipecat.processors.metrics.sentry import SentryMetrics
 from pipecat.services.elevenlabs.tts import ElevenLabsTTSService
 from pipecat.services.openai.llm import OpenAILLMService
 from pipecat.transports.services.daily import DailyParams, DailyTransport
+from runner import configure
 
 load_dotenv(override=True)
 

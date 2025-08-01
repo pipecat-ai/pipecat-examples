@@ -23,7 +23,6 @@ import sys
 from dotenv import load_dotenv
 from loguru import logger
 from PIL import Image
-
 from pipecat.audio.vad.silero import SileroVADAnalyzer
 from pipecat.frames.frames import (
     BotStartedSpeakingFrame,

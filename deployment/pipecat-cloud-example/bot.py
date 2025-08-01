@@ -10,8 +10,6 @@ import os
 import aiohttp
 from dotenv import load_dotenv
 from loguru import logger
-from pipecatcloud.agent import DailySessionArguments
-
 from pipecat.audio.vad.silero import SileroVADAnalyzer
 from pipecat.frames.frames import LLMMessagesFrame
 from pipecat.pipeline.pipeline import Pipeline
@@ -21,6 +19,7 @@ from pipecat.processors.aggregators.openai_llm_context import OpenAILLMContext
 from pipecat.services.cartesia.tts import CartesiaTTSService
 from pipecat.services.openai.llm import OpenAILLMService
 from pipecat.transports.services.daily import DailyParams, DailyTransport
+from pipecatcloud.agent import DailySessionArguments
 
 # Load environment variables
 load_dotenv(override=True)
