@@ -1,0 +1,13 @@
+pipecat-ai[daily,cartesia,openai,silero]
+numpy
+live2d-py
+fastapi==0.115.6
+uvicorn
+python-dotenv
+python-multipart
+aiohttp
+loguru
+pillow
+pyopengl
+pyopengl-accelerate
+glfw
