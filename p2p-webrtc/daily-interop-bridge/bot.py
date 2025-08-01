@@ -8,7 +8,6 @@ import sys
 
 from dotenv import load_dotenv
 from loguru import logger
-
 from pipecat.frames.frames import (
     InputAudioRawFrame,
     InputImageRawFrame,

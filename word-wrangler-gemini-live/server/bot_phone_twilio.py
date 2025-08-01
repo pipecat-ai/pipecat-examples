@@ -22,9 +22,6 @@ from typing import Any, Mapping, Optional
 from dotenv import load_dotenv
 from fastapi import WebSocket
 from loguru import logger
-from pipecatcloud import WebSocketSessionArguments
-from word_list import generate_game_words
-
 from pipecat.audio.filters.krisp_filter import KrispFilter
 from pipecat.audio.resamplers.soxr_resampler import SOXRAudioResampler
 from pipecat.audio.vad.silero import SileroVADAnalyzer
@@ -65,6 +62,8 @@ from pipecat.transports.network.fastapi_websocket import (
     FastAPIWebsocketTransport,
 )
 from pipecat.utils.text.base_text_filter import BaseTextFilter
+from pipecatcloud import WebSocketSessionArguments
+from word_list import generate_game_words
 
 load_dotenv(override=True)
 

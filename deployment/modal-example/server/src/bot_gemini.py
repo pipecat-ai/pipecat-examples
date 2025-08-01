@@ -22,7 +22,6 @@ import sys
 from dotenv import load_dotenv
 from loguru import logger
 from PIL import Image
-
 from pipecat.audio.vad.silero import SileroVADAnalyzer
 from pipecat.audio.vad.vad_analyzer import VADParams
 from pipecat.frames.frames import (

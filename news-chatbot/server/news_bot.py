@@ -12,7 +12,6 @@ from pathlib import Path
 import aiohttp
 from dotenv import load_dotenv
 from loguru import logger
-
 from pipecat.audio.vad.silero import SileroVADAnalyzer
 from pipecat.frames.frames import Frame
 from pipecat.pipeline.pipeline import Pipeline

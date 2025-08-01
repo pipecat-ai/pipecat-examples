@@ -7,14 +7,10 @@
 import argparse
 import asyncio
 import os
-import threading
 import time
 
 from dotenv import load_dotenv
 from loguru import logger
-from strands import Agent, tool
-from strands.models import BedrockModel
-
 from pipecat.adapters.schemas.tools_schema import ToolsSchema
 from pipecat.audio.vad.silero import SileroVADAnalyzer
 from pipecat.frames.frames import TTSSpeakFrame
@@ -29,6 +25,8 @@ from pipecat.services.openai.llm import OpenAILLMService
 from pipecat.transports.base_transport import BaseTransport, TransportParams
 from pipecat.transports.network.fastapi_websocket import FastAPIWebsocketParams
 from pipecat.transports.services.daily import DailyParams
+from strands import Agent, tool
+from strands.models import BedrockModel
 
 load_dotenv(override=True)
 

@@ -2,7 +2,6 @@ import os
 import wave
 
 from PIL import Image
-
 from pipecat.frames.frames import OutputAudioRawFrame, OutputImageRawFrame
 
 script_dir = os.path.dirname(__file__)

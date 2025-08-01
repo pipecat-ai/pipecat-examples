@@ -13,7 +13,6 @@ import aiohttp
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, RedirectResponse
-
 from pipecat.transports.services.helpers.daily_rest import DailyRESTHelper, DailyRoomParams
 
 MAX_BOTS_PER_ROOM = 1

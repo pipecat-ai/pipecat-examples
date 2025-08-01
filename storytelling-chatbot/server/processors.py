@@ -10,15 +10,6 @@ import re
 import google.ai.generativelanguage as glm
 from async_timeout import timeout
 from loguru import logger
-from prompts import (
-    CUE_ASSISTANT_TURN,
-    CUE_USER_TURN,
-    FIRST_IMAGE_PROMPT,
-    IMAGE_GEN_PROMPT,
-    NEXT_IMAGE_PROMPT,
-)
-from utils.helpers import load_sounds
-
 from pipecat.frames.frames import (
     Frame,
     LLMFullResponseEndFrame,
@@ -28,6 +19,14 @@ from pipecat.frames.frames import (
 from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
 from pipecat.services.google.llm import GoogleLLMService
 from pipecat.transports.services.daily import DailyTransportMessageFrame
+from prompts import (
+    CUE_ASSISTANT_TURN,
+    CUE_USER_TURN,
+    FIRST_IMAGE_PROMPT,
+    IMAGE_GEN_PROMPT,
+    NEXT_IMAGE_PROMPT,
+)
+from utils.helpers import load_sounds
 
 sounds = load_sounds(["talking.wav", "listening.wav", "ding.wav"])
 

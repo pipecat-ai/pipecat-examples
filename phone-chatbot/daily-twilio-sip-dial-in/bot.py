@@ -7,8 +7,6 @@ import sys
 
 from dotenv import load_dotenv
 from loguru import logger
-from twilio.rest import Client
-
 from pipecat.audio.vad.silero import SileroVADAnalyzer
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
@@ -17,6 +15,7 @@ from pipecat.processors.aggregators.openai_llm_context import OpenAILLMContext
 from pipecat.services.cartesia.tts import CartesiaTTSService
 from pipecat.services.openai.llm import OpenAILLMService
 from pipecat.transports.services.daily import DailyParams, DailyTransport
+from twilio.rest import Client
 
 # Setup logging
 load_dotenv()

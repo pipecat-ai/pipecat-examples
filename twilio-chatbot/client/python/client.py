@@ -18,7 +18,6 @@ import aiofiles
 import aiohttp
 from dotenv import load_dotenv
 from loguru import logger
-
 from pipecat.audio.vad.silero import SileroVADAnalyzer
 from pipecat.audio.vad.vad_analyzer import VADParams
 from pipecat.frames.frames import EndFrame, TransportMessageUrgentFrame
