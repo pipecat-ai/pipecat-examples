@@ -1,0 +1,43 @@
+name: format
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - '**'
+
+concurrency:
+  group: format-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ruff-format:
+    name: 'Code quality checks'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          version: 'latest'
+
+      - name: Set up Python
+        run: uv python install 3.10
+
+      - name: Install development dependencies
+        run: uv sync --group dev
+
+      - name: Ruff formatter check
+        id: ruff-format
+        run: |
+          uv run ruff format --diff --check .
+
+      - name: Ruff linter check
+        id: ruff-check
+        run: |
+          uv run ruff check .
