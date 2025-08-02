@@ -4,7 +4,7 @@ Basic implementation using the [Pipecat React SDK](https://docs.pipecat.ai/clien
 
 ## Setup
 
-1. Run the bot server; see [README](../../README).
+1. Run the server-side bot; see [README](../../server/README).
 
 2. Navigate to the `client/react` directory:
 

@@ -4,7 +4,7 @@ Basic implementation using the [Pipecat JavaScript SDK](https://docs.pipecat.ai/
 
 ## Setup
 
-1. Run the bot server. See the [server README](../../README).
+1. Run the server-side bot; see [README](../../server/README).
 
 2. Navigate to the `client/javascript` directory:
 

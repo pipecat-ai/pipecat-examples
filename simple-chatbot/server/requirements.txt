@@ -1,4 +1,1 @@
-python-dotenv
-fastapi[all]
-uvicorn
-pipecat-ai[daily,elevenlabs,openai,silero,google]
+pipecat-ai[daily,elevenlabs,openai,silero,google,runner]>=0.0.77

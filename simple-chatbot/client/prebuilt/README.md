@@ -2,11 +2,19 @@
 
 The simplest way to connect to the chatbot using Daily's Prebuilt UI.
 
-1. Start the bot server
+1. Start either the OpenAI or Gemini Live bot
 
-```bash
-python server/server.py
-```
+   OpenAI:
+
+   ```bash
+   python server/bot-openai.py --transport daily
+   ```
+
+   Gemini Live:
+
+   ```bash
+   python server/bot-gemini.py --transport daily
+   ```
 
 2. Visit http://localhost:7860
 

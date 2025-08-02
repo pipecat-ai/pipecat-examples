@@ -6,7 +6,7 @@ This repository demonstrates a simple AI chatbot with real-time audio/video inte
 
 ## Two Bot Options
 
-1. **OpenAI Bot** (Default)
+1. **OpenAI Bot**
 
    - Uses gpt-4o for conversation
    - Requires OpenAI API key
@@ -15,7 +15,7 @@ This repository demonstrates a simple AI chatbot with real-time audio/video inte
    - Uses Google's Gemini Multimodal Live model
    - Requires Gemini API key
 
-## Five Client Options
+## Six Client Options
 
 1. **Daily Prebuilt** (Simplest)
 
@@ -33,12 +33,17 @@ This repository demonstrates a simple AI chatbot with real-time audio/video inte
    - Basic impelmentation using [Pipecat React SDK](https://docs.pipecat.ai/client/react/introduction)
    - Demonstrates the basic client principles with Pipecat React
 
-4. **Android**
+4. **React Native**
+
+   - Basic impelmentation using [Pipecat React Native SDK](https://docs.pipecat.ai/client/react-native/introduction)
+   - Demonstrates the basic client principles with Pipecat React Native
+
+5. **Android**
 
    - Basic implementation using [Pipecat Android SDK](https://docs.pipecat.ai/client/android/introduction)
    - Demonstrates the basic client principles with Pipecat Android
 
-5. **iOS**
+6. **iOS**
    - Basic implementation using [Pipecat iOS SDK](https://docs.pipecat.ai/client/ios/introduction)
    - Demonstrates the basic client principles with Pipecat iOS
 
@@ -46,29 +51,7 @@ This repository demonstrates a simple AI chatbot with real-time audio/video inte
 
 ### First, start the bot server:
 
-1. Navigate to the server directory:
-   ```bash
-   cd server
-   ```
-2. Create and activate a virtual environment:
-   ```bash
-   python3 -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
-   ```
-3. Install requirements:
-   ```bash
-   pip install -r requirements.txt
-   ```
-4. Copy env.example to .env and configure:
-   - Add your API keys
-   - Choose your bot implementation:
-     ```ini
-     BOT_IMPLEMENTATION=      # Options: 'openai' (default) or 'gemini'
-     ```
-5. Start the server:
-   ```bash
-   python server.py
-   ```
+Follow the instructions in the [server directory](server/).
 
 ### Next, connect using your preferred client app:
 
@@ -97,15 +80,17 @@ The bot server must be running for any of the client implementations to work. St
 ```
 simple-chatbot/
 ├── server/              # Bot server implementation
+│   ├── assets.py        # Sprite images
 │   ├── bot-openai.py    # OpenAI bot implementation
 │   ├── bot-gemini.py    # Gemini bot implementation
-│   ├── runner.py        # Server runner utilities
-│   ├── server.py        # FastAPI server
+│   ├── env.example      # Env variable example
+│   ├── README.md        # More specific server setup instructions
 │   └── requirements.txt
 └── client/              # Client implementations
     ├── android/         # Daily Android connection
     ├── ios/             # Daily iOS connection
     ├── javascript/      # Daily JavaScript connection
     ├── prebuilt/        # Pipecat Prebuilt client
-    └── react/           # Pipecat React client
+    ├── react/           # Pipecat React client
+    └── react-native/    # Pipecat React Native client
 ```
