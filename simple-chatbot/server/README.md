@@ -1,75 +1,67 @@
 # Simple Chatbot Server
 
-A FastAPI server that manages bot instances and provides endpoints for both Daily Prebuilt and Pipecat client connections.
-
-## Endpoints
-
-- `GET /` - Direct browser access, redirects to a Daily Prebuilt room
-- `POST /connect` - Pipecat client connection endpoint
-- `GET /status/{pid}` - Get status of a specific bot process
-
-## Environment Variables
-
-Copy `env.example` to `.env` and configure:
-
-```ini
-# Required API Keys
-DAILY_API_KEY=           # Your Daily API key
-OPENAI_API_KEY=          # Your OpenAI API key (required for OpenAI bot)
-GEMINI_API_KEY=          # Your Gemini API key (required for Gemini bot)
-ELEVENLABS_API_KEY=      # Your ElevenLabs API key
-
-# Bot Selection
-BOT_IMPLEMENTATION=      # Options: 'openai' or 'gemini'
-
-# Optional Configuration
-DAILY_API_URL=           # Optional: Daily API URL (defaults to https://api.daily.co/v1)
-DAILY_SAMPLE_ROOM_URL=   # Optional: Fixed room URL for development
-HOST=                    # Optional: Host address (defaults to 0.0.0.0)
-FAST_API_PORT=           # Optional: Port number (defaults to 7860)
-```
+A Pipecat server-side bot that connects to a Pipecat client, enabling a user to talk to the bot through their browser or mobile device.
 
 ## Available Bots
 
 The server supports two bot implementations:
 
-1. **OpenAI Bot** (Default)
+1. **OpenAI Bot**
 
-   - Uses GPT-4 for conversation
+   - Uses gpt-4o for conversation
    - Requires OPENAI_API_KEY
 
 2. **Gemini Bot**
    - Uses Google's Gemini model
-   - Requires GEMINI_API_KEY
+   - Requires GOOGLE_API_KEY
 
-Select your preferred bot by setting `BOT_IMPLEMENTATION` in your `.env` file.
+Select your preferred bot by running the corresponding bot.py file:
 
-## Running the Server
+- `bot-openai.py` for OpenAI
+- `bot-gemini.py` for Gemini
 
-Set up and activate your virtual environment:
+## Setup
 
-```bash
-python3 -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-```
+1. Configure environment variables
 
-Install dependencies:
+   Create a `.env` file:
 
-```bash
-pip install -r requirements.txt
-```
+   ```bash
+   cp env.example .env
+   ```
 
-If you want to use the local version of `pipecat` in this repo rather than the last published version, also run:
+   Then, add your API keys:
 
-```bash
-pip install --editable "../../../[daily,elevenlabs,openai,silero,google]"
-```
+   ```ini
+   # Required API Keys
+   DAILY_API_KEY=           # Your Daily API key
+   OPENAI_API_KEY=          # Your OpenAI API key (required for OpenAI bot)
+   GOOGLE_API_KEY=          # Your Google Gemini API key (required for Gemini bot)
+   ELEVENLABS_API_KEY=      # Your ElevenLabs API key
 
-Run the server:
+   # Optional Configuration
+   DAILY_API_URL=           # Optional: Daily API URL (defaults to https://api.daily.co/v1)
+   DAILY_SAMPLE_ROOM_URL=   # Optional: Fixed room URL for development
+   ```
 
-```bash
-python server.py
-```
+2. Set up a virtual environment and install dependencies
+
+   ```bash
+   cd server
+   python -m venv .venv
+   source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+   pip install -r requirements.txt
+   ```
+
+   > Using `uv`? Create your venv using: `uv sync`
+
+3. Run the bot:
+
+   ```bash
+   python bot-openai.py --transport daily
+   ```
+
+   > Using `uv`? Run your bot using: `uv run bot-openai.py --transport daily`
 
 ## Troubleshooting
 
@@ -81,6 +73,6 @@ aiohttp.client_exceptions.ClientConnectorCertificateError: Cannot connect to hos
 
 It's because Python cannot verify the SSL certificate from https://api.daily.co when making a POST request to create a room or token.
 
-This is a common issue when the system doesn't have the proper CA certificates.
+This issue occurs when the system doesn't have the proper CA certificates.
 
 Install SSL Certificates (macOS): `/Applications/Python\ 3.12/Install\ Certificates.command`
