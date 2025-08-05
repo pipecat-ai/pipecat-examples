@@ -26,6 +26,7 @@ app = FastAPI()
 # Store connections by pc_id
 pcs_map: Dict[str, SmallWebRTCConnection] = {}
 
+# TODO: need to configure a TURN server if using inside Docker on Mac.
 ice_servers = [
     IceServer(
         urls="stun:stun.l.google.com:19302",

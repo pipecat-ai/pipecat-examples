@@ -6,54 +6,65 @@ A Pipecat example demonstrating the simplest way to create a voice agent using `
 
 ### 1️⃣ Build the Bot Server
 
-1. Configure environment variables:
-   - Copy `env.example` to `.env`
+1. **Configure environment variables:**
+
    ```bash
    cp env.example .env
    ```
-   - Add your API keys
 
-2. Build the container:
+   - Then edit `.env` to include your API keys.
+
+2. **Build the Docker container:**
+
    ```bash
    docker build -t small-webrtc-bot .
    ```
 
-#### ▶️ Run the Server
-```bash
-# We are running it in background
+---
 
-# Share the same network as the host
+### ▶️ Run the Bot Server
+
+#### ✅ **Linux**
+
+On Linux, Docker allows advanced networking options (like exposing UDP port ranges), which are required for direct WebRTC peer-to-peer connections.
+
+```bash
+# Run in the background using host networking (preferred for local dev)
 docker run -d --network=host --name small-webrtc-bot small-webrtc-bot:latest
 
-# Control low-level networking which ports are expose, only works on Linux
+# Or, expose individual ports explicitly
 docker run --rm \
-  --sysctl net.ipv4.ip_local_port_range="40000 40100"
+  --sysctl net.ipv4.ip_local_port_range="40000 40100" \
   -p 7860:7860 \
   -p 40000-40100:40000-40100/udp \
   --name small-webrtc-bot \
   small-webrtc-bot:latest
-  
-# Mac:
-docker run --rm \
-  -p 7860:7860 \
-  -p 40000-40100:40000-40100/udp \
-  --name small-webrtc-bot \
-  small-webrtc-bot:latest
-
 ```
+
+#### 🍏 **macOS (and Windows via Docker Desktop)**
+
+Docker Desktop on macOS does **not support `--network=host`**, and UDP port forwarding has known limitations.
+
+```bash
+docker run --rm \
+  -p 7860:7860 \
+  --name small-webrtc-bot \
+  small-webrtc-bot:latest
+```
+
+> ⚠️ **On macOS, a TURN server is needed**  
+> Because we can not configure which UDP ports aiortc it is going to use, direct WebRTC peer-to-peer connections are unlikely to succeed.  
+> A TURN server is required to relay media traffic between the client and the bot when NAT traversal fails.
+
+---
 
 ### 2️⃣ Connect Using the Client App
 
-Open your browser and visit:
+Open your browser and go to:
+
 ```
 http://localhost:7860
 ```
-
-## 📌 Requirements
-
-- Docker
-- Google API Key
-- Modern web browser with WebRTC support
 
 ---
 
@@ -95,11 +106,26 @@ const config = {
 > For testing purposes, you can either use public **STUN** servers (like Google's) or set up your own **TURN** server. 
 If you're running your own TURN server, make sure to include your server URL, username, and credential in the configuration.
 
+> 🧪 For local Linux tests, STUN alone may work.  
+> 🍏 On macOS or behind strict NAT/firewall, TURN is **required**.
+
 ---
 
-### 💡 Notes
-- Ensure all dependencies are installed before running the server.
-- Check the `.env` file for missing configurations.
-- WebRTC requires a secure environment (HTTPS) for full functionality in production.
+## 📋 Requirements
+
+- Docker (Docker Desktop for macOS/Windows)
+- Google API Key (or your own STT/TTS provider)
+- Modern WebRTC-compatible browser (e.g., Chrome, Firefox)
+
+---
+
+## 📝 Notes
+
+- Check `.env` for required API credentials.
+- On macOS or Windows, don't rely on `--network=host`.
+- In production, WebRTC apps **must** run over HTTPS.
+- Consider deploying your own TURN server or using a provider like Twilio or coturn.
+
+---
 
 Happy coding! 🎉

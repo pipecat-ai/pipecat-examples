@@ -24,6 +24,23 @@
         let connected = false
         let peerConnection = null
 
+        const printSelectedIceCandidate = async (pc) => {
+            const stats = await pc.getStats(null)
+            stats.forEach(report => {
+                if (
+                  report.type === "transport" &&
+                  report.selectedCandidatePairId
+                ) {
+                  const candidatePair = stats.get(report.selectedCandidatePairId);
+                  const localCandidate = stats.get(candidatePair.localCandidateId);
+                  const remoteCandidate = stats.get(candidatePair.remoteCandidateId);
+
+                  console.log("Selected local candidate:", localCandidate);
+                  console.log("Selected remote candidate:", remoteCandidate);
+                }
+            });
+        }
+
         const waitForIceGatheringComplete = async (pc, timeoutMs = 2000) => {
             if (pc.iceGatheringState === 'complete') return;
             console.log("Waiting for ICE gathering to complete. Current state:", pc.iceGatheringState);
@@ -54,6 +71,7 @@
 
 
         const createSmallWebRTCConnection = async (audioTrack) => {
+            // TODO: need to configure a TURN server if using inside Docker on Mac.
             const config = {
               iceServers:[
                   {
@@ -115,6 +133,7 @@
         }
 
         const _onConnected = () => {
+            printSelectedIceCandidate(peerConnection);
             statusEl.textContent = "Connected"
             buttonEl.textContent = "Disconnect"
             connected = true
