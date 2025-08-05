@@ -21,16 +21,25 @@ A Pipecat example demonstrating the simplest way to create a voice agent using `
 #### ▶️ Run the Server
 ```bash
 # We are running it in background
+
+# Share the same network as the host
 docker run -d --network=host --name small-webrtc-bot small-webrtc-bot:latest
 
-# Check the logs
-docker logs -f small-webrtc-bot
+# Control low-level networking which ports are expose, only works on Linux
+docker run --rm \
+  --sysctl net.ipv4.ip_local_port_range="40000 40100"
+  -p 7860:7860 \
+  -p 40000-40100:40000-40100/udp \
+  --name small-webrtc-bot \
+  small-webrtc-bot:latest
+  
+# Mac:
+docker run --rm \
+  -p 7860:7860 \
+  -p 40000-40100:40000-40100/udp \
+  --name small-webrtc-bot \
+  small-webrtc-bot:latest
 
-# Stop the container
-docker stop small-webrtc-bot
-
-# Start the container
-docker start small-webrtc-bot
 ```
 
 ### 2️⃣ Connect Using the Client App

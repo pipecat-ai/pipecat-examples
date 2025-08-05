@@ -14,10 +14,9 @@ import uvicorn
 from bot import run_bot
 from dotenv import load_dotenv
 from fastapi import BackgroundTasks, FastAPI
-from fastapi.responses import RedirectResponse
+from fastapi.responses import FileResponse
 from loguru import logger
 from pipecat.transports.network.webrtc_connection import IceServer, SmallWebRTCConnection
-from pipecat_ai_small_webrtc_prebuilt.frontend import SmallWebRTCPrebuiltUI
 
 # Load environment variables
 load_dotenv(override=True)
@@ -32,14 +31,6 @@ ice_servers = [
         urls="stun:stun.l.google.com:19302",
     )
 ]
-
-# Mount the frontend at /
-app.mount("/client", SmallWebRTCPrebuiltUI)
-
-
-@app.get("/", include_in_schema=False)
-async def root_redirect():
-    return RedirectResponse(url="/client/")
 
 
 @app.post("/api/offer")
@@ -68,6 +59,11 @@ async def offer(request: dict, background_tasks: BackgroundTasks):
     pcs_map[answer["pc_id"]] = pipecat_connection
 
     return answer
+
+
+@app.get("/")
+async def serve_index():
+    return FileResponse("index.html")
 
 
 @asynccontextmanager

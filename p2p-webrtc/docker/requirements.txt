@@ -3,4 +3,3 @@ fastapi[all]
 uvicorn
 aiortc
 pipecat-ai[google,silero,webrtc]
-pipecat-ai-small-webrtc-prebuilt
