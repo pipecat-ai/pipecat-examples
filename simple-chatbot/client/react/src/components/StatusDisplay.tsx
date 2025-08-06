@@ -1,4 +1,4 @@
-import { usePipecatClientTransportState } from '@pipecat-ai/client-react';
+import { usePipecatClientTransportState } from "@pipecat-ai/client-react";
 
 export function StatusDisplay() {
   const transportState = usePipecatClientTransportState();
