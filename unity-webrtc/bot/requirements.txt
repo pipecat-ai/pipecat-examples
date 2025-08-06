@@ -1,0 +1,4 @@
+python-dotenv
+fastapi[all]
+uvicorn
+pipecat-ai[webrtc,google,websocket,daily,deepgram,cartesia,silero,runner]>=0.0.77

@@ -1,0 +1,98 @@
+#
+# Copyright (c) 2024–2025, Daily
+#
+# SPDX-License-Identifier: BSD 2-Clause License
+#
+
+import os
+
+from dotenv import load_dotenv
+from loguru import logger
+
+from pipecat.audio.vad.silero import SileroVADAnalyzer
+from pipecat.frames.frames import LLMMessagesAppendFrame
+from pipecat.pipeline.pipeline import Pipeline
+from pipecat.pipeline.runner import PipelineRunner
+from pipecat.pipeline.task import PipelineParams, PipelineTask
+from pipecat.services.gemini_multimodal_live.gemini import (
+    GeminiMultimodalLiveLLMService,
+)
+from pipecat.transports.base_transport import TransportParams
+from pipecat.transports.network.small_webrtc import SmallWebRTCTransport
+
+# Load environment variables
+load_dotenv(override=True)
+
+
+async def run_bot(webrtc_connection):
+    logger.info(f"Starting bot")
+
+    transport = SmallWebRTCTransport(
+        webrtc_connection=webrtc_connection,
+        params=TransportParams(
+            audio_in_enabled=True,
+            audio_out_enabled=True,
+            vad_analyzer=SileroVADAnalyzer(),
+            audio_out_10ms_chunks=2,
+        ),
+    )
+
+    # Create the Gemini Multimodal Live LLM service
+    system_instruction = """
+    You are a helpful AI assistant.
+    Your goal is to demonstrate your capabilities in a helpful and engaging way.
+    Your output will be converted to audio so don't include special characters in your answers.
+    Respond to what the user said in a creative and helpful way.
+    """
+
+    llm = GeminiMultimodalLiveLLMService(
+        api_key=os.getenv("GOOGLE_API_KEY"),
+        system_instruction=system_instruction,
+        voice_id="Puck",  # Aoede, Charon, Fenrir, Kore, Puck
+    )
+
+    # Build the pipeline
+    pipeline = Pipeline(
+        [
+            transport.input(),
+            llm,
+            transport.output(),
+        ]
+    )
+
+    # Configure the pipeline task
+    task = PipelineTask(
+        pipeline,
+        params=PipelineParams(
+            enable_metrics=True,
+            enable_usage_metrics=True,
+        ),
+    )
+
+    # Handle client connection event
+    @transport.event_handler("on_client_connected")
+    async def on_client_connected(transport, client):
+        logger.info(f"Client connected")
+        # Kick off the conversation.
+        await task.queue_frames(
+            [
+                LLMMessagesAppendFrame(
+                    messages=[
+                        {
+                            "role": "user",
+                            "content": f"Greet the user and introduce yourself.",
+                        }
+                    ]
+                )
+            ]
+        )
+
+    # Handle client disconnection events
+    @transport.event_handler("on_client_disconnected")
+    async def on_client_disconnected(transport, client):
+        logger.info(f"Client disconnected")
+        await task.cancel()
+
+    # Run the pipeline
+    runner = PipelineRunner(handle_sigint=False)
+    await runner.run(task)
