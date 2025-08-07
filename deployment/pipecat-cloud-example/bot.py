@@ -11,7 +11,7 @@ import aiohttp
 from dotenv import load_dotenv
 from loguru import logger
 from pipecat.audio.vad.silero import SileroVADAnalyzer
-from pipecat.frames.frames import LLMMessagesFrame
+from pipecat.frames.frames import LLMMessagesUpdateFrame
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineParams, PipelineTask
@@ -82,7 +82,7 @@ async def main(transport: DailyTransport):
                 "content": "Please start with 'Hello World' and introduce yourself to the user.",
             }
         )
-        await task.queue_frames([LLMMessagesFrame(messages)])
+        await task.queue_frames([LLMMessagesUpdateFrame(messages, run_llm=True)])
 
     @transport.event_handler("on_participant_left")
     async def on_participant_left(transport, participant, reason):
