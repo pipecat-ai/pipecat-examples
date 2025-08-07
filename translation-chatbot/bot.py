@@ -15,7 +15,7 @@ from loguru import logger
 from pipecat.audio.vad.silero import SileroVADAnalyzer
 from pipecat.frames.frames import (
     Frame,
-    LLMMessagesFrame,
+    LLMMessagesUpdateFrame,
     TranscriptionFrame,
     TranscriptionMessage,
     TranscriptionUpdateFrame,
@@ -73,14 +73,14 @@ class TranslationProcessor(FrameProcessor):
 
         if isinstance(frame, TranscriptionFrame):
             logger.debug(f"Translating {self._in_language}: {frame.text} to {self._out_language}")
-            context = [
+            messages = [
                 {
                     "role": "system",
                     "content": f"You will be provided with a sentence in {self._in_language}, and your task is to only translate it into {self._out_language}.",
                 },
                 {"role": "user", "content": frame.text},
             ]
-            await self.push_frame(LLMMessagesFrame(context))
+            await self.push_frame(LLMMessagesUpdateFrame(messages, run_llm=True))
         else:
             await self.push_frame(frame)
 

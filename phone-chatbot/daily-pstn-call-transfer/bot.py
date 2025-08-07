@@ -18,7 +18,7 @@ from pipecat.frames.frames import (
     BotStoppedSpeakingFrame,
     EndTaskFrame,
     Frame,
-    LLMMessagesFrame,
+    LLMMessagesAppendFrame,
     TranscriptionFrame,
 )
 from pipecat.pipeline.pipeline import Pipeline
@@ -305,8 +305,7 @@ async def run_bot(
             # Notify user that operator connection failed
             content = "I'm sorry, but I'm unable to connect you with a supervisor at this time. Please try again later or contact us through other means."
             message = {"role": "system", "content": content}
-            messages.append(message)
-            await task.queue_frames([LLMMessagesFrame(messages)])
+            await task.queue_frames([LLMMessagesAppendFrame([message], run_llm=True)])
 
     # ------------ LLM AND CONTEXT SETUP ------------
 
@@ -347,10 +346,9 @@ async def run_bot(
             "role": "system",
             "content": content,
         }
-        # Append the message to the list
-        messages.append(message)
+
         # Queue the message to the context
-        await task.queue_frames([LLMMessagesFrame(messages)])
+        await task.queue_frames([LLMMessagesAppendFrame([message], run_llm=True)])
 
         # Then end the call
         await params.llm.queue_frame(EndTaskFrame(), FrameDirection.UPSTREAM)
@@ -370,10 +368,8 @@ async def run_bot(
                 "content": content,
             }
 
-            # Append the message to the list
-            messages.append(message)
             # Queue the message to the context
-            await task.queue_frames([LLMMessagesFrame(messages)])
+            await task.queue_frames([LLMMessagesAppendFrame([message], run_llm=True)])
 
             # Set up dialout parameters and start attempt
             dialout_params = {"phoneNumber": operator_number}
@@ -387,10 +383,9 @@ async def run_bot(
                 "role": "system",
                 "content": content,
             }
-            # Append the message to the list
-            messages.append(message)
+
             # Queue the message to the context
-            await task.queue_frames([LLMMessagesFrame(messages)])
+            await task.queue_frames([LLMMessagesAppendFrame([message], run_llm=True)])
             logger.info("No operator dialout settings available")
 
     # Define function schemas for tools
@@ -496,8 +491,7 @@ async def run_bot(
             "role": "system",
             "content": content,
         }
-        messages.append(message)
-        await task.queue_frames([LLMMessagesFrame(messages)])
+        await task.queue_frames([LLMMessagesAppendFrame([message], run_llm=True)])
 
     @transport.event_handler("on_dialout_connected")
     async def on_dialout_connected(transport, data):
@@ -545,8 +539,7 @@ async def run_bot(
             "role": "system",
             "content": content,
         }
-        messages.append(message)
-        await task.queue_frames([LLMMessagesFrame(messages)])
+        await task.queue_frames([LLMMessagesAppendFrame([message], run_llm=True)])
 
     # ------------ RUN PIPELINE ------------
 
