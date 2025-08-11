@@ -96,7 +96,7 @@ class TalkingAnimation(FrameProcessor):
         await self.push_frame(frame, direction)
 
 
-async def run_bot(transport: BaseTransport):
+async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     """Main bot execution function.
 
     Sets up and runs the bot pipeline including:
@@ -105,6 +105,12 @@ async def run_bot(transport: BaseTransport):
     - Animation processing
     - RTVI event handling
     """
+
+    # You can receive custom body data from the client, which is accessed
+    # here as runner_args.body. You can use this to pass in any custom data
+    # you need for your bot, such as a custom prompt or other configuration.
+    body = runner_args.body
+    logger.info(f"Body: {body}")
 
     # Initialize the Gemini Multimodal Live model
     llm = GeminiMultimodalLiveLLMService(
@@ -177,12 +183,22 @@ async def run_bot(transport: BaseTransport):
 async def bot(runner_args: RunnerArguments):
     """Main bot entry point compatible with Pipecat Cloud."""
 
+    transport = None
+
+    if os.environ.get("ENV") != "local":
+        from pipecat.audio.filters.krisp_filter import KrispFilter
+
+        krisp_filter = KrispFilter()
+    else:
+        krisp_filter = None
+
     transport = DailyTransport(
         runner_args.room_url,
         runner_args.token,
         "Pipecat Bot",
         params=DailyParams(
             audio_in_enabled=True,
+            audio_in_filter=krisp_filter,
             audio_out_enabled=True,
             video_out_enabled=True,
             video_out_width=1024,
@@ -192,7 +208,16 @@ async def bot(runner_args: RunnerArguments):
         ),
     )
 
-    await run_bot(transport)
+    if transport is None:
+        logger.error("Failed to create transport")
+        return
+
+    try:
+        await run_bot(transport, runner_args)
+        logger.info("Bot process completed")
+    except Exception as e:
+        logger.exception(f"Error in bot process: {str(e)}")
+        raise
 
 
 if __name__ == "__main__":

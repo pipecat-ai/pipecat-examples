@@ -1,1 +1,1 @@
-pipecat-ai[daily,elevenlabs,openai,silero,google,runner]>=0.0.77
+pipecat-ai[daily,elevenlabs,openai,silero,google,runner]>=0.0.79
