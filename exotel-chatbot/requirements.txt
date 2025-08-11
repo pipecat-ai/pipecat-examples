@@ -1,0 +1,1 @@
+pipecat-ai[openai,silero,deepgram,cartesia,runner]>=0.0.79
