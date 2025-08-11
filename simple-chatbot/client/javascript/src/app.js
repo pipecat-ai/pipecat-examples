@@ -328,8 +328,8 @@ class ChatbotClient {
     try {
       // Connect to the bot
       this.log('Connecting to bot...');
-      await this.pcClient.connect({
-        endpoint: 'http://localhost:7860/connect',
+      await this.pcClient.startBotAndConnect({
+        endpoint: 'http://localhost:7860/start',
         timeout: 25000,
       });
 
