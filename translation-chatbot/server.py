@@ -10,10 +10,13 @@ import subprocess
 from contextlib import asynccontextmanager
 
 import aiohttp
+from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, RedirectResponse
 from pipecat.transports.services.helpers.daily_rest import DailyRESTHelper, DailyRoomParams
+
+load_dotenv(override=True)
 
 MAX_BOTS_PER_ROOM = 1
 
