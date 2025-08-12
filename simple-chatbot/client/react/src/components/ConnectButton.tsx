@@ -18,7 +18,9 @@ export function ConnectButton() {
       if (isConnected) {
         await client.disconnect();
       } else {
-        await client.connect({ endpoint: 'http://localhost:7860/connect' });
+        await client.startBotAndConnect({
+          endpoint: 'http://localhost:7860/start',
+        });
       }
     } catch (error) {
       console.error('Connection error:', error);
