@@ -168,16 +168,15 @@ export const App = ({ connectParams, transportType }: AppProps) => {
                   </div>
                   <div className="absolute bottom-32 left-1/2 transform -translate-x-1/2">
                     <button
-                      onMouseDown={handlePushToTalk}
-                      onMouseUp={handlePushToTalk}
+                      onClick={handlePushToTalk}
                       className={`px-8 py-4 rounded-full font-semibold transition-all duration-200 select-none ${
                         pushToTalkState === 'talking'
                           ? 'bg-red-500 text-white shadow-lg scale-105'
                           : 'bg-blue-500 hover:bg-blue-600 text-white shadow-md'
                       }`}>
                       {pushToTalkState === 'talking'
-                        ? 'Release to Send'
-                        : 'Hold to Talk'}
+                        ? 'Click to Stop'
+                        : 'Click to Talk'}
                     </button>
                   </div>
                 </>
