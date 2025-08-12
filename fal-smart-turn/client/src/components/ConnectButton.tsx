@@ -24,7 +24,7 @@ export function ConnectButton() {
       if (isConnected) {
         await client.disconnect();
       } else {
-        await client.connect({
+        await client.startBotAndConnect({
           endpoint: `${API_BASE_URL}/connect`,
           requestData: { foo: 'bar' },
         });

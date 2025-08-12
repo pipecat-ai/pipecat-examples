@@ -45,7 +45,7 @@ export function useConnectionState(
       if (isConnected) {
         await client.disconnect();
       } else {
-        await client.connect({
+        await client.startBotAndConnect({
           endpoint: `${API_BASE_URL}/connect`,
           requestData: {
             personality: config.personality,

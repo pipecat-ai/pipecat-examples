@@ -187,7 +187,7 @@ class WebsocketClientApp {
       await this.pcClient.initDevices();
 
       this.log('Connecting to bot...');
-      await this.pcClient.connect({
+      await this.pcClient.startBotAndConnect({
         // The baseURL and endpoint of your bot server that the client will connect to
         endpoint: 'http://localhost:7860/connect',
       });

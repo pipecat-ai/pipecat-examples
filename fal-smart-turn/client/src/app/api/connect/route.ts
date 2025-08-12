@@ -30,10 +30,7 @@ export async function POST(request: NextRequest) {
     const data = await response.json();
 
     // Transform the response to match what RTVI client expects
-    return NextResponse.json({
-      room_url: data.dailyRoom,
-      token: data.dailyToken,
-    });
+    return NextResponse.json(data);
   } catch (error) {
     console.error('API error:', error);
     return NextResponse.json(
