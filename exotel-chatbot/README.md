@@ -26,7 +26,6 @@ This project is a FastAPI-based chatbot that integrates with Exotel to handle We
 
 ## Requirements
 
-- Python 3.10
 - Docker (for containerized deployment)
 - ngrok (for tunneling)
 - Exotel Account with voice streaming enabled
@@ -54,7 +53,7 @@ This project is a FastAPI-based chatbot that integrates with Exotel to handle We
    ```
 
 4. **Install ngrok**:
-   Follow the instructions on the [ngrok website](https://ngrok.com/download) to download and install ngrok.
+   Follow the instructions on the [ngrok website](https://ngrok.com/download) to download and install ngrok. ngrok is used for development only.
 
 ## Configure Exotel App Bazaar Application
 

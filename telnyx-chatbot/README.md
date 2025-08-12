@@ -24,7 +24,6 @@ This project is a FastAPI-based chatbot that integrates with Telnyx to handle We
 
 ## Requirements
 
-- Python 3.10
 - Docker (for containerized deployment)
 - ngrok (for tunneling)
 - Telnyx Account
@@ -52,7 +51,7 @@ This project is a FastAPI-based chatbot that integrates with Telnyx to handle We
    ```
 
 4. **Install ngrok**:
-   Follow the instructions on the [ngrok website](https://ngrok.com/download) to download and install ngrok.
+   Follow the instructions on the [ngrok website](https://ngrok.com/download) to download and install ngrok. ngrok is used for development only.
 
 ## Configure Telnyx TeXML application
 
