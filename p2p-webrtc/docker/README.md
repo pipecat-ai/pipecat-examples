@@ -40,6 +40,13 @@ docker run --rm \
   --name small-webrtc-bot \
   small-webrtc-bot:latest
 ```
+> ⚠️ **Port Range Limitation**
+>
+> `SmallWebRTCConnection` uses aiortc, which relies on aioice for ICE transport. There is a known limitation ([aiortc/aioice#47](https://github.com/aiortc/aioice/issues/47)) where port control for `gather_candidates` is not fully supported. The Docker configuration above provides a Linux-specific workaround by:
+> 1. Limiting the ephemeral port range the container can use (`--sysctl net.ipv4.ip_local_port_range`)
+> 2. Explicitly exposing only those allowed ports (`-p 40000-40100:40000-40100/udp`)
+>
+> This ensures predictable port usage for WebRTC connections on Linux.
 
 #### 🍏 **macOS (and Windows via Docker Desktop)**
 
