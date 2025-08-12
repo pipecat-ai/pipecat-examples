@@ -66,7 +66,7 @@ class WebsocketClientApp {
   private ENABLE_RECORDING_MODE = false;
   private RECORDING_TIME_MS = 10000;
 
-  private rtviClient: PipecatClient | null = null;
+  private pcClient: PipecatClient | null = null;
   private connectBtn: HTMLButtonElement | null = null;
   private disconnectBtn: HTMLButtonElement | null = null;
   private statusSpan: HTMLElement | null = null;
@@ -152,8 +152,8 @@ class WebsocketClientApp {
    * This is called when the bot is ready or when the transport state changes to ready
    */
   setupMediaTracks() {
-    if (!this.rtviClient) return;
-    const tracks = this.rtviClient.tracks();
+    if (!this.pcClient) return;
+    const tracks = this.pcClient.tracks();
     if (tracks.bot?.audio) {
       this.setupAudioTrack(tracks.bot.audio);
     }
@@ -164,10 +164,10 @@ class WebsocketClientApp {
    * This handles new tracks being added during the session
    */
   setupTrackListeners() {
-    if (!this.rtviClient) return;
+    if (!this.pcClient) return;
 
     // Listen for new tracks starting
-    this.rtviClient.on(RTVIEvent.TrackStarted, (track, participant) => {
+    this.pcClient.on(RTVIEvent.TrackStarted, (track, participant) => {
       // Only handle non-local (bot) tracks
       if (!participant?.local && track.kind === 'audio') {
         this.setupAudioTrack(track);
@@ -175,7 +175,7 @@ class WebsocketClientApp {
     });
 
     // Listen for tracks stopping
-    this.rtviClient.on(RTVIEvent.TrackStopped, (track, participant) => {
+    this.pcClient.on(RTVIEvent.TrackStopped, (track, participant) => {
       this.log(
         `Track stopped: ${track.kind} from ${participant?.name || 'unknown'}`
       );
@@ -245,15 +245,15 @@ class WebsocketClientApp {
           onError: (error) => console.error('Error:', error),
         },
       };
-      this.rtviClient = new PipecatClient(RTVIConfig);
-      this.websocketTransport = this.rtviClient.transport as WebSocketTransport;
+      this.pcClient = new PipecatClient(RTVIConfig);
+      this.websocketTransport = this.pcClient.transport as WebSocketTransport;
       this.setupTrackListeners();
 
       this.log('Initializing devices...');
-      await this.rtviClient.initDevices();
+      await this.pcClient.initDevices();
 
       this.log('Connecting to bot...');
-      await this.rtviClient.connect({
+      await this.pcClient.startBotAndConnect({
         endpoint: 'http://localhost:7860/connect',
       });
 
@@ -270,16 +270,16 @@ class WebsocketClientApp {
         await this.sleep(this.RECORDING_TIME_MS);
         this.recordingSerializer.stopRecording();
         this.log('Recording stopped');
-        this.rtviClient.enableMic(false);
+        this.pcClient.enableMic(false);
         this.startSendingRecordedAudio();
       }
     } catch (error) {
       this.log(`Error connecting: ${(error as Error).message}`);
       this.updateStatus('Error');
       // Clean up if there's an error
-      if (this.rtviClient) {
+      if (this.pcClient) {
         try {
-          await this.rtviClient.disconnect();
+          await this.pcClient.disconnect();
         } catch (disconnectError) {
           this.log(`Error during disconnect: ${disconnectError}`);
         }
@@ -291,11 +291,11 @@ class WebsocketClientApp {
    * Disconnect from the bot and clean up media resources
    */
   public async disconnect(): Promise<void> {
-    if (this.rtviClient) {
+    if (this.pcClient) {
       try {
         this.stopSendingRecordedAudio();
-        await this.rtviClient.disconnect();
-        this.rtviClient = null;
+        await this.pcClient.disconnect();
+        this.pcClient = null;
         if (
           this.botAudio.srcObject &&
           'getAudioTracks' in this.botAudio.srcObject

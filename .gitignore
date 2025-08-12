@@ -31,19 +31,20 @@ MANIFEST
 fly.toml
 
 # Examples
-examples/telnyx-chatbot/templates/streams.xml
-examples/twilio-chatbot/templates/streams.xml
-examples/**/node_modules/
-examples/**/.expo/
-examples/**/dist/
-examples/**/npm-debug.*
-examples/**/*.jks
-examples/**/*.p8
-examples/**/*.p12
-examples/**/*.key
-examples/**/*.mobileprovision
-examples/**/*.orig.*
-examples/**/web-build/
+telnyx-chatbot/templates/streams.xml
+twilio-chatbot/templates/streams.xml
+twilio-chatbot/server*.wav
+**/node_modules/
+**/.expo/
+**/dist/
+**/npm-debug.*
+**/*.jks
+**/*.p8
+**/*.p12
+**/*.key
+**/*.mobileprovision
+**/*.orig.*
+**/web-build/
 
 # macOS
 .DS_Store

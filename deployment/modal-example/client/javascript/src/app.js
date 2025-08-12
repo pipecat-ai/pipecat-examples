@@ -313,7 +313,7 @@ class ChatbotClient {
 
       // Connect to the bot
       this.log(`Connecting to bot: ${selectedBot}`);
-      await this.pcClient.connect({
+      await this.pcClient.startBotAndConnect({
         // REPLACE WITH YOUR MODAL URL ENDPOINT
         endpoint:
           'https://<your-workspace>--pipecat-modal-fastapi-app.modal.run/connect',

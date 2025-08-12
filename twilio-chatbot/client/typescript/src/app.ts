@@ -9,7 +9,9 @@ import {
   Participant,
   PipecatClient,
   PipecatClientOptions,
-  RTVIEvent, RTVIMessage, TranscriptData,
+  RTVIEvent,
+  RTVIMessage,
+  TranscriptData,
 } from '@pipecat-ai/client-js';
 import {
   WebSocketTransport,
@@ -124,19 +126,25 @@ class WebsocketClientApp {
     if (!this.rtviClient) return;
 
     // Listen for new tracks starting
-    this.rtviClient.on(RTVIEvent.TrackStarted, (track: MediaStreamTrack, participant?: Participant) => {
-      // Only handle non-local (bot) tracks
-      if (!participant?.local && track.kind === 'audio') {
-        this.setupAudioTrack(track);
+    this.rtviClient.on(
+      RTVIEvent.TrackStarted,
+      (track: MediaStreamTrack, participant?: Participant) => {
+        // Only handle non-local (bot) tracks
+        if (!participant?.local && track.kind === 'audio') {
+          this.setupAudioTrack(track);
+        }
       }
-    });
+    );
 
     // Listen for tracks stopping
-    this.rtviClient.on(RTVIEvent.TrackStopped, (track: MediaStreamTrack, participant?: Participant) => {
-      this.log(
-        `Track stopped: ${track.kind} from ${participant?.name || 'unknown'}`
-      );
-    });
+    this.rtviClient.on(
+      RTVIEvent.TrackStopped,
+      (track: MediaStreamTrack, participant?: Participant) => {
+        this.log(
+          `Track stopped: ${track.kind} from ${participant?.name || 'unknown'}`
+        );
+      }
+    );
   }
 
   /**
@@ -167,9 +175,9 @@ class WebsocketClientApp {
         serializer: new TwilioSerializer(),
         recorderSampleRate: 8000,
         playerSampleRate: 8000,
-        ws_url: 'http://localhost:8765/ws',
+        wsUrl: 'http://localhost:8765/ws',
       };
-      const RTVIConfig: PipecatClientOptions = {
+      const pcConfig: PipecatClientOptions = {
         transport: new WebSocketTransport(ws_opts),
         enableMic: true,
         enableCam: false,
@@ -195,12 +203,14 @@ class WebsocketClientApp {
               this.log(`User: ${data.text}`);
             }
           },
-          onBotTranscript: (data: BotLLMTextData) => this.log(`Bot: ${data.text}`),
-          onMessageError: (error: RTVIMessage) => console.error('Message error:', error),
+          onBotTranscript: (data: BotLLMTextData) =>
+            this.log(`Bot: ${data.text}`),
+          onMessageError: (error: RTVIMessage) =>
+            console.error('Message error:', error),
           onError: (error: RTVIMessage) => console.error('Error:', error),
         },
       };
-      this.rtviClient = new PipecatClient(RTVIConfig);
+      this.rtviClient = new PipecatClient(pcConfig);
       this.setupTrackListeners();
 
       this.log('Initializing devices...');
