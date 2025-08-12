@@ -4,17 +4,24 @@
 # SPDX-License-Identifier: BSD 2-Clause License
 #
 
+import asyncio
 import os
+from typing import Optional
 
 from dotenv import load_dotenv
 from loguru import logger
 from pipecat.audio.vad.silero import SileroVADAnalyzer
 from pipecat.frames.frames import (
+    BotInterruptionFrame,
+    CancelFrame,
+    EndFrame,
     Frame,
     InputAudioRawFrame,
+    InterimTranscriptionFrame,
     StartFrame,
     StartInterruptionFrame,
     StopInterruptionFrame,
+    TranscriptionFrame,
     UserStartedSpeakingFrame,
 )
 from pipecat.pipeline.pipeline import Pipeline
@@ -33,6 +40,8 @@ from pipecat.runner.utils import create_transport
 from pipecat.services.cartesia.tts import CartesiaTTSService
 from pipecat.services.deepgram.stt import DeepgramSTTService
 from pipecat.services.openai.llm import OpenAILLMService
+from pipecat.sync.base_notifier import BaseNotifier
+from pipecat.sync.event_notifier import EventNotifier
 from pipecat.transports.base_transport import BaseTransport, TransportParams
 from pipecat.transports.network.fastapi_websocket import FastAPIWebsocketParams
 from pipecat.transports.services.daily import DailyParams
@@ -62,8 +71,9 @@ transport_params = {
 
 
 class PushToTalkGate(FrameProcessor):
-    def __init__(self):
+    def __init__(self, flush_notifier: BaseNotifier):
         super().__init__()
+        self._flush_notifier = flush_notifier
         self._gate_opened = False
 
     async def process_frame(self, frame: Frame, direction: FrameDirection):
@@ -73,7 +83,7 @@ class PushToTalkGate(FrameProcessor):
             await self.push_frame(frame, direction)
 
         elif isinstance(frame, RTVIClientMessageFrame):
-            self._handle_rtvi_frame(frame)
+            await self._handle_rtvi_frame(frame)
             await self.push_frame(frame, direction)
 
         # If the gate is closed, suppress all audio frames until the user releases the button
@@ -92,15 +102,75 @@ class PushToTalkGate(FrameProcessor):
         else:
             await self.push_frame(frame, direction)
 
-    def _handle_rtvi_frame(self, frame: RTVIClientMessageFrame):
+    async def _handle_rtvi_frame(self, frame: RTVIClientMessageFrame):
         if frame.type == "push_to_talk" and frame.data:
             data = frame.data
             if data.get("state") == "start":
                 self._gate_opened = True
+                # Push a bot interruption frame to the upstream pipeline
+                # This causes the bot to stop speaking and wait for the user to push the button again
+                await self.push_frame(BotInterruptionFrame(), FrameDirection.UPSTREAM)
                 logger.info("Input gate opened - user started talking")
             elif data.get("state") == "stop":
                 self._gate_opened = False
+                await self._flush_notifier.notify()
                 logger.info("Input gate closed - user stopped talking")
+
+
+class STTBuffer(FrameProcessor):
+    def __init__(self, flush_notifier: BaseNotifier):
+        super().__init__()
+        self._buffer = []
+        self._flush_notifier = flush_notifier
+        self._notify_task: Optional[asyncio.Task] = None
+
+    async def process_frame(self, frame: Frame, direction: FrameDirection):
+        await super().process_frame(frame, direction)
+
+        if isinstance(frame, StartFrame):
+            # Start the wait_for_notify task
+            if self._notify_task is None or self._notify_task.done():
+                self._notify_task = asyncio.create_task(self._wait_for_notify())
+            await self.push_frame(frame, direction)
+
+        elif isinstance(frame, (EndFrame, CancelFrame)):
+            # Stop the wait_for_notify task
+            if self._notify_task and not self._notify_task.done():
+                self._notify_task.cancel()
+                try:
+                    await self._notify_task
+                except asyncio.CancelledError:
+                    pass
+                self._notify_task = None
+            await self.push_frame(frame, direction)
+
+        elif isinstance(frame, (InterimTranscriptionFrame, TranscriptionFrame)):
+            # Buffer the transcription frame
+            self._buffer.append(frame)
+            logger.debug(f"Buffered transcription: {frame.text}")
+
+        else:
+            await self.push_frame(frame, direction)
+
+    async def _wait_for_notify(self):
+        """Wait for flush notification and then flush the buffer."""
+        try:
+            while True:
+                await self._flush_notifier.wait()
+                await self._flush_buffer()
+        except asyncio.CancelledError:
+            logger.debug("STTBuffer notify task cancelled")
+            raise
+
+    async def _flush_buffer(self):
+        """Flush all buffered transcription frames."""
+        if self._buffer:
+            logger.info(f"Flushing {len(self._buffer)} transcription frames")
+            for frame in self._buffer:
+                await self.push_frame(frame, FrameDirection.DOWNSTREAM)
+            self._buffer.clear()
+        else:
+            logger.debug("No transcription frames to flush")
 
 
 async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
@@ -115,7 +185,10 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
 
     llm = OpenAILLMService(api_key=os.getenv("OPENAI_API_KEY"))
 
-    push_to_talk_gate = PushToTalkGate()
+    flush_notifier = EventNotifier()
+
+    push_to_talk_gate = PushToTalkGate(flush_notifier)
+    stt_buffer = STTBuffer(flush_notifier)
 
     rtvi = RTVIProcessor(config=RTVIConfig(config=[]))
 
@@ -135,6 +208,7 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
             rtvi,
             push_to_talk_gate,
             stt,
+            stt_buffer,  # Buffer transcriptions until button is released
             context_aggregator.user(),  # User responses
             llm,  # LLM
             tts,  # TTS
