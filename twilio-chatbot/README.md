@@ -20,7 +20,6 @@ This project is a FastAPI-based chatbot that integrates with Twilio to handle We
 
 ## Requirements
 
-- Python 3.10
 - Docker (for containerized deployment)
 - ngrok (for tunneling)
 - Twilio Account
@@ -48,7 +47,7 @@ This project is a FastAPI-based chatbot that integrates with Twilio to handle We
    ```
 
 4. **Install ngrok**:
-   Follow the instructions on the [ngrok website](https://ngrok.com/download) to download and install ngrok.
+   Follow the instructions on the [ngrok website](https://ngrok.com/download) to download and install ngrok. ngrok is used for development only.
 
 ## Configure Twilio URLs
 
@@ -111,5 +110,6 @@ To start a call, simply make a call to your configured Twilio phone number. The 
 ## Testing
 
 It is also possible to test the server without making phone calls by using one of these clients.
-- [python](client/python/README.md): This Python client enables automated testing of the server via WebSocket without the need to make actual phone calls. 
+
+- [python](client/python/README.md): This Python client enables automated testing of the server via WebSocket without the need to make actual phone calls.
 - [typescript](client/typescript/README.md): This typescript client enables manual testing of the server via WebSocket without the need to make actual phone calls.
