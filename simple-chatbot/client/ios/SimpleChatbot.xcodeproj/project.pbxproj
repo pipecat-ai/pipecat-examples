@@ -15,6 +15,8 @@
 		90031FC22C616EE900408370 /* SimpleChatbotUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90031FC12C616EE900408370 /* SimpleChatbotUITests.swift */; };
 		90031FC42C616EE900408370 /* SimpleChatbotUITestsLaunchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90031FC32C616EE900408370 /* SimpleChatbotUITestsLaunchTests.swift */; };
 		90031FDC2C6D5DD700408370 /* ToastModifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90031FDB2C6D5DD700408370 /* ToastModifier.swift */; };
+		902DB3172E4BD22200FEF1DE /* PipecatClientIOSDaily in Frameworks */ = {isa = PBXBuildFile; productRef = 902DB3162E4BD22200FEF1DE /* PipecatClientIOSDaily */; };
+		902DB31A2E4BD24600FEF1DE /* PipecatClientIOSDaily in Frameworks */ = {isa = PBXBuildFile; productRef = 902DB3192E4BD24600FEF1DE /* PipecatClientIOSDaily */; };
 		90ABB98E2C735ED6000D9CC7 /* MeetingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90ABB98D2C735ED6000D9CC7 /* MeetingView.swift */; };
 		90ABB9902C736A8B000D9CC7 /* WaveformView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90ABB98F2C736A8B000D9CC7 /* WaveformView.swift */; };
 		90ABB9932C73820D000D9CC7 /* MicrophoneView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90ABB9922C73820D000D9CC7 /* MicrophoneView.swift */; };
@@ -25,7 +27,7 @@
 		90ABB9A62C74EA8A000D9CC7 /* SettingsPreference.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90ABB9A52C74EA8A000D9CC7 /* SettingsPreference.swift */; };
 		90ABB9A82C74EAB1000D9CC7 /* SettingsManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90ABB9A72C74EAB1000D9CC7 /* SettingsManager.swift */; };
 		90CC98B02E158093003C2706 /* PipecatClientIOSDaily in Frameworks */ = {isa = PBXBuildFile; productRef = 90CC98AF2E158093003C2706 /* PipecatClientIOSDaily */; };
-		90CC98B62E15820B003C2706 /* PipecatClientIOSDaily in Frameworks */ = {isa = PBXBuildFile; productRef = 90CC98B52E15820B003C2706 /* PipecatClientIOSDaily */; };
+		90EB04752E469E6C00560870 /* PipecatClientIOSDaily in Frameworks */ = {isa = PBXBuildFile; productRef = 90EB04742E469E6C00560870 /* PipecatClientIOSDaily */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -74,7 +76,9 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				90CC98B62E15820B003C2706 /* PipecatClientIOSDaily in Frameworks */,
+				902DB31A2E4BD24600FEF1DE /* PipecatClientIOSDaily in Frameworks */,
+				90EB04752E469E6C00560870 /* PipecatClientIOSDaily in Frameworks */,
+				902DB3172E4BD22200FEF1DE /* PipecatClientIOSDaily in Frameworks */,
 				90CC98B02E158093003C2706 /* PipecatClientIOSDaily in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -221,7 +225,9 @@
 			name = SimpleChatbot;
 			packageProductDependencies = (
 				90CC98AF2E158093003C2706 /* PipecatClientIOSDaily */,
-				90CC98B52E15820B003C2706 /* PipecatClientIOSDaily */,
+				90EB04742E469E6C00560870 /* PipecatClientIOSDaily */,
+				902DB3162E4BD22200FEF1DE /* PipecatClientIOSDaily */,
+				902DB3192E4BD24600FEF1DE /* PipecatClientIOSDaily */,
 			);
 			productName = SimpleChatbot;
 			productReference = 90031FA32C616EE700408370 /* SimpleChatbot.app */;
@@ -296,7 +302,7 @@
 			);
 			mainGroup = 90031F9A2C616EE700408370;
 			packageReferences = (
-				90CC98B42E15820B003C2706 /* XCRemoteSwiftPackageReference "pipecat-client-ios-daily" */,
+				902DB3182E4BD24600FEF1DE /* XCRemoteSwiftPackageReference "pipecat-client-ios-daily" */,
 			);
 			productRefGroup = 90031FA42C616EE700408370 /* Products */;
 			projectDirPath = "";
@@ -685,24 +691,32 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
-		90CC98B42E15820B003C2706 /* XCRemoteSwiftPackageReference "pipecat-client-ios-daily" */ = {
+		902DB3182E4BD24600FEF1DE /* XCRemoteSwiftPackageReference "pipecat-client-ios-daily" */ = {
 			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/pipecat-ai/pipecat-client-ios-daily/";
+			repositoryURL = "https://github.com/pipecat-ai/pipecat-client-ios-daily";
 			requirement = {
 				kind = upToNextMajorVersion;
-				minimumVersion = 0.3.6;
+				minimumVersion = 0.3.7;
 			};
 		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		902DB3162E4BD22200FEF1DE /* PipecatClientIOSDaily */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = PipecatClientIOSDaily;
+		};
+		902DB3192E4BD24600FEF1DE /* PipecatClientIOSDaily */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 902DB3182E4BD24600FEF1DE /* XCRemoteSwiftPackageReference "pipecat-client-ios-daily" */;
+			productName = PipecatClientIOSDaily;
+		};
 		90CC98AF2E158093003C2706 /* PipecatClientIOSDaily */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = PipecatClientIOSDaily;
 		};
-		90CC98B52E15820B003C2706 /* PipecatClientIOSDaily */ = {
+		90EB04742E469E6C00560870 /* PipecatClientIOSDaily */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 90CC98B42E15820B003C2706 /* XCRemoteSwiftPackageReference "pipecat-client-ios-daily" */;
 			productName = PipecatClientIOSDaily;
 		};
 /* End XCSwiftPackageProductDependency section */
