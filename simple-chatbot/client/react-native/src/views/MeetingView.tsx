@@ -21,24 +21,13 @@ import CustomButton from '../theme/CustomButton';
 
 const MeetingView: React.FC = () => {
 
-  const { leave, toggleMicInput, toggleCamInput, timerCountDown } = useVoiceClient();
-
-  const timerString = (count: number): string => {
-    const hours = Math.floor(count / 3600);
-    const minutes = Math.floor((count % 3600) / 60);
-    const seconds = count % 60;
-    return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-  };
+  const { leave, toggleMicInput } = useVoiceClient();
 
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.container}>
         <View style={styles.header}>
           <Image source={Images.dailyBot} style={styles.botImage} />
-          <View style={styles.timerContainer}>
-            <MaterialIcons name="timelapse" size={24} color="black" />
-            <Text style={styles.timerText}>{timerString(timerCountDown)}</Text>
-          </View>
         </View>
 
         <View style={styles.mainPanel}>
@@ -85,19 +74,6 @@ const styles = StyleSheet.create({
   botImage: {
     width: 48,
     height: 48,
-  },
-  timerContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.timer,
-    padding: 10,
-    borderRadius: 12,
-  },
-  timerText: {
-    color: 'black',
-    fontWeight: '500',
-    fontSize: 18,
-    marginLeft: 5,
   },
   mainPanel: {
     flex: 1,

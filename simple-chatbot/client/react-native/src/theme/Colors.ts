@@ -6,7 +6,6 @@ type ColorsType = {
   backgroundApp: string;
   buttonsBorder: string;
   micVolume: string;
-  timer: string;
   disabledMic: string;
   disabledVision: string;
 };
@@ -19,7 +18,6 @@ const Colors: ColorsType = {
   backgroundApp: '#F9FAFB',
   buttonsBorder: '#E5E7EB',
   micVolume: '#86EFAC',
-  timer: '#E5E7EB',
   disabledMic: '#ee6b6e',
   disabledVision: '#BBF7D0',
 };
