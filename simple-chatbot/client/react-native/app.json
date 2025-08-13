@@ -54,7 +54,6 @@
       "favicon": "./assets/images/pipecat.png"
     },
     "plugins": [
-      "@config-plugins/react-native-webrtc",
       "@daily-co/config-plugin-rn-daily-js",
       [
         "expo-build-properties",

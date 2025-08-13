@@ -1,12 +1,12 @@
 import React, { createContext, useState, useContext, ReactNode, useCallback, useMemo, useRef, useEffect } from 'react'
 import Toast from 'react-native-toast-message'
 import { RNDailyTransport } from '@pipecat-ai/react-native-daily-transport'
-import { RTVIClient, TransportState, RTVIMessage, Participant } from '@pipecat-ai/client-js'
+import { PipecatClient, TransportState, Participant } from '@pipecat-ai/client-js'
 import { MediaStreamTrack } from '@daily-co/react-native-webrtc'
 import { SettingsManager } from '../settings/SettingsManager';
 
 interface VoiceClientContextProps {
-  voiceClient: RTVIClient | null
+  voiceClient: PipecatClient | null
   inCall: boolean
   currentState: string
   botReady: boolean
@@ -15,7 +15,6 @@ interface VoiceClientContextProps {
   isMicEnabled: boolean
   isCamEnabled: boolean
   videoTrack?: MediaStreamTrack
-  timerCountDown: number
   // methods
   start: (url: string) => Promise<void>
   leave: () => void
@@ -30,7 +29,8 @@ interface VoiceClientProviderProps {
 }
 
 export const VoiceClientProvider: React.FC<VoiceClientProviderProps> = ({ children }) => {
-  const [voiceClient, setVoiceClient] = useState<RTVIClient | null>(null)
+
+  const [voiceClient, setVoiceClient] = useState<PipecatClient | null>(null)
   const [inCall, setInCall] = useState<boolean>(false)
   const [currentState, setCurrentState] = useState<TransportState>("disconnected")
   const [botReady, setBotReady] = useState<boolean>(false)
@@ -39,24 +39,7 @@ export const VoiceClientProvider: React.FC<VoiceClientProviderProps> = ({ childr
   const [videoTrack, setVideoTrack] = useState<MediaStreamTrack>()
   const [localAudioLevel, setLocalAudioLevel] = useState<number>(0)
   const [remoteAudioLevel, setRemoteAudioLevel] = useState<number>(0)
-  const [timerCountDown, setTimerCountDown] = useState<number>(0)
-
   const botSpeakingRef = useRef(false)
-  let meetingTimer: NodeJS.Timeout | null
-
-  const createVoiceClient = useCallback((url: string): RTVIClient => {
-    return new RTVIClient({
-      transport: new RNDailyTransport(),
-      params: {
-        baseUrl: url,
-        endpoints: {
-          connect: "/connect"
-        }
-      },
-      enableMic: true,
-      enableCam: false
-    })
-  }, [])
 
   const handleError = useCallback((error: any) => {
     console.log("Error occurred:", error)
@@ -67,68 +50,65 @@ export const VoiceClientProvider: React.FC<VoiceClientProviderProps> = ({ childr
     })
   }, [])
 
-  const setupListeners = useCallback((voiceClient: RTVIClient): void => {
-    const inCallStates = new Set(["authenticating", "connecting", "connected", "ready"])
-
-    voiceClient
-      .on("transportStateChanged", (state: TransportState) => {
-        setCurrentState(voiceClient.state)
-        setInCall(inCallStates.has(state))
-      })
-      .on("error", (error: RTVIMessage) => {
-        handleError(error)
-      })
-      .on("botReady", () => {
-        setBotReady(true)
-        let expirationTime = voiceClient.transportExpiry
-        if (expirationTime) {
-          startTimer(expirationTime)
-        }
-      })
-      .on("disconnected", () => {
-        setBotReady(false)
-        stopTimer()
-        setIsMicEnabled(false)
-        setIsCamEnabled(false)
-      })
-      .on("localAudioLevel", (level: number) => {
+  const createVoiceClient = useCallback((): PipecatClient => {
+    const inCallStates = new Set(["authenticating", "authenticated", "connecting", "connected", "ready"])
+    const client = new PipecatClient({
+      transport: new RNDailyTransport(),
+      enableMic: true,
+      enableCam: false,
+      callbacks: {
+        onTransportStateChanged: (state) => {
+          setCurrentState(state)
+          setInCall(inCallStates.has(state))
+        },
+        onError: (error) => {
+          handleError(error)
+        },
+        onBotReady: () => {
+          setBotReady(true)
+        },
+        onDisconnected: () => {
+          setBotReady(false)
+          setIsMicEnabled(false)
+          setIsCamEnabled(false)
+        },
+        onLocalAudioLevel: (level: number) => {
           setLocalAudioLevel(level)
-      })
-      .on("remoteAudioLevel", (level: number) => {
-        if (botSpeakingRef.current) {
-          setRemoteAudioLevel(level)
+        },
+        onRemoteAudioLevel: (level: number) => {
+          if (botSpeakingRef.current) {
+            setRemoteAudioLevel(level)
+          }
+        },
+        onBotStartedSpeaking: () => {
+          botSpeakingRef.current = true
+        },
+        onBotStoppedSpeaking: () => {
+          botSpeakingRef.current = false
+          setRemoteAudioLevel(0)
+        },
+        onConnected: () => {
+          setIsMicEnabled(client.isMicEnabled)
+          setIsCamEnabled(client.isCamEnabled)
+        },
+        onTrackStarted: (track: MediaStreamTrack, p?: Participant) => {
+          if (p?.local && track.kind === 'video'){
+            setVideoTrack(track)
+          }
         }
-      })
-      .on("userStartedSpeaking", () => {
-        // nothing to do here
-      })
-      .on("userStoppedSpeaking", () => {
-        // nothing to do here
-      })
-      .on("botStartedSpeaking", () => {
-        botSpeakingRef.current = true
-      })
-      .on("botStoppedSpeaking", () => {
-        botSpeakingRef.current = false
-        setRemoteAudioLevel(0)
-      })
-      .on("connected", () => {
-        setIsMicEnabled(voiceClient.isMicEnabled)
-        setIsCamEnabled(voiceClient.isCamEnabled)
-      })
-      .on("trackStarted", (track: MediaStreamTrack, p?: Participant) => {
-        if (p?.local && track.kind === 'video'){
-          setVideoTrack(track)
-        }
-      })
+      },
+    })
+    return client
   }, [handleError])
 
   const start = useCallback(async (url: string): Promise<void> => {
-    const client = createVoiceClient(url)
+    const client = createVoiceClient()
     setVoiceClient(client)
-    setupListeners(client)
     try {
-      await client.connect()
+      await client?.initDevices()
+      await client?.startBotAndConnect({
+        endpoint: url + '/connect',
+      });
       // updating the preferences
       const newSettings = await SettingsManager.getSettings();
       newSettings.backendURL = url
@@ -136,7 +116,7 @@ export const VoiceClientProvider: React.FC<VoiceClientProviderProps> = ({ childr
     } catch (error) {
       handleError(error)
     }
-  }, [createVoiceClient, setupListeners, handleError])
+  }, [createVoiceClient, handleError])
 
   const leave = useCallback(async (): Promise<void> => {
     if (voiceClient) {
@@ -169,25 +149,6 @@ export const VoiceClientProvider: React.FC<VoiceClientProviderProps> = ({ childr
     }
   }, [voiceClient, isCamEnabled])
 
-  const startTimer = (expirationTime: number): void => {
-    const currentTime = Math.floor(Date.now() / 1000)
-    const leftTime = expirationTime - currentTime
-    setTimerCountDown(leftTime)
-    meetingTimer = setInterval(() => {
-      setTimerCountDown((prevCountDown) => {
-        return prevCountDown - 1
-      })
-    }, 1000)
-  }
-
-  const stopTimer = (): void => {
-      if (meetingTimer) {
-      clearInterval(meetingTimer)
-      meetingTimer = null
-    }
-    setTimerCountDown(0)
-  }
-
   useEffect(() => {
     return () => {
       if (voiceClient) {
@@ -206,12 +167,11 @@ export const VoiceClientProvider: React.FC<VoiceClientProviderProps> = ({ childr
     localAudioLevel,
     remoteAudioLevel,
     videoTrack,
-    timerCountDown,
     start,
     leave,
     toggleMicInput,
     toggleCamInput
-  }), [voiceClient, inCall, currentState, botReady, isMicEnabled, isCamEnabled, localAudioLevel, remoteAudioLevel, videoTrack, timerCountDown, start, leave, toggleMicInput, toggleCamInput])
+  }), [voiceClient, inCall, currentState, botReady, isMicEnabled, isCamEnabled, localAudioLevel, remoteAudioLevel, videoTrack, start, leave, toggleMicInput, toggleCamInput])
 
   return (
     <VoiceClientContext.Provider value={contextValue}>
