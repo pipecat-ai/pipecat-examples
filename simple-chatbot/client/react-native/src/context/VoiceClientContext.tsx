@@ -105,6 +105,7 @@ export const VoiceClientProvider: React.FC<VoiceClientProviderProps> = ({ childr
     const client = createVoiceClient()
     setVoiceClient(client)
     try {
+      await client?.initDevices()
       await client?.startBotAndConnect({
         endpoint: url + '/connect',
       });
