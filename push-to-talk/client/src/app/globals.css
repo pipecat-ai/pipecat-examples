@@ -1,0 +1,4 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+
+@import '@pipecat-ai/voice-ui-kit/styles';
