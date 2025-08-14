@@ -180,6 +180,14 @@ async def bot(runner_args: RunnerArguments):
                 auth_token=os.getenv("PLIVO_AUTH_TOKEN", ""),
             )
 
+        elif transport_type == "exotel":
+            from pipecat.serializers.exotel import ExotelFrameSerializer
+
+            serializer = ExotelFrameSerializer(
+                stream_sid=call_data["stream_id"],
+                call_sid=call_data["call_id"],
+            )
+
         else:
             # Generic fallback
             serializer = None
