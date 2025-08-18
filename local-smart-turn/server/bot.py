@@ -12,7 +12,7 @@ import aiohttp
 from dotenv import load_dotenv
 from loguru import logger
 from PIL import Image
-from pipecat.audio.turn.smart_turn.fal_smart_turn import FalSmartTurnAnalyzer
+from pipecat.audio.turn.smart_turn.local_smart_turn_v3 import LocalSmartTurnAnalyzerV3
 from pipecat.audio.vad.silero import SileroVADAnalyzer
 from pipecat.audio.vad.vad_analyzer import VADParams
 from pipecat.frames.frames import (
@@ -52,6 +52,10 @@ logger.add(sys.stderr, level="DEBUG")
 
 sprites = []
 script_dir = os.path.dirname(__file__)
+
+ONNX_MODEL_PATH = os.getenv("SMART_TURN_V3_ONNX_MODEL_PATH")
+if not ONNX_MODEL_PATH:
+    raise ValueError("SMART_TURN_V3_ONNX_MODEL_PATH environment variable not set")
 
 # Load sequential animation frames
 for i in range(1, 26):
@@ -246,9 +250,7 @@ async def bot(args: DailySessionArguments):
                 video_out_width=1024,
                 video_out_height=576,
                 vad_analyzer=SileroVADAnalyzer(params=VADParams(stop_secs=0.2)),
-                turn_analyzer=FalSmartTurnAnalyzer(
-                    api_key=os.getenv("FAL_SMART_TURN_API_KEY"), aiohttp_session=session
-                ),
+                turn_analyzer=LocalSmartTurnAnalyzerV3(ONNX_MODEL_PATH),
             ),
         )
 
@@ -279,9 +281,7 @@ async def local_daily():
                     video_out_width=1024,
                     video_out_height=576,
                     vad_analyzer=SileroVADAnalyzer(params=VADParams(stop_secs=0.2)),
-                    turn_analyzer=FalSmartTurnAnalyzer(
-                        api_key=os.getenv("FAL_SMART_TURN_API_KEY"), aiohttp_session=session
-                    ),
+                    turn_analyzer=LocalSmartTurnAnalyzerV3(smart_turn_model_path=ONNX_MODEL_PATH),
                 ),
             )
 

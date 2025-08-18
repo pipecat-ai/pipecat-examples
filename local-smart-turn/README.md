@@ -2,7 +2,7 @@
 
 This demo showcases Pipecat's Smart Turn Detection feature - an advanced conversational turn detection system that uses machine learning to identify when a speaker has finished their turn in a conversation. Unlike basic Voice Activity Detection (VAD) which only detects speech vs. silence, Smart Turn detects natural conversational cues like intonation patterns, pacing, and linguistic signals.
 
-This demo uses the [pipecat-ai/smart-turn](https://huggingface.co/pipecat-ai/smart-turn) model - an open-source, community-driven conversational turn detection model designed to provide more natural turn-taking in voice interactions. The model is being hosted on Fal's infrastructure for GPU acceleration, offering inference times between 50-60ms.
+This demo uses the [pipecat-ai/smart-turn-v3](https://huggingface.co/pipecat-ai/smart-turn-v3) model - an open-source, community-driven conversational turn detection model designed to provide more natural turn-taking in voice interactions. This new version of the model allows fast CPU inference, with no GPU required.
 
 In the client UI, you can see the transcription messages along with the smart-turn model's prediction results in real-time.
 
@@ -45,7 +45,9 @@ Try the hosted version of the demo here: https://pcc-smart-turn.vercel.app/.
    - CARTESIA_API_KEY
    - DEEPGRAM_API_KEY
    - DAILY_API_KEY
-   - FAL_SMART_TURN_API_KEY
+   - SMART_TURN_V3_ONNX_MODEL_PATH
+
+The `SMART_TURN_V3_ONNX_MODEL_PATH` variable should point to the ONNX model file for Smart Turn V3.
 
 4. Run the server:
 
@@ -151,8 +153,4 @@ Follow the vercel prompts to deploy your project.
 
 Now with the client and server deployed, you can join the call using your Vercel URL.
 
-See the debug information for the Smart Turn data. It prints a log line for each smart-turn inference:
-
-```
-Smart Turn: COMPLETE, Probability: 95.3%, Model inference: 65.23ms, Server processing: 82.09ms, End-to-end: 245.43ms
-```
+See the debug information for the Smart Turn data. It prints a log line for each smart-turn inference.
