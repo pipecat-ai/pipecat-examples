@@ -76,7 +76,7 @@ Ready to explore more? These are two of the most useful examples for common use 
 ### **Advanced Features**
 
 - **[chatbot-audio-recording](chatbot-audio-recording/)** - Voice interactions with recording capabilities
-- **[fal-smart-turn](fal-smart-turn/)** - Smart conversation turn-taking
+- **[local-smart-turn](local-smart-turn/)** - Smart conversation turn-taking
 - **[daily-custom-tracks](daily-custom-tracks/)** - Custom audio/video track handling
 - **[local-input-select-stt](local-input-select-stt/)** - Local audio input selection
 - **[bot-ready-signalling](bot-ready-signalling/)** - Bot connect management
