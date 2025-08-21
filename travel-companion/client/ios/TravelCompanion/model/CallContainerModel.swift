@@ -23,7 +23,7 @@ class CallContainerModel: ObservableObject {
     
     private var meetingTimer: Timer?
     
-    var rtviClientIOS: RTVIClient?
+    var pipecatClientIOS: PipecatClient?
     let locationManager = LocationManager()
     
     init() {
@@ -41,40 +41,33 @@ class CallContainerModel: ObservableObject {
         }
         
         let currentSettings = SettingsManager.getSettings()
-        let rtviClientOptions = RTVIClientOptions.init(
+        let pipecatClientOptions = PipecatClientOptions.init(
+            transport: DailyTransport.init(),
             enableMic: currentSettings.enableMic,
             enableCam: false,
-            params: RTVIClientParams(
-                baseUrl: baseUrl,
-                endpoints: RTVIURLEndpoints(connect: "/connect")
-            )
         )
-        self.rtviClientIOS = RTVIClient.init(
-            transport: DailyTransport.init(options: rtviClientOptions),
-            options: rtviClientOptions
+        self.pipecatClientIOS = PipecatClient.init(
+            options: pipecatClientOptions
         )
         
-        // Registering the llm helper
-        let llmHelper = try? self.rtviClientIOS?.registerHelper(service: "llm", helper: LLMHelper.self)
-        llmHelper?.delegate = self
-        
-        self.rtviClientIOS?.delegate = self
-        self.rtviClientIOS?.start() { result in
+        self.pipecatClientIOS?.delegate = self
+        let startBotParams = APIRequest.init(endpoint: URL(string: baseUrl + "/connect")!)
+        self.pipecatClientIOS?.startBotAndConnect(startBotParams: startBotParams) { (result: Result<DailyTransportConnectionParams, AsyncExecutionError>) in
             if case .failure(let error) = result {
                 self.showError(message: error.localizedDescription)
-                self.rtviClientIOS = nil
+                self.pipecatClientIOS = nil
             }
         }
         // Selecting the mic based on the preferences
         if let selectedMic = currentSettings.selectedMic {
-            self.rtviClientIOS?.updateMic(micId: MediaDeviceId(id:selectedMic), completion: nil)
+            self.pipecatClientIOS?.updateMic(micId: MediaDeviceId(id:selectedMic), completion: nil)
         }
         self.saveCredentials(backendURL: baseUrl)
     }
     
     @MainActor
     func disconnect() {
-        self.rtviClientIOS?.disconnect(completion: nil)
+        self.pipecatClientIOS?.disconnect(completion: nil)
     }
     
     func showError(message: String) {
@@ -89,22 +82,21 @@ class CallContainerModel: ObservableObject {
     
     @MainActor
     func toggleMicInput() {
-        self.rtviClientIOS?.enableMic(enable: !self.isMicEnabled) { result in
+        self.pipecatClientIOS?.enableMic(enable: !self.isMicEnabled) { result in
             switch result {
             case .success():
-                self.isMicEnabled = self.rtviClientIOS?.isMicEnabled ?? false
+                self.isMicEnabled = self.pipecatClientIOS?.isMicEnabled ?? false
             case .failure(let error):
                 self.showError(message: error.localizedDescription)
             }
         }
     }
     
-    private func startTimer(withExpirationTime expirationTime: Int) {
-        let currentTime = Int(Date().timeIntervalSince1970)
-        self.timerCount = expirationTime - currentTime
+    private func startTimer() {
+        self.timerCount = 0
         self.meetingTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { timer in
             DispatchQueue.main.async {
-                self.timerCount -= 1
+                self.timerCount += 1
             }
         }
     }
@@ -124,7 +116,7 @@ class CallContainerModel: ObservableObject {
     
 }
 
-extension CallContainerModel:RTVIClientDelegate, LLMHelperDelegate {
+extension CallContainerModel:PipecatClientDelegate {
     
     private func handleEvent(eventName: String, eventValue: Any? = nil) {
         if let value = eventValue {
@@ -140,18 +132,18 @@ extension CallContainerModel:RTVIClientDelegate, LLMHelperDelegate {
         self.isInCall = ( state == .connecting || state == .connected || state == .ready || state == .authenticating )
     }
     
-    @MainActor
     func onBotReady(botReadyData: BotReadyData) {
-        self.handleEvent(eventName: "onBotReady.")
-        self.isBotReady = true
-        if let expirationTime = self.rtviClientIOS?.expiry() {
-            self.startTimer(withExpirationTime: expirationTime)
+        Task { @MainActor in
+            self.handleEvent(eventName: "onBotReady.")
+            self.isBotReady = true
+            self.startTimer()
         }
     }
     
-    @MainActor
     func onConnected() {
-        self.isMicEnabled = self.rtviClientIOS?.isMicEnabled ?? false
+        Task { @MainActor in
+            self.isMicEnabled = self.pipecatClientIOS?.isMicEnabled ?? false
+        }
     }
     
     func onDisconnected() {
@@ -160,30 +152,48 @@ extension CallContainerModel:RTVIClientDelegate, LLMHelperDelegate {
     }
     
     func onRemoteAudioLevel(level: Float, participant: Participant) {
-        self.remoteAudioLevel = level
-    }
-    
-    func onUserAudioLevel(level: Float) {
-        self.localAudioLevel = level
-    }
-    
-    func onUserTranscript(data: Transcript) {
-        if (data.final ?? false) {
-            self.handleEvent(eventName: "onUserTranscript", eventValue: data.text)
+        Task { @MainActor in
+            self.remoteAudioLevel = level
         }
     }
     
-    func onBotTranscript(data: String) {
-        self.handleEvent(eventName: "onBotTranscript", eventValue: data)
+    func onLocalAudioLevel(level: Float) {
+        Task { @MainActor in
+            self.localAudioLevel = level
+        }
     }
     
-    func onError(message: String) {
-        self.handleEvent(eventName: "onError", eventValue: message)
-        self.showError(message: message)
+    func onUserTranscript(data: Transcript) {
+        Task { @MainActor in
+            if (data.final ?? false) {
+                self.handleEvent(eventName: "onUserTranscript", eventValue: data.text)
+            }
+        }
     }
     
-    func onTracksUpdated(tracks: Tracks) {
-        self.handleEvent(eventName: "onTracksUpdated", eventValue: tracks)
+    func onBotTranscript(data: BotLLMText) {
+        Task { @MainActor in
+            self.handleEvent(eventName: "onBotTranscript", eventValue: data)
+        }
+    }
+    
+    func onError(message: RTVIMessageInbound) {
+        Task { @MainActor in
+            self.handleEvent(eventName: "onError", eventValue: message)
+            self.showError(message: message.data ?? "")
+        }
+    }
+    
+    func onTrackStarted(track: MediaStreamTrack, participant: Participant?) {
+        Task { @MainActor in
+            self.handleEvent(eventName: "onTrackStarted", eventValue: track)
+        }
+    }
+
+    func onTrackStopped(track: MediaStreamTrack, participant: Participant?) {
+        Task { @MainActor in
+            self.handleEvent(eventName: "onTrackStopped", eventValue: track)
+        }
     }
     
     private func openGoogleMaps(fullAddress: String) {
@@ -210,7 +220,7 @@ extension CallContainerModel:RTVIClientDelegate, LLMHelperDelegate {
         var longitude: Double? = nil
         var latitude: Double? = nil
         var fullAddress: String = ""
-
+        
         if case .object(let dictionary) = restaurantInfo {
             if let restaurantValue = dictionary["restaurant"],
                case .string(let name) = restaurantValue {

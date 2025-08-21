@@ -3,7 +3,7 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 56;
+	objectVersion = 60;
 	objects = {
 
 /* Begin PBXBuildFile section */
@@ -25,7 +25,7 @@
 		90ABB9A32C74E1CE000D9CC7 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90ABB9A22C74E1CE000D9CC7 /* SettingsView.swift */; };
 		90ABB9A62C74EA8A000D9CC7 /* SettingsPreference.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90ABB9A52C74EA8A000D9CC7 /* SettingsPreference.swift */; };
 		90ABB9A82C74EAB1000D9CC7 /* SettingsManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90ABB9A72C74EAB1000D9CC7 /* SettingsManager.swift */; };
-		90CED5EE2D39CFBC00B03BC9 /* PipecatClientIOSDaily in Frameworks */ = {isa = PBXBuildFile; productRef = 90CED5ED2D39CFBC00B03BC9 /* PipecatClientIOSDaily */; };
+		90C2CCE22E5768AF0094F9E8 /* PipecatClientIOSDaily in Frameworks */ = {isa = PBXBuildFile; productRef = 90C2CCE12E5768AF0094F9E8 /* PipecatClientIOSDaily */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -75,7 +75,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				90CED5EE2D39CFBC00B03BC9 /* PipecatClientIOSDaily in Frameworks */,
+				90C2CCE22E5768AF0094F9E8 /* PipecatClientIOSDaily in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -221,7 +221,7 @@
 			);
 			name = TravelCompanion;
 			packageProductDependencies = (
-				90CED5ED2D39CFBC00B03BC9 /* PipecatClientIOSDaily */,
+				90C2CCE12E5768AF0094F9E8 /* PipecatClientIOSDaily */,
 			);
 			productName = TravelCompanion;
 			productReference = 90031FA32C616EE700408370 /* TravelCompanion.app */;
@@ -296,7 +296,7 @@
 			);
 			mainGroup = 90031F9A2C616EE700408370;
 			packageReferences = (
-				90CED5EC2D39CFBC00B03BC9 /* XCRemoteSwiftPackageReference "pipecat-client-ios-daily" */,
+				90C2CCE02E5768AF0094F9E8 /* XCLocalSwiftPackageReference "../../../../ios-public-repos/pipecat-client-ios-daily" */,
 			);
 			productRefGroup = 90031FA42C616EE700408370 /* Products */;
 			projectDirPath = "";
@@ -689,21 +689,16 @@
 		};
 /* End XCConfigurationList section */
 
-/* Begin XCRemoteSwiftPackageReference section */
-		90CED5EC2D39CFBC00B03BC9 /* XCRemoteSwiftPackageReference "pipecat-client-ios-daily" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/pipecat-ai/pipecat-client-ios-daily/";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 0.3.2;
-			};
+/* Begin XCLocalSwiftPackageReference section */
+		90C2CCE02E5768AF0094F9E8 /* XCLocalSwiftPackageReference "../../../../ios-public-repos/pipecat-client-ios-daily" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = "../../../../ios-public-repos/pipecat-client-ios-daily";
 		};
-/* End XCRemoteSwiftPackageReference section */
+/* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
-		90CED5ED2D39CFBC00B03BC9 /* PipecatClientIOSDaily */ = {
+		90C2CCE12E5768AF0094F9E8 /* PipecatClientIOSDaily */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 90CED5EC2D39CFBC00B03BC9 /* XCRemoteSwiftPackageReference "pipecat-client-ios-daily" */;
 			productName = PipecatClientIOSDaily;
 		};
 /* End XCSwiftPackageProductDependency section */
