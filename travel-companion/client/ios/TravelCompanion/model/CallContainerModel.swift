@@ -52,6 +52,17 @@ class CallContainerModel: ObservableObject {
         
         self.pipecatClientIOS?.delegate = self
         let startBotParams = APIRequest.init(endpoint: URL(string: baseUrl + "/connect")!)
+        
+        // Handling the function calls
+        self.pipecatClientIOS?.registerFunctionCallHandler(functionName: ToolsFunctions.getMyCurrentLocation.rawValue) { functionCallData, onResult  in
+            let location = await self.handleGetCurrentLocation()
+            await onResult(location)
+        }
+        self.pipecatClientIOS?.registerFunctionCallHandler(functionName: ToolsFunctions.setRestaurantLocation.rawValue) { functionCallData, onResult  in
+            self.handleRestaurantLocation(restaurantInfo: functionCallData.args)
+            await onResult(.string("success"))
+        }
+        
         self.pipecatClientIOS?.startBotAndConnect(startBotParams: startBotParams) { (result: Result<DailyTransportConnectionParams, AsyncExecutionError>) in
             if case .failure(let error) = result {
                 self.showError(message: error.localizedDescription)
@@ -67,6 +78,7 @@ class CallContainerModel: ObservableObject {
     
     @MainActor
     func disconnect() {
+        self.pipecatClientIOS?.unregisterAllFunctionCallHandlers()
         self.pipecatClientIOS?.disconnect(completion: nil)
     }
     
@@ -262,25 +274,6 @@ extension CallContainerModel:PipecatClientDelegate {
         } catch {
             return Value.string("Failed to get current location!")
         }
-    }
-    
-    func onLLMFunctionCall(functionCallData: LLMFunctionCallData, onResult: ((Value) async -> Void)) async {
-        print("onLLMFunctionCall \(functionCallData.functionName)")
-        var result = Value.object([:])
-        if let selectedFunction = ToolsFunctions(rawValue: functionCallData.functionName) {
-            // Use a switch to handle the different enum cases
-            switch selectedFunction {
-            case .getMyCurrentLocation:
-                result = await self.handleGetCurrentLocation()
-            case .setRestaurantLocation:
-                print("Restaurant location: \(functionCallData.args)")
-                self.handleRestaurantLocation(restaurantInfo: functionCallData.args)
-                result = .string("success")
-            }
-        } else {
-            print("Invalid function received \(functionCallData.functionName)")
-        }
-        await onResult(result)
     }
 }
 
