@@ -135,7 +135,6 @@ class CallContainerModel: ObservableObject {
 }
 
 extension CallContainerModel:PipecatClientDelegate {
-    
     private func handleEvent(eventName: String, eventValue: Any? = nil) {
         if let value = eventValue {
             print("RTVI Demo, received event:\(eventName), value:\(value)")
@@ -212,13 +211,11 @@ extension CallContainerModel:PipecatClientDelegate {
         }
     }
 
-    /// Invoked when a track stops.
     func onTrackStopped(track: MediaStreamTrack, participant: Participant?) {
         Task { @MainActor in
-            self.handleEvent(eventName: "onTrackStarted", eventValue: track)
+            self.handleEvent(eventName: "onTrackStopped", eventValue: track)
         }
     }
-
     
     func onAvailableMicsUpdated(mics: [MediaDeviceInfo]) {
         Task { @MainActor in
@@ -229,6 +226,12 @@ extension CallContainerModel:PipecatClientDelegate {
     func onMicUpdated(mic: MediaDeviceInfo?) {
         Task { @MainActor in
             self.selectedMic = mic?.id
+        }
+    }
+    
+    func onMetrics(data: PipecatMetrics) {
+        Task { @MainActor in
+            self.handleEvent(eventName: "onMetrics", eventValue: data)
         }
     }
 }
