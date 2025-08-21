@@ -21,6 +21,8 @@ import os
 from dotenv import load_dotenv
 from loguru import logger
 
+from pipecat.adapters.schemas.function_schema import FunctionSchema
+from pipecat.adapters.schemas.tools_schema import ToolsSchema, AdapterType
 from pipecat.audio.vad.silero import SileroVADAnalyzer
 from pipecat.audio.vad.vad_analyzer import VADParams
 from pipecat.pipeline.pipeline import Pipeline
@@ -65,45 +67,43 @@ transport_params = {
 # Search tool can only be used together with other tools when using the Multimodal Live API
 # Otherwise it should be used alone.
 # We are registering the tools here, but who are handling them is the RTVI client
-search_tool = {'google_search': {}}
-tools = [
-    {
-        "function_declarations": [
-            {
-                "name": "get_my_current_location",
-                "description": "Retrieves the user current location",
-                "parameters": None,  # Specify None for no parameters
-            },
-            {
-                "name": "set_restaurant_location",
-                "description": "Sets the location of the chosen restaurant",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "restaurant": {
-                            "type": "string",
-                            "description": "Restaurant name",
-                        },
-                        "lat": {
-                            "type": "string",
-                            "description": "Latitude of the location",
-                        },
-                        "lon": {
-                            "type": "string",
-                            "description": "Longitude of the location",
-                        },
-                        "address": {
-                            "type": "string",
-                            "description": "Complete address of the location in this format: {street, number, city}",
-                        }
-                    },
-                    "required": ["restaurant", "lat", "lon", "address"],
-                },
-            },
-        ]
+get_location_function = FunctionSchema(
+    name="get_my_current_location",
+    description="Retrieves the user current location",
+    properties={},
+    required=[],
+)
+
+set_restaurant_function = FunctionSchema(
+    name="set_restaurant_location",
+    description="Sets the location of the chosen restaurant",
+    properties={
+        "restaurant": {
+            "type": "string",
+            "description": "Restaurant name",
+        },
+        "lat": {
+            "type": "string",
+            "description": "Latitude of the location",
+        },
+        "lon": {
+            "type": "string",
+            "description": "Longitude of the location",
+        },
+        "address": {
+            "type": "string",
+            "description": "Complete address of the location in this format: {street, number, city}",
+        }
     },
-    search_tool
-]
+    required=["restaurant", "lat", "lon", "address"],
+)
+
+search_tool = {"google_search": {}}
+tools = ToolsSchema(
+    standard_tools=[get_location_function, set_restaurant_function],
+    custom_tools={AdapterType.GEMINI: [search_tool]},
+)
+
 
 system_instruction = """
 You are a travel companion, and your responses will be converted to audio, so keep them simple and avoid special characters or complex formatting.
@@ -152,6 +152,11 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     # RTVI events for Pipecat client UI
     #
     rtvi = RTVIProcessor(config=RTVIConfig(config=[]))
+
+    # Registering the functions to be invoked by RTVI
+    llm.register_function(
+        None, rtvi.handle_function_call
+    )
 
     pipeline = Pipeline(
         [

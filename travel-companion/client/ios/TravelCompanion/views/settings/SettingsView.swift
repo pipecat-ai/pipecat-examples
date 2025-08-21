@@ -12,7 +12,7 @@ struct SettingsView: View {
     @State private var backendURL: String = ""
     
     var body: some View {
-        let microphones = self.model.rtviClientIOS?.getAllMics() ?? []
+        let microphones = self.model.pipecatClientIOS?.getAllMics() ?? []
         NavigationView {
             Form {
                 Section(header: Text("Audio Settings")) {
@@ -55,7 +55,7 @@ struct SettingsView: View {
     
     private func selectMic(_ mic: MediaDeviceId) {
         self.selectedMic = mic
-        self.model.rtviClientIOS?.updateMic(micId: mic, completion: nil)
+        self.model.pipecatClientIOS?.updateMic(micId: mic, completion: nil)
     }
     
     private func saveSettings() {
