@@ -20,9 +20,8 @@ import os
 
 from dotenv import load_dotenv
 from loguru import logger
-
 from pipecat.adapters.schemas.function_schema import FunctionSchema
-from pipecat.adapters.schemas.tools_schema import ToolsSchema, AdapterType
+from pipecat.adapters.schemas.tools_schema import AdapterType, ToolsSchema
 from pipecat.audio.vad.silero import SileroVADAnalyzer
 from pipecat.audio.vad.vad_analyzer import VADParams
 from pipecat.pipeline.pipeline import Pipeline
@@ -93,7 +92,7 @@ set_restaurant_function = FunctionSchema(
         "address": {
             "type": "string",
             "description": "Complete address of the location in this format: {street, number, city}",
-        }
+        },
     },
     required=["restaurant", "lat", "lon", "address"],
 )
@@ -154,9 +153,7 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     rtvi = RTVIProcessor(config=RTVIConfig(config=[]))
 
     # Registering the functions to be invoked by RTVI
-    llm.register_function(
-        None, rtvi.handle_function_call
-    )
+    llm.register_function(None, rtvi.handle_function_call)
 
     pipeline = Pipeline(
         [
