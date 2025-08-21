@@ -42,7 +42,6 @@ class WebRTCApp {
   private initializePipecatClient(): void {
     const opts: PipecatClientOptions = {
       transport: new SmallWebRTCTransport({ webrtcUrl: '/api/offer' }),
-      // transport: new DailyTransport(),
       enableMic: true,
       enableCam: true,
       callbacks: {
@@ -314,10 +313,8 @@ class WebRTCApp {
     this.connectBtn.disabled = true;
     this.updateStatus('Connecting');
 
-    if (this.smallWebRTCTransport) {
-      this.smallWebRTCTransport.setAudioCodec(this.audioCodec.value);
-      this.smallWebRTCTransport.setVideoCodec(this.videoCodec.value);
-    }
+    this.smallWebRTCTransport.setAudioCodec(this.audioCodec.value);
+    this.smallWebRTCTransport.setVideoCodec(this.videoCodec.value);
     try {
       await this.pcClient.connect();
     } catch (e) {
