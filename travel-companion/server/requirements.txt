@@ -1,0 +1,6 @@
+fastapi[all]
+pip-tools~=7.4.1
+pipecat-ai~=0.0.52
+pipecat-ai-flows~=0.0.10
+pipecat-ai[daily,silero,google,openai, cartesia, deepgram]
+python-dotenv~=1.0.1
