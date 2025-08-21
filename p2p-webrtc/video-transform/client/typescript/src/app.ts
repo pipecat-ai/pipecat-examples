@@ -11,15 +11,20 @@ import {
 class WebRTCApp {
   private declare connectBtn: HTMLButtonElement;
   private declare disconnectBtn: HTMLButtonElement;
+  private declare micBtn: HTMLButtonElement;
   private declare muteBtn: HTMLButtonElement;
+  private declare screenBtn: HTMLButtonElement;
 
   private declare audioInput: HTMLSelectElement;
   private declare videoInput: HTMLSelectElement;
   private declare audioCodec: HTMLSelectElement;
   private declare videoCodec: HTMLSelectElement;
 
-  private declare videoElement: HTMLVideoElement;
-  private declare audioElement: HTMLAudioElement;
+  private declare botVideoElement: HTMLVideoElement;
+  private declare botAudioElement: HTMLAudioElement;
+
+  private declare localCamElement: HTMLVideoElement;
+  private declare localScreenElement: HTMLVideoElement;
 
   private debugLog: HTMLElement | null = null;
   private statusSpan: HTMLElement | null = null;
@@ -37,6 +42,7 @@ class WebRTCApp {
   private initializePipecatClient(): void {
     const opts: PipecatClientOptions = {
       transport: new SmallWebRTCTransport({ webrtcUrl: '/api/offer' }),
+      // transport: new DailyTransport(),
       enableMic: true,
       enableCam: true,
       callbacks: {
@@ -77,9 +83,18 @@ class WebRTCApp {
           participant?: Participant
         ) => {
           if (participant?.local) {
-            return;
+            this.onLocalTrackStarted(track);
+          } else {
+            this.onBotTrackStarted(track);
           }
-          this.onBotTrackStarted(track);
+        },
+        onTrackStopped: (
+          track: MediaStreamTrack,
+          participant?: Participant
+        ) => {
+          if (participant?.local) {
+            this.onLocalTrackStopped(track);
+          }
         },
         onServerMessage: (msg: unknown) => {
           this.log(`Server message: ${msg}`);
@@ -87,6 +102,10 @@ class WebRTCApp {
       },
     };
     this.pcClient = new PipecatClient(opts);
+    // @ts-ignore
+    window.webapp = this;
+    // @ts-ignore
+    window.client = this.pcClient; // Expose client for debugging
     this.smallWebRTCTransport = this.pcClient.transport as SmallWebRTCTransport;
   }
 
@@ -97,7 +116,9 @@ class WebRTCApp {
     this.disconnectBtn = document.getElementById(
       'disconnect-btn'
     ) as HTMLButtonElement;
+    this.micBtn = document.getElementById('mute-mic') as HTMLButtonElement;
     this.muteBtn = document.getElementById('mute-btn') as HTMLButtonElement;
+    this.screenBtn = document.getElementById('screen-btn') as HTMLButtonElement;
 
     this.audioInput = document.getElementById(
       'audio-input'
@@ -112,12 +133,19 @@ class WebRTCApp {
       'video-codec'
     ) as HTMLSelectElement;
 
-    this.videoElement = document.getElementById(
+    this.botVideoElement = document.getElementById(
       'bot-video'
     ) as HTMLVideoElement;
-    this.audioElement = document.getElementById(
+    this.botAudioElement = document.getElementById(
       'bot-audio'
     ) as HTMLAudioElement;
+
+    this.localCamElement = document.getElementById(
+      'local-cam'
+    ) as HTMLVideoElement;
+    this.localScreenElement = document.getElementById(
+      'local-screen'
+    ) as HTMLVideoElement;
 
     this.debugLog = document.getElementById('debug-log');
     this.statusSpan = document.getElementById('connection-status');
@@ -131,15 +159,33 @@ class WebRTCApp {
       let audioDevice = e.target?.value;
       this.pcClient.updateMic(audioDevice);
     });
+    this.micBtn.addEventListener('click', async () => {
+      if (this.pcClient.state === 'disconnected') {
+        await this.pcClient.initDevices();
+      } else {
+        let isMicEnabled = this.pcClient.isMicEnabled;
+        this.pcClient.enableMic(!isMicEnabled);
+      }
+    });
     this.videoInput.addEventListener('change', (e) => {
       // @ts-ignore
       let videoDevice = e.target?.value;
       this.pcClient.updateCam(videoDevice);
     });
-    this.muteBtn.addEventListener('click', () => {
-      let isCamEnabled = this.pcClient.isCamEnabled;
-      this.pcClient.enableCam(!isCamEnabled);
-      this.muteBtn.textContent = isCamEnabled ? '📵' : '📷';
+    this.muteBtn.addEventListener('click', async () => {
+      if (this.pcClient.state === 'disconnected') {
+        await this.pcClient.initDevices();
+      } else {
+        let isCamEnabled = this.pcClient.isCamEnabled;
+        this.pcClient.enableCam(!isCamEnabled);
+      }
+    });
+    this.screenBtn.addEventListener('click', async () => {
+      if (this.pcClient.state === 'disconnected') {
+        await this.pcClient.initDevices();
+      }
+      let isScreenEnabled = this.pcClient.isSharingScreen;
+      this.pcClient.enableScreenShare(!isScreenEnabled);
     });
   }
 
@@ -179,11 +225,61 @@ class WebRTCApp {
     if (this.disconnectBtn) this.disconnectBtn.disabled = true;
   }
 
+  private onLocalTrackStarted(track: MediaStreamTrack) {
+    if (track.kind === 'audio') {
+      this.micBtn.innerHTML = 'Mute Mic';
+      return;
+    }
+
+    const settings = track.getSettings();
+    // ... Because Firefox 😡
+    interface FirefoxConstraints extends MediaTrackConstraints {
+      mediaSource?: string;
+    }
+    const constraints = track.getConstraints() as FirefoxConstraints;
+    const screenShareOpts = ['window', 'monitor', 'browser'];
+    if (
+      screenShareOpts.includes(settings?.displaySurface ?? '') ||
+      screenShareOpts.includes(constraints?.mediaSource ?? '')
+    ) {
+      this.localScreenElement.srcObject = new MediaStream([track]);
+      (document.getElementById('screen-x') as HTMLDivElement).hidden = true;
+    } else {
+      this.localCamElement.srcObject = new MediaStream([track]);
+      (document.getElementById('cam-x') as HTMLDivElement).hidden = true;
+    }
+  }
+
   private onBotTrackStarted(track: MediaStreamTrack) {
     if (track.kind === 'video') {
-      this.videoElement.srcObject = new MediaStream([track]);
+      this.botVideoElement.srcObject = new MediaStream([track]);
     } else {
-      this.audioElement.srcObject = new MediaStream([track]);
+      this.botAudioElement.srcObject = new MediaStream([track]);
+    }
+  }
+
+  private onLocalTrackStopped(track: MediaStreamTrack) {
+    if (track.kind === 'audio') {
+      this.micBtn.innerHTML = 'Unmute Mic';
+      return;
+    }
+
+    const settings = track.getSettings();
+    // ... Because Firefox 😡
+    interface FirefoxConstraints extends MediaTrackConstraints {
+      mediaSource?: string;
+    }
+    const constraints = track.getConstraints() as FirefoxConstraints;
+    const screenShareOpts = ['window', 'monitor', 'browser'];
+    if (
+      screenShareOpts.includes(settings?.displaySurface ?? '') ||
+      screenShareOpts.includes(constraints?.mediaSource ?? '')
+    ) {
+      this.localScreenElement.srcObject = null;
+      (document.getElementById('screen-x') as HTMLDivElement).hidden = false;
+    } else {
+      this.localCamElement.srcObject = null;
+      (document.getElementById('cam-x') as HTMLDivElement).hidden = false;
     }
   }
 
@@ -218,8 +314,10 @@ class WebRTCApp {
     this.connectBtn.disabled = true;
     this.updateStatus('Connecting');
 
-    this.smallWebRTCTransport.setAudioCodec(this.audioCodec.value);
-    this.smallWebRTCTransport.setVideoCodec(this.videoCodec.value);
+    if (this.smallWebRTCTransport) {
+      this.smallWebRTCTransport.setAudioCodec(this.audioCodec.value);
+      this.smallWebRTCTransport.setVideoCodec(this.videoCodec.value);
+    }
     try {
       await this.pcClient.connect();
     } catch (e) {
