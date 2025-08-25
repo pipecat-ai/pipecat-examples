@@ -3,7 +3,7 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 60;
+	objectVersion = 56;
 	objects = {
 
 /* Begin PBXBuildFile section */
@@ -17,6 +17,7 @@
 		90031FDC2C6D5DD700408370 /* ToastModifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90031FDB2C6D5DD700408370 /* ToastModifier.swift */; };
 		902DB3172E4BD22200FEF1DE /* PipecatClientIOSDaily in Frameworks */ = {isa = PBXBuildFile; productRef = 902DB3162E4BD22200FEF1DE /* PipecatClientIOSDaily */; };
 		902DB31D2E4D45DF00FEF1DE /* PipecatClientIOSDaily in Frameworks */ = {isa = PBXBuildFile; productRef = 902DB31C2E4D45DF00FEF1DE /* PipecatClientIOSDaily */; };
+		909DA2AE2E5D2F190067DB3B /* PipecatClientIOSDaily in Frameworks */ = {isa = PBXBuildFile; productRef = 909DA2AD2E5D2F190067DB3B /* PipecatClientIOSDaily */; };
 		90ABB98E2C735ED6000D9CC7 /* MeetingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90ABB98D2C735ED6000D9CC7 /* MeetingView.swift */; };
 		90ABB9902C736A8B000D9CC7 /* WaveformView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90ABB98F2C736A8B000D9CC7 /* WaveformView.swift */; };
 		90ABB9932C73820D000D9CC7 /* MicrophoneView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90ABB9922C73820D000D9CC7 /* MicrophoneView.swift */; };
@@ -79,6 +80,7 @@
 				902DB31D2E4D45DF00FEF1DE /* PipecatClientIOSDaily in Frameworks */,
 				90EB04752E469E6C00560870 /* PipecatClientIOSDaily in Frameworks */,
 				902DB3172E4BD22200FEF1DE /* PipecatClientIOSDaily in Frameworks */,
+				909DA2AE2E5D2F190067DB3B /* PipecatClientIOSDaily in Frameworks */,
 				90CC98B02E158093003C2706 /* PipecatClientIOSDaily in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -228,6 +230,7 @@
 				90EB04742E469E6C00560870 /* PipecatClientIOSDaily */,
 				902DB3162E4BD22200FEF1DE /* PipecatClientIOSDaily */,
 				902DB31C2E4D45DF00FEF1DE /* PipecatClientIOSDaily */,
+				909DA2AD2E5D2F190067DB3B /* PipecatClientIOSDaily */,
 			);
 			productName = SimpleChatbot;
 			productReference = 90031FA32C616EE700408370 /* SimpleChatbot.app */;
@@ -302,7 +305,7 @@
 			);
 			mainGroup = 90031F9A2C616EE700408370;
 			packageReferences = (
-				902DB31B2E4D45DF00FEF1DE /* XCLocalSwiftPackageReference "../../../../ios-public-repos/pipecat-client-ios-daily" */,
+				909DA2AC2E5D2F190067DB3B /* XCRemoteSwiftPackageReference "pipecat-client-ios-daily" */,
 			);
 			productRefGroup = 90031FA42C616EE700408370 /* Products */;
 			projectDirPath = "";
@@ -690,12 +693,16 @@
 		};
 /* End XCConfigurationList section */
 
-/* Begin XCLocalSwiftPackageReference section */
-		902DB31B2E4D45DF00FEF1DE /* XCLocalSwiftPackageReference "../../../../ios-public-repos/pipecat-client-ios-daily" */ = {
-			isa = XCLocalSwiftPackageReference;
-			relativePath = "../../../../ios-public-repos/pipecat-client-ios-daily";
+/* Begin XCRemoteSwiftPackageReference section */
+		909DA2AC2E5D2F190067DB3B /* XCRemoteSwiftPackageReference "pipecat-client-ios-daily" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/pipecat-ai/pipecat-client-ios-daily";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.0.0;
+			};
 		};
-/* End XCLocalSwiftPackageReference section */
+/* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
 		902DB3162E4BD22200FEF1DE /* PipecatClientIOSDaily */ = {
@@ -704,6 +711,11 @@
 		};
 		902DB31C2E4D45DF00FEF1DE /* PipecatClientIOSDaily */ = {
 			isa = XCSwiftPackageProductDependency;
+			productName = PipecatClientIOSDaily;
+		};
+		909DA2AD2E5D2F190067DB3B /* PipecatClientIOSDaily */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 909DA2AC2E5D2F190067DB3B /* XCRemoteSwiftPackageReference "pipecat-client-ios-daily" */;
 			productName = PipecatClientIOSDaily;
 		};
 		90CC98AF2E158093003C2706 /* PipecatClientIOSDaily */ = {
