@@ -132,9 +132,9 @@ extension CallContainerModel:PipecatClientDelegate {
     
     private func handleEvent(eventName: String, eventValue: Any? = nil) {
         if let value = eventValue {
-            print("RTVI Demo, received event:\(eventName), value:\(value)")
+            print("Travel Companion Demo, received event:\(eventName), value:\(value)")
         } else {
-            print("RTVI Demo, received event: \(eventName)")
+            print("Travel Companion Demo, received event: \(eventName)")
         }
     }
     
@@ -149,6 +149,10 @@ extension CallContainerModel:PipecatClientDelegate {
             self.handleEvent(eventName: "onBotReady.")
             self.isBotReady = true
             self.startTimer()
+            // Only to show how to send custom messages or requests
+            try self.pipecatClientIOS?.sendClientMessage(msgType: "ios-app-name", data: .string("Travel Companion!"))
+            let llmVendor = try await self.pipecatClientIOS?.sendClientRequest(msgType: "get-llm-vendor").d?.asString
+            print("Travel Companion Demo, LLM Vendor: \(llmVendor ?? "")")
         }
     }
     

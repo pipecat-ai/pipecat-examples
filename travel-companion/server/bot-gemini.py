@@ -51,16 +51,6 @@ transport_params = {
         # endpointing, for now.
         vad_analyzer=SileroVADAnalyzer(params=VADParams(stop_secs=0.5)),
     ),
-    "webrtc": lambda: TransportParams(
-        audio_in_enabled=True,
-        audio_out_enabled=True,
-        video_in_enabled=True,
-        # set stop_secs to something roughly similar to the internal setting
-        # of the Multimodal Live api, just to align events. This doesn't really
-        # matter because we can only use the Multimodal Live API's phrase
-        # endpointing, for now.
-        vad_analyzer=SileroVADAnalyzer(params=VADParams(stop_secs=0.5)),
-    ),
 }
 
 # Search tool can only be used together with other tools when using the Multimodal Live API
@@ -185,6 +175,13 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     async def on_client_disconnected(transport, client):
         logger.info(f"Client disconnected")
         await task.cancel()
+
+    @rtvi.event_handler("on_client_message")
+    async def on_client_message(rtvi, msg):
+        print("RTVI client message:", msg.type, msg.data)
+        # Sample message to show how it works
+        if msg.type == "get-llm-vendor":
+            await rtvi.send_server_response(msg, "Google")
 
     runner = PipelineRunner(handle_sigint=False)
 
