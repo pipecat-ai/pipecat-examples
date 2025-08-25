@@ -1,0 +1,4 @@
+/server/venv
+/server/.env
+/client/ios/TravelCompanion.xcodeproj/xcuserdata/
+/client/ios/TravelCompanion.xcodeproj/project.xcworkspace/xcuserdata/
