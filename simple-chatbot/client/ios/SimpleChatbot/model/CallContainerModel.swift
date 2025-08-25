@@ -22,7 +22,7 @@ class CallContainerModel: ObservableObject {
     
     private var meetingTimer: Timer?
     
-    var rtviClientIOS: RTVIClient?
+    var pipecatClientIOS: PipecatClient?
     
     @Published var selectedMic: MediaDeviceId? = nil {
         didSet {
@@ -48,31 +48,28 @@ class CallContainerModel: ObservableObject {
         }
         
         let currentSettings = SettingsManager.getSettings()
-        let rtviClientOptions = RTVIClientOptions.init(
+        let pipecatClientOptions = PipecatClientOptions.init(
+            transport: DailyTransport.init(),
             enableMic: currentSettings.enableMic,
             enableCam: false,
-            params: RTVIClientParams(
-                baseUrl: baseUrl,
-                endpoints: RTVIURLEndpoints(connect: "/connect")
-            )
         )
-        self.rtviClientIOS = RTVIClient.init(
-            transport: DailyTransport.init(options: rtviClientOptions),
-            options: rtviClientOptions
+        self.pipecatClientIOS = PipecatClient.init(
+            options: pipecatClientOptions
         )
-        self.rtviClientIOS?.delegate = self
-        self.rtviClientIOS?.start() { result in
+        self.pipecatClientIOS?.delegate = self
+        let startBotParams = APIRequest.init(endpoint: URL(string: baseUrl + "/connect")!)
+        self.pipecatClientIOS?.startBotAndConnect(startBotParams: startBotParams) { (result: Result<DailyTransportConnectionParams, AsyncExecutionError>) in
             switch result {
             case .failure(let error):
                 self.showError(message: error.localizedDescription)
-                self.rtviClientIOS = nil
-            case .success():
+                self.pipecatClientIOS = nil
+            case .success(_):
                 // Apply initial mic preference
                 if let selectedMic = currentSettings.selectedMic {
                     self.selectMic(MediaDeviceId(id: selectedMic))
                 }
                 // Populate available devices list
-                self.availableMics = self.rtviClientIOS?.getAllMics() ?? []
+                self.availableMics = self.pipecatClientIOS?.getAllMics() ?? []
             }
         }
         self.saveCredentials(backendURL: baseUrl)
@@ -80,8 +77,8 @@ class CallContainerModel: ObservableObject {
     
     func disconnect() {
         Task { @MainActor in
-            try await self.rtviClientIOS?.disconnect()
-            self.rtviClientIOS?.release()
+            try await self.pipecatClientIOS?.disconnect()
+            self.pipecatClientIOS?.release()
         }
     }
     
@@ -97,22 +94,22 @@ class CallContainerModel: ObservableObject {
     
     @MainActor
     func toggleMicInput() {
-        self.rtviClientIOS?.enableMic(enable: !self.isMicEnabled) { result in
+        self.pipecatClientIOS?.enableMic(enable: !self.isMicEnabled) { result in
             switch result {
             case .success():
-                self.isMicEnabled = self.rtviClientIOS?.isMicEnabled ?? false
+                self.isMicEnabled = self.pipecatClientIOS?.isMicEnabled ?? false
             case .failure(let error):
                 self.showError(message: error.localizedDescription)
             }
         }
     }
     
-    private func startTimer(withExpirationTime expirationTime: Int) {
+    private func startTimer() {
         let currentTime = Int(Date().timeIntervalSince1970)
-        self.timerCount = expirationTime - currentTime
+        self.timerCount = 0
         self.meetingTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { timer in
             DispatchQueue.main.async {
-                self.timerCount -= 1
+                self.timerCount += 1
             }
         }
     }
@@ -133,12 +130,11 @@ class CallContainerModel: ObservableObject {
     @MainActor
     func selectMic(_ mic: MediaDeviceId) {
         self.selectedMic = mic
-        self.rtviClientIOS?.updateMic(micId: mic, completion: nil)
+        self.pipecatClientIOS?.updateMic(micId: mic, completion: nil)
     }
 }
 
-extension CallContainerModel:RTVIClientDelegate {
-    
+extension CallContainerModel:PipecatClientDelegate {
     private func handleEvent(eventName: String, eventValue: Any? = nil) {
         if let value = eventValue {
             print("RTVI Demo, received event:\(eventName), value:\(value)")
@@ -159,15 +155,13 @@ extension CallContainerModel:RTVIClientDelegate {
         Task { @MainActor in
             self.handleEvent(eventName: "onBotReady.")
             self.isBotReady = true
-            if let expirationTime = self.rtviClientIOS?.expiry() {
-                self.startTimer(withExpirationTime: expirationTime)
-            }
+            self.startTimer()
         }
     }
     
     func onConnected() {
         Task { @MainActor in
-            self.isMicEnabled = self.rtviClientIOS?.isMicEnabled ?? false
+            self.isMicEnabled = self.pipecatClientIOS?.isMicEnabled ?? false
         }
     }
     
@@ -184,7 +178,7 @@ extension CallContainerModel:RTVIClientDelegate {
         }
     }
     
-    func onUserAudioLevel(level: Float) {
+    func onLocalAudioLevel(level: Float) {
         Task { @MainActor in
             self.localAudioLevel = level
         }
@@ -198,22 +192,28 @@ extension CallContainerModel:RTVIClientDelegate {
         }
     }
     
-    func onBotTranscript(data: String) {
+    func onBotTranscript(data: BotLLMText) {
         Task { @MainActor in
             self.handleEvent(eventName: "onBotTranscript", eventValue: data)
         }
     }
     
-    func onError(message: String) {
+    func onError(message: RTVIMessageInbound) {
         Task { @MainActor in
             self.handleEvent(eventName: "onError", eventValue: message)
-            self.showError(message: message)
+            self.showError(message: message.data ?? "")
         }
     }
     
-    func onTracksUpdated(tracks: Tracks) {
+    func onTrackStarted(track: MediaStreamTrack, participant: Participant?) {
         Task { @MainActor in
-            self.handleEvent(eventName: "onTracksUpdated", eventValue: tracks)
+            self.handleEvent(eventName: "onTrackStarted", eventValue: track)
+        }
+    }
+
+    func onTrackStopped(track: MediaStreamTrack, participant: Participant?) {
+        Task { @MainActor in
+            self.handleEvent(eventName: "onTrackStopped", eventValue: track)
         }
     }
     
@@ -226,6 +226,12 @@ extension CallContainerModel:RTVIClientDelegate {
     func onMicUpdated(mic: MediaDeviceInfo?) {
         Task { @MainActor in
             self.selectedMic = mic?.id
+        }
+    }
+    
+    func onMetrics(data: PipecatMetrics) {
+        Task { @MainActor in
+            self.handleEvent(eventName: "onMetrics", eventValue: data)
         }
     }
 }
