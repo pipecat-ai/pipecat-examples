@@ -4,7 +4,6 @@
 # SPDX-License-Identifier: BSD 2-Clause License
 #
 import os
-import sys
 
 import cv2
 import numpy as np
@@ -17,7 +16,7 @@ from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineParams, PipelineTask
 from pipecat.processors.aggregators.openai_llm_context import OpenAILLMContext
 from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
-from pipecat.processors.frameworks.rtvi import RTVIConfig, RTVIObserver, RTVIProcessor
+from pipecat.processors.frameworks.rtvi import RTVIObserver, RTVIProcessor
 from pipecat.services.gemini_multimodal_live import GeminiMultimodalLiveLLMService
 from pipecat.transports.base_transport import TransportParams
 from pipecat.transports.network.small_webrtc import SmallWebRTCTransport
@@ -34,25 +33,27 @@ class EdgeDetectionProcessor(FrameProcessor):
     async def process_frame(self, frame: Frame, direction: FrameDirection):
         await super().process_frame(frame, direction)
 
-        if isinstance(frame, InputImageRawFrame):
+        # Send back the user's camera video with edge detection applied
+        if isinstance(frame, InputImageRawFrame) and frame.transport_source == "camera":
             # Convert bytes to NumPy array
             img = np.frombuffer(frame.image, dtype=np.uint8).reshape(
                 (frame.size[1], frame.size[0], 3)
             )
 
-            # perform edge detection
+            # perform edge detection only on camera frames
             img = cv2.cvtColor(cv2.Canny(img, 100, 200), cv2.COLOR_GRAY2BGR)
 
             # convert the size if needed
             desired_size = (self._video_out_width, self._video_out_height)
             if frame.size != desired_size:
                 resized_image = cv2.resize(img, desired_size)
-                frame = OutputImageRawFrame(resized_image.tobytes(), desired_size, frame.format)
-                await self.push_frame(frame)
+                out_frame = OutputImageRawFrame(resized_image.tobytes(), desired_size, frame.format)
+                await self.push_frame(out_frame)
             else:
-                await self.push_frame(
-                    OutputImageRawFrame(image=img.tobytes(), size=frame.size, format=frame.format)
+                out_frame = OutputImageRawFrame(
+                    image=img.tobytes(), size=frame.size, format=frame.format
                 )
+                await self.push_frame(out_frame)
         else:
             await self.push_frame(frame, direction)
 
@@ -90,18 +91,18 @@ async def run_bot(webrtc_connection):
         system_instruction=SYSTEM_INSTRUCTION,
     )
 
-    context = OpenAILLMContext(
-        [
-            {
-                "role": "user",
-                "content": "Start by greeting the user warmly and introducing yourself.",
-            }
-        ],
-    )
+    messages = [
+        {
+            "role": "user",
+            "content": "Start by greeting the user warmly and introducing yourself.",
+        }
+    ]
+
+    context = OpenAILLMContext(messages)
     context_aggregator = llm.create_context_aggregator(context)
 
     # RTVI events for Pipecat client UI
-    rtvi = RTVIProcessor(config=RTVIConfig(config=[]))
+    rtvi = RTVIProcessor()
 
     pipeline = Pipeline(
         [
@@ -136,6 +137,8 @@ async def run_bot(webrtc_connection):
     @pipecat_transport.event_handler("on_client_connected")
     async def on_client_connected(transport, client):
         logger.info("Pipecat Client connected")
+        await pipecat_transport.capture_participant_video("camera")
+        await pipecat_transport.capture_participant_video("screenVideo")
 
     @pipecat_transport.event_handler("on_client_disconnected")
     async def on_client_disconnected(transport, client):
