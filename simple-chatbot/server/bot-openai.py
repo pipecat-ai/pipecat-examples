@@ -21,7 +21,10 @@ import os
 
 from dotenv import load_dotenv
 from loguru import logger
+from openai.types.chat import ChatCompletionMessageParam
 from PIL import Image
+from pipecat.adapters.schemas.function_schema import FunctionSchema
+from pipecat.adapters.schemas.tools_schema import ToolsSchema
 from pipecat.audio.vad.silero import SileroVADAnalyzer
 from pipecat.frames.frames import (
     BotStartedSpeakingFrame,
@@ -35,9 +38,15 @@ from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineParams, PipelineTask
 from pipecat.processors.aggregators.openai_llm_context import OpenAILLMContext
 from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
-from pipecat.processors.frameworks.rtvi import RTVIConfig, RTVIObserver, RTVIProcessor
-from pipecat.runner.types import RunnerArguments
+from pipecat.processors.frameworks.rtvi import (
+    RTVIConfig,
+    RTVIObserver,
+    RTVIProcessor,
+    RTVIServerMessageFrame,
+)
+from pipecat.runner.types import DailyRunnerArguments, RunnerArguments
 from pipecat.services.elevenlabs.tts import ElevenLabsTTSService
+from pipecat.services.llm_service import FunctionCallParams
 from pipecat.services.openai.llm import OpenAILLMService
 from pipecat.transports.base_transport import BaseTransport
 from pipecat.transports.services.daily import DailyParams, DailyTransport
@@ -110,23 +119,63 @@ async def run_bot(transport: BaseTransport):
 
     # Initialize text-to-speech service
     tts = ElevenLabsTTSService(
-        api_key=os.getenv("ELEVENLABS_API_KEY"),
+        api_key=os.getenv("ELEVENLABS_API_KEY", ""),
         voice_id="pNInz6obpgDQGcFmaJgB",
     )
 
     # Initialize LLM service
     llm = OpenAILLMService(api_key=os.getenv("OPENAI_API_KEY"))
 
-    messages = [
+    #
+    # RTVI events for Pipecat client UI
+    #
+    rtvi = RTVIProcessor(config=RTVIConfig(config=[]))
+
+    # Define the get_participant_name tool function
+    async def get_participant_name(params: FunctionCallParams):
+        """Handle participant name extraction and send both JSON response and RTVI message."""
+        # Extract the name from the function parameters
+        name = params.arguments.get("name", "Unknown") if params.arguments else "Unknown"
+
+        # Create the JSON response
+        result = {"name": name}
+
+        # Send RTVI server message frame
+        name_event_frame = RTVIServerMessageFrame(
+            data={"type": "name-event", "payload": {"name": name}}
+        )
+        await rtvi.push_frame(name_event_frame)
+
+        # Return the result to the LLM
+        await params.result_callback(result)
+
+    # Register the function with the LLM
+    llm.register_function("get_participant_name", get_participant_name)
+
+    # Define the get_participant_name tool schema
+    name_function = FunctionSchema(
+        name="get_participant_name",
+        description="Extract and store the participant's name when they introduce themselves",
+        properties={
+            "name": {
+                "type": "string",
+                "description": "The name the participant provided",
+            },
+        },
+        required=["name"],
+    )
+    tools = ToolsSchema(standard_tools=[name_function])
+
+    messages: list[ChatCompletionMessageParam] = [
         {
             "role": "system",
-            "content": "You are Chatbot, a friendly, helpful robot. Your goal is to demonstrate your capabilities in a succinct way. Your output will be converted to audio so don't include special characters in your answers. Respond to what the user said in a creative and helpful way, but keep your responses brief. Start by introducing yourself.",
+            "content": "You are Chatbot, a friendly, helpful robot. Your goal is to demonstrate your capabilities in a succinct way. Your output will be converted to audio so don't include special characters in your answers. Respond to what the user said in a creative and helpful way, but keep your responses brief. When someone introduces themselves or mentions their name, use the get_participant_name function to store their name. Start by introducing yourself.",
         },
     ]
 
     # Set up conversation context and management
     # The context_aggregator will automatically collect conversation context
-    context = OpenAILLMContext(messages)
+    context = OpenAILLMContext(messages, tools=tools)
     context_aggregator = llm.create_context_aggregator(context)
 
     ta = TalkingAnimation()
@@ -183,20 +232,30 @@ async def run_bot(transport: BaseTransport):
 async def bot(runner_args: RunnerArguments):
     """Main bot entry point compatible with Pipecat Cloud."""
 
-    transport = DailyTransport(
-        runner_args.room_url,
-        runner_args.token,
-        "Pipecat Bot",
-        params=DailyParams(
-            audio_in_enabled=True,
-            audio_out_enabled=True,
-            video_out_enabled=True,
-            video_out_width=1024,
-            video_out_height=576,
-            vad_analyzer=SileroVADAnalyzer(),
-            transcription_enabled=True,
-        ),
-    )
+    transport = None
+
+    if isinstance(runner_args, DailyRunnerArguments):
+        transport = DailyTransport(
+            runner_args.room_url,
+            runner_args.token,
+            "Pipecat Bot",
+            params=DailyParams(
+                audio_in_enabled=True,
+                audio_out_enabled=True,
+                video_out_enabled=True,
+                video_out_width=1024,
+                video_out_height=576,
+                vad_analyzer=SileroVADAnalyzer(),
+                transcription_enabled=True,
+            ),
+        )
+    else:
+        logger.error(f"Unsupported runner arguments type: {type(runner_args)}")
+        return
+
+    if transport is None:
+        logger.error("Failed to create transport")
+        return
 
     await run_bot(transport)
 
