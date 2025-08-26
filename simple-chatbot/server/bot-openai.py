@@ -66,11 +66,6 @@ async def run_bot(transport: DailyTransport):
     # Initialize LLM service
     llm = OpenAILLMService(api_key=os.getenv("OPENAI_API_KEY"))
 
-    #
-    # RTVI events for Pipecat client UI
-    #
-    rtvi = RTVIProcessor(config=RTVIConfig(config=[]))
-
     messages: list[ChatCompletionMessageParam] = [
         {
             "role": "system",
