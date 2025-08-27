@@ -95,22 +95,22 @@ async def run_server_with_signal_handling(host: str, port: int):
     loop = asyncio.get_running_loop()
     for sig in (signal.SIGINT, signal.SIGTERM):
         loop.add_signal_handler(sig, signal_handler)
-    
+
     # Create server config
     config = uvicorn.Config(app, host=host, port=port, log_config=None)
     server = uvicorn.Server(config)
-    
+
     # Start server in background
     server_task = asyncio.create_task(server.serve())
 
     logger.info(f"Server started on {host}:{port}...")
     # Wait for shutdown signal
     await shutdown_event.wait()
-    
+
     # Initiate graceful shutdown
     logger.info("Shutting down server...")
     await whatsapp_client.terminate_all_calls()
-    
+
     # Wait for server to finish
     await server_task
 
