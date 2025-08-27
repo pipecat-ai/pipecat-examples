@@ -21,7 +21,7 @@ Key features:
 Environment Variables Required:
 - WHATSAPP_TOKEN: WhatsApp Business API access token
 - WHATSAPP_WEBHOOK_VERIFICATION_TOKEN: Token for webhook verification
-- PHONE_NUMBER_ID: WhatsApp Business phone number ID
+- WHATSAPP_PHONE_NUMBER_ID: WhatsApp Business phone number ID
 
 Usage:
     python server.py --host 0.0.0.0 --port 8080 --verbose
@@ -51,16 +51,16 @@ import os
 # Global configuration - loaded from environment variables
 WHATSAPP_TOKEN = os.getenv("WHATSAPP_TOKEN")
 WHATSAPP_WEBHOOK_VERIFICATION_TOKEN = os.getenv("WHATSAPP_WEBHOOK_VERIFICATION_TOKEN")
-PHONE_NUMBER_ID = os.getenv("PHONE_NUMBER_ID")
+WHATSAPP_PHONE_NUMBER_ID = os.getenv("WHATSAPP_PHONE_NUMBER_ID")
 
 # Validate required environment variables
-if not all([WHATSAPP_TOKEN, WHATSAPP_WEBHOOK_VERIFICATION_TOKEN, PHONE_NUMBER_ID]):
+if not all([WHATSAPP_TOKEN, WHATSAPP_WEBHOOK_VERIFICATION_TOKEN, WHATSAPP_PHONE_NUMBER_ID]):
     missing_vars = [
         var
         for var, val in [
             ("WHATSAPP_TOKEN", WHATSAPP_TOKEN),
             ("WHATSAPP_WEBHOOK_VERIFICATION_TOKEN", WHATSAPP_WEBHOOK_VERIFICATION_TOKEN),
-            ("PHONE_NUMBER_ID", PHONE_NUMBER_ID),
+            ("WHATSAPP_PHONE_NUMBER_ID", WHATSAPP_PHONE_NUMBER_ID),
         ]
         if not val
     ]
@@ -99,7 +99,7 @@ async def lifespan(app: FastAPI):
     # Initialize WhatsApp client with persistent HTTP session
     async with aiohttp.ClientSession() as session:
         whatsapp_client = WhatsAppClient(
-            whatsapp_token=WHATSAPP_TOKEN, phone_number_id=PHONE_NUMBER_ID, session=session
+            whatsapp_token=WHATSAPP_TOKEN, phone_number_id=WHATSAPP_PHONE_NUMBER_ID, session=session
         )
         logger.info("WhatsApp client initialized successfully")
 
