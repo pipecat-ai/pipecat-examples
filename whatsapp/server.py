@@ -19,7 +19,7 @@ from pipecat.transports.network.webrtc_connection import IceServer, SmallWebRTCC
 load_dotenv(override=True)
 from fastapi import FastAPI, Request, HTTPException
 from pydantic import BaseModel, Field
-from typing import List, Optional
+from typing import List, Optional, Union, Dict, Any
 import httpx
 import os
 
@@ -46,14 +46,36 @@ class Session(BaseModel):
     sdp_type: str
 
 
-class Call(BaseModel):
+class Error(BaseModel):
+    code: int
+    message: str
+    href: str
+    error_data: Dict[str, Any]
+
+
+class ConnectCall(BaseModel):
     id: str
     from_: str = Field(..., alias="from")
     to: str
-    event: str
+    event: str  # "connect"
     timestamp: str
     direction: Optional[str]
     session: Session
+
+
+class TerminateCall(BaseModel):
+    id: str
+    from_: str = Field(..., alias="from")
+    to: str
+    event: str  # "terminate"
+    timestamp: str
+    direction: Optional[str]
+    biz_opaque_callback_data: Optional[str] = None
+    status: Optional[str] = None  # "FAILED" or "COMPLETED"
+    start_time: Optional[str] = None
+    end_time: Optional[str] = None
+    duration: Optional[int] = None
+
 
 class Profile(BaseModel):
     name: str
@@ -69,15 +91,22 @@ class Metadata(BaseModel):
     phone_number_id: str
 
 
-class CallValue(BaseModel):
+class ConnectCallValue(BaseModel):
     messaging_product: str
     metadata: Metadata
     contacts: List[Contact]
-    calls: List[Call]
+    calls: List[ConnectCall]
+
+
+class TerminateCallValue(BaseModel):
+    messaging_product: str
+    metadata: Metadata
+    calls: List[TerminateCall]
+    errors: Optional[List[Error]] = None
 
 
 class Change(BaseModel):
-    value: CallValue
+    value: Union[ConnectCallValue, TerminateCallValue]
     field: str
 
 
@@ -124,7 +153,7 @@ def filter_sdp_for_whatsapp(sdp: str) -> str:
         filtered.append(line)
     return "\r\n".join(filtered) + "\r\n"
 
-async def handle_connect_event(call: Call, background_tasks: BackgroundTasks):
+async def handle_connect_event(call: ConnectCall, background_tasks: BackgroundTasks):
     """Handle a CONNECT event: pre-accept and accept the call."""
     logger.info(f"Incoming call from {call.from_}, call_id: {call.id}")
 
@@ -147,6 +176,18 @@ async def handle_connect_event(call: Call, background_tasks: BackgroundTasks):
         return {"status": "failed"}
     logger.info("Accept response:", accept_resp)
     return {"status": "success", "message": "Call pre-accepted and accepted"}
+
+async def handle_terminate_event(call: TerminateCall):
+    """Handle a TERMINATE event: clean up resources and log call completion."""
+    logger.info(f"Call terminated from {call.from_}, call_id: {call.id}")
+    logger.info(f"Call status: {call.status}")
+    if call.duration:
+        logger.info(f"Call duration: {call.duration} seconds")
+    
+    # Here you can add any cleanup logic needed when a call terminates
+    # For example, updating database records, sending notifications, etc.
+    
+    return {"status": "success", "message": "Call termination handled"}
 
 # ----------------------------
 # Webhook Endpoint
@@ -172,11 +213,19 @@ async def whatsapp_call_webhook(body: WebhookRequest, background_tasks: Backgrou
 
     for entry in body.entry:
         for change in entry.changes:
-            for call in change.value.calls:
-                if call.event == "connect":
-                    return await handle_connect_event(call, background_tasks)
+            # Handle connect events
+            if isinstance(change.value, ConnectCallValue):
+                for call in change.value.calls:
+                    if call.event == "connect":
+                        return await handle_connect_event(call, background_tasks)
+            
+            # Handle terminate events
+            elif isinstance(change.value, TerminateCallValue):
+                for call in change.value.calls:
+                    if call.event == "terminate":
+                        return await handle_terminate_event(call)
 
-    raise HTTPException(status_code=400, detail="No CONNECT event found")
+    raise HTTPException(status_code=400, detail="No supported event found")
 
 
 if __name__ == "__main__":
