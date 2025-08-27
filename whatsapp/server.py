@@ -4,139 +4,279 @@
 # SPDX-License-Identifier: BSD 2-Clause License
 #
 
+"""WhatsApp WebRTC Bot Server
+
+A FastAPI server that handles WhatsApp webhook events and manages WebRTC connections
+for real-time communication with WhatsApp users. The server integrates with WhatsApp's
+Business API to receive incoming calls and messages, then establishes WebRTC connections
+to enable audio/video communication through a bot.
+
+Key features:
+- WhatsApp webhook verification and message handling
+- WebRTC connection management with ICE server support
+- Graceful shutdown handling with signal management
+- Background task processing for bot instances
+- Connection cleanup and resource management
+
+Environment Variables Required:
+- WHATSAPP_TOKEN: WhatsApp Business API access token
+- WHATSAPP_WEBHOOK_VERIFICATION_TOKEN: Token for webhook verification
+- PHONE_NUMBER_ID: WhatsApp Business phone number ID
+
+Usage:
+    python server.py --host 0.0.0.0 --port 8080 --verbose
+"""
+
 import argparse
 import asyncio
 import signal
 import sys
 from contextlib import asynccontextmanager
+from typing import Optional
 
 import aiohttp
 import uvicorn
 from bot import run_bot
 from dotenv import load_dotenv
-from fastapi import BackgroundTasks
+from fastapi import BackgroundTasks, FastAPI, HTTPException, Request
 from loguru import logger
 from pipecat.transports.network.webrtc_connection import SmallWebRTCConnection
-from pipecat.utils.whatsapp.api import (
-    WhatsAppWebhookRequest,
-)
+from pipecat.utils.whatsapp.api import WhatsAppWebhookRequest
 from pipecat.utils.whatsapp.client import WhatsAppClient
 
-# Load environment variables
+# Load environment variables first
 load_dotenv(override=True)
 import os
 
-from fastapi import FastAPI, HTTPException, Request
-
-# WhatsApp - will be initialized in lifespan
+# Global configuration - loaded from environment variables
 WHATSAPP_TOKEN = os.getenv("WHATSAPP_TOKEN")
 WHATSAPP_WEBHOOK_VERIFICATION_TOKEN = os.getenv("WHATSAPP_WEBHOOK_VERIFICATION_TOKEN")
 PHONE_NUMBER_ID = os.getenv("PHONE_NUMBER_ID")
-whatsapp_client: WhatsAppClient = None
 
-# Global flag to handle shutdown
+# Validate required environment variables
+if not all([WHATSAPP_TOKEN, WHATSAPP_WEBHOOK_VERIFICATION_TOKEN, PHONE_NUMBER_ID]):
+    missing_vars = [
+        var
+        for var, val in [
+            ("WHATSAPP_TOKEN", WHATSAPP_TOKEN),
+            ("WHATSAPP_WEBHOOK_VERIFICATION_TOKEN", WHATSAPP_WEBHOOK_VERIFICATION_TOKEN),
+            ("PHONE_NUMBER_ID", PHONE_NUMBER_ID),
+        ]
+        if not val
+    ]
+    raise ValueError(f"Missing required environment variables: {', '.join(missing_vars)}")
+
+# Global state
+whatsapp_client: Optional[WhatsAppClient] = None
 shutdown_event = asyncio.Event()
 
 
-def signal_handler():
-    """Handle SIGINT and SIGTERM signals"""
+def signal_handler() -> None:
+    """Handle shutdown signals (SIGINT, SIGTERM) gracefully.
+
+    Sets the shutdown event to initiate graceful server shutdown.
+    This allows the server to complete ongoing requests and cleanup resources.
+    """
     logger.info("Received shutdown signal, initiating graceful shutdown...")
     shutdown_event.set()
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    """Manage application lifespan and resources.
+
+    Sets up the WhatsApp client with an HTTP session on startup
+    and ensures proper cleanup on shutdown.
+
+    Args:
+        app: The FastAPI application instance
+
+    Yields:
+        None: Control back to the application during runtime
+    """
     global whatsapp_client
-    # Create the session and initialize WhatsApp API
+
+    # Initialize WhatsApp client with persistent HTTP session
     async with aiohttp.ClientSession() as session:
         whatsapp_client = WhatsAppClient(
             whatsapp_token=WHATSAPP_TOKEN, phone_number_id=PHONE_NUMBER_ID, session=session
         )
-        yield  # Run app
-        # Clean up
-        await whatsapp_client.terminate_all_calls()
+        logger.info("WhatsApp client initialized successfully")
+
+        try:
+            yield  # Run the application
+        finally:
+            # Cleanup all active calls on shutdown
+            logger.info("Cleaning up WhatsApp client resources...")
+            if whatsapp_client:
+                await whatsapp_client.terminate_all_calls()
+            logger.info("Cleanup completed")
 
 
-app = FastAPI(lifespan=lifespan)
+# Initialize FastAPI app with lifespan management
+app = FastAPI(
+    title="WhatsApp WebRTC Bot Server",
+    description="Handles WhatsApp webhooks and manages WebRTC connections for bot communication",
+    version="1.0.0",
+    lifespan=lifespan,
+)
 
 
-# ----------------------------
-# Webhook Endpoint
-# ----------------------------
-@app.get("/")
+@app.get(
+    "/",
+    summary="Verify WhatsApp webhook",
+    description="Handles WhatsApp webhook verification requests from Meta",
+)
 async def verify_webhook(request: Request):
+    """Verify WhatsApp webhook endpoint.
+
+    This endpoint is called by Meta's WhatsApp Business API to verify
+    the webhook URL during setup. It validates the verification token
+    and returns the challenge parameter if successful.
+
+    Args:
+        request: FastAPI request object containing query parameters
+
+    Returns:
+        dict: Verification response or challenge string
+
+    Raises:
+        HTTPException: 403 if verification token is invalid
+    """
     params = dict(request.query_params)
+    logger.debug(f"Webhook verification request received with params: {list(params.keys())}")
 
     try:
         result = await whatsapp_client.handle_verify_webhook_request(
             params=params, expected_verification_token=WHATSAPP_WEBHOOK_VERIFICATION_TOKEN
         )
+        logger.info("Webhook verification successful")
         return result
     except ValueError as e:
         logger.warning(f"Webhook verification failed: {e}")
         raise HTTPException(status_code=403, detail="Verification failed")
 
 
-@app.post("/")
-async def whatsapp_call_webhook(body: WhatsAppWebhookRequest, background_tasks: BackgroundTasks):
+@app.post(
+    "/",
+    summary="Handle WhatsApp webhook events",
+    description="Processes incoming WhatsApp messages and call events",
+)
+async def whatsapp_webhook(body: WhatsAppWebhookRequest, background_tasks: BackgroundTasks):
+    """Handle incoming WhatsApp webhook events.
+
+    Processes WhatsApp Business API webhook requests including:
+    - Incoming messages
+    - Call requests and status updates
+    - User interactions
+
+    For call events, establishes WebRTC connections and spawns bot instances
+    in the background to handle real-time communication.
+
+    Args:
+        body: Parsed WhatsApp webhook request body
+        background_tasks: FastAPI background tasks manager
+
+    Returns:
+        dict: Success response with processing status
+
+    Raises:
+        HTTPException:
+            400 for invalid request format or object type
+            500 for internal processing errors
+    """
+    # Validate webhook object type
     if body.object != "whatsapp_business_account":
+        logger.warning(f"Invalid webhook object type: {body.object}")
         raise HTTPException(status_code=400, detail="Invalid object type")
 
-    logger.info(f"Webhook received: {body}")
+    logger.info(f"Processing WhatsApp webhook: {body.dict()}")
 
     async def connection_callback(connection: SmallWebRTCConnection):
-        """Callback to handle new WebRTC connections"""
+        """Handle new WebRTC connections from WhatsApp calls.
+
+        Called when a WebRTC connection is established for a WhatsApp call.
+        Spawns a bot instance to handle the conversation.
+
+        Args:
+            connection: The established WebRTC connection
+        """
         try:
-            logger.debug(f"Starting bot for connection: {connection.pc_id}")
+            logger.info(f"Starting bot for WebRTC connection: {connection.pc_id}")
             background_tasks.add_task(run_bot, connection)
+            logger.debug(f"Bot task queued successfully for connection: {connection.pc_id}")
         except Exception as e:
             logger.error(f"Failed to start bot for connection {connection.pc_id}: {e}")
-            # Optionally disconnect the connection on error
+            # Attempt to cleanup the connection on error
             try:
                 await connection.disconnect()
+                logger.debug(f"Connection {connection.pc_id} disconnected after error")
             except Exception as disconnect_error:
                 logger.error(f"Failed to disconnect connection after error: {disconnect_error}")
 
     try:
+        # Process the webhook request
         result = await whatsapp_client.handle_webhook_request(body, connection_callback)
         logger.debug(f"Webhook processed successfully: {result}")
         return {"status": "success", "message": "Webhook processed successfully"}
+
     except ValueError as ve:
-        logger.warning(f"Invalid webhook request: {ve}")
-        raise HTTPException(status_code=400, detail=str(ve))
+        logger.warning(f"Invalid webhook request format: {ve}")
+        raise HTTPException(status_code=400, detail=f"Invalid request: {str(ve)}")
     except Exception as e:
-        logger.error(f"Failed to process webhook request: {e}")
+        logger.error(f"Internal error processing webhook: {e}")
         raise HTTPException(status_code=500, detail="Internal server error processing webhook")
 
 
-async def run_server_with_signal_handling(host: str, port: int):
-    """Run the server with proper signal handling"""
-    # Set up signal handlers
+async def run_server_with_signal_handling(host: str, port: int) -> None:
+    """Run the FastAPI server with proper signal handling.
+
+    Sets up signal handlers for graceful shutdown and manages the server lifecycle.
+    Handles SIGINT (Ctrl+C) and SIGTERM signals to ensure proper cleanup.
+
+    Args:
+        host: The host address to bind the server to
+        port: The port number to listen on
+    """
+    # Set up signal handlers for graceful shutdown
     loop = asyncio.get_running_loop()
     for sig in (signal.SIGINT, signal.SIGTERM):
         loop.add_signal_handler(sig, signal_handler)
 
-    # Create server config
-    config = uvicorn.Config(app, host=host, port=port, log_config=None)
+    # Configure and create the server
+    config = uvicorn.Config(
+        app,
+        host=host,
+        port=port,
+        log_config=None,
+    )
     server = uvicorn.Server(config)
 
-    # Start server in background
+    # Start server in background task
     server_task = asyncio.create_task(server.serve())
+    logger.info(f"WhatsApp WebRTC server started on {host}:{port}")
+    logger.info("Press Ctrl+C to stop the server")
 
-    logger.info(f"Server started on {host}:{port}...")
     # Wait for shutdown signal
     await shutdown_event.wait()
 
     # Initiate graceful shutdown
-    logger.info("Shutting down server...")
-    await whatsapp_client.terminate_all_calls()
+    logger.info("Shutting down server.")
 
-    # Wait for server to finish
+    # Cleanup WhatsApp client resources
+    if whatsapp_client:
+        await whatsapp_client.terminate_all_calls()
+
+    # Stop the server
+    server.should_exit = True
     await server_task
+    logger.info("Server shutdown completed")
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="WebRTC demo")
+    parser = argparse.ArgumentParser(
+        description="WhatsApp WebRTC Bot Server - Handles WhatsApp webhooks and WebRTC connections"
+    )
     parser.add_argument(
         "--host", default="localhost", help="Host for HTTP server (default: localhost)"
     )
@@ -152,5 +292,15 @@ if __name__ == "__main__":
     else:
         logger.add(sys.stderr, level="DEBUG")
 
-    # Use asyncio.run with the new signal handling function
-    asyncio.run(run_server_with_signal_handling(args.host, args.port))
+    # Validate configuration
+    logger.info("Starting WhatsApp WebRTC Bot Server...")
+    logger.debug(f"Configuration: host={args.host}, port={args.port}, verbose={args.verbose}")
+
+    # Run the server
+    try:
+        asyncio.run(run_server_with_signal_handling(args.host, args.port))
+    except KeyboardInterrupt:
+        logger.info("Server interrupted by user")
+    except Exception as e:
+        logger.error(f"Fatal error: {e}")
+        sys.exit(1)
