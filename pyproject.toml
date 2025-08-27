@@ -4,7 +4,7 @@ name = "pipecat-examples"
 version = "0.0.0"
 description = "Examples for Pipecat AI framework"
 requires-python = ">=3.10"
-dependencies = [ "pipecat-ai>=0.0.79", ]
+dependencies = []
 
 [dependency-groups]
 dev = [
@@ -20,3 +20,8 @@ line-length = 100
 [tool.ruff.lint]
 select = ["I"]
 ignore = []
+
+[tool.uv.workspace]
+members = [
+    "twilio-chatbot",
+]
