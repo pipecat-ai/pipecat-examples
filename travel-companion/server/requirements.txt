@@ -1,0 +1,1 @@
+pipecat-ai[daily,openai,silero,google,runner]>=0.0.80
