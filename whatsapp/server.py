@@ -66,13 +66,14 @@ app = FastAPI(lifespan=lifespan)
 @app.get("/")
 async def verify_webhook(request: Request):
     params = dict(request.query_params)
-    mode = params.get("hub.mode")
-    challenge = params.get("hub.challenge")
-    verify_token = params.get("hub.verify_token")
 
-    if mode == "subscribe" and verify_token == WHATSAPP_WEBHOOK_VERIFICATION_TOKEN:
-        return int(challenge)  # must return the same received challenge
-    else:
+    try:
+        result = await whatsapp_client.handle_verify_webhook_request(
+            params=params, expected_verification_token=WHATSAPP_WEBHOOK_VERIFICATION_TOKEN
+        )
+        return result
+    except ValueError as e:
+        logger.warning(f"Webhook verification failed: {e}")
         raise HTTPException(status_code=403, detail="Verification failed")
 
 
