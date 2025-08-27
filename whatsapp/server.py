@@ -9,143 +9,42 @@ import asyncio
 import sys
 from contextlib import asynccontextmanager
 
+import aiohttp
 import uvicorn
 from bot import run_bot
 from dotenv import load_dotenv
-from fastapi import BackgroundTasks, FastAPI, HTTPException, Request
+from fastapi import BackgroundTasks
 from loguru import logger
 from pipecat.transports.network.webrtc_connection import IceServer, SmallWebRTCConnection
+from pipecat.utils.whatsapp.api import (
+    WhatsAppApi,
+    WhatsAppConnectCall,
+    WhatsAppConnectCallValue,
+    WhatsAppTerminateCall,
+    WhatsAppTerminateCallValue,
+    WhatsAppWebhookRequest,
+)
 
 # Load environment variables
 load_dotenv(override=True)
 import os
-from typing import Any, Dict, List, Optional, Union
+from typing import Dict
 
-import httpx
 from fastapi import FastAPI, HTTPException, Request
-from pydantic import BaseModel, Field
-
-app = FastAPI()
 
 # Store connections by pc_id
 ongoing_calls_map: Dict[str, SmallWebRTCConnection] = {}
-
-# Environment variables
-WHATSAPP_TOKEN = os.getenv("WHATSAPP_TOKEN")
-WHATSAPP_WEBHOOK_VERIFICATION_TOKEN = os.getenv("WHATSAPP_WEBHOOK_VERIFICATION_TOKEN")
-
-PHONE_NUMBER_ID = os.getenv("PHONE_NUMBER_ID")
-WHATSAPP_API_URL = f"https://graph.facebook.com/v23.0/{PHONE_NUMBER_ID}/calls"
-
 ice_servers = [
     IceServer(
         urls="stun:stun.l.google.com:19302",
     )
 ]
 
-
-# ----------------------------
-# Pydantic Models for Webhook
-# ----------------------------
-class Session(BaseModel):
-    sdp: str
-    sdp_type: str
-
-
-class Error(BaseModel):
-    code: int
-    message: str
-    href: str
-    error_data: Dict[str, Any]
-
-
-class ConnectCall(BaseModel):
-    id: str
-    from_: str = Field(..., alias="from")
-    to: str
-    event: str  # "connect"
-    timestamp: str
-    direction: Optional[str]
-    session: Session
-
-
-class TerminateCall(BaseModel):
-    id: str
-    from_: str = Field(..., alias="from")
-    to: str
-    event: str  # "terminate"
-    timestamp: str
-    direction: Optional[str]
-    biz_opaque_callback_data: Optional[str] = None
-    status: Optional[str] = None  # "FAILED" or "COMPLETED"
-    start_time: Optional[str] = None
-    end_time: Optional[str] = None
-    duration: Optional[int] = None
-
-
-class Profile(BaseModel):
-    name: str
-
-
-class Contact(BaseModel):
-    profile: Profile
-    wa_id: str
-
-
-class Metadata(BaseModel):
-    display_phone_number: str
-    phone_number_id: str
-
-
-class ConnectCallValue(BaseModel):
-    messaging_product: str
-    metadata: Metadata
-    contacts: List[Contact]
-    calls: List[ConnectCall]
-
-
-class TerminateCallValue(BaseModel):
-    messaging_product: str
-    metadata: Metadata
-    calls: List[TerminateCall]
-    errors: Optional[List[Error]] = None
-
-
-class Change(BaseModel):
-    value: Union[ConnectCallValue, TerminateCallValue]
-    field: str
-
-
-class Entry(BaseModel):
-    id: str
-    changes: List[Change]
-
-
-class WebhookRequest(BaseModel):
-    object: str
-    entry: List[Entry]
-
-
-# ----------------------------
-# Helper functions
-# ----------------------------
-async def answer_call_to_whatsapp(call_id: str, action: str, sdp: str, from_: str):
-    async with httpx.AsyncClient() as client:
-        response = await client.post(
-            WHATSAPP_API_URL,
-            headers={
-                "Authorization": f"Bearer {WHATSAPP_TOKEN}",
-                "Content-Type": "application/json",
-            },
-            json={
-                "messaging_product": "whatsapp",
-                "to": from_,
-                "action": action,
-                "call_id": call_id,
-                "session": {"sdp": sdp, "sdp_type": "answer"},
-            },
-        )
-        return response
+# WhatsApp - will be initialized in lifespan
+WHATSAPP_TOKEN = os.getenv("WHATSAPP_TOKEN")
+WHATSAPP_WEBHOOK_VERIFICATION_TOKEN = os.getenv("WHATSAPP_WEBHOOK_VERIFICATION_TOKEN")
+PHONE_NUMBER_ID = os.getenv("PHONE_NUMBER_ID")
+whatsapp_api: WhatsAppApi = None
 
 
 def filter_sdp_for_whatsapp(sdp: str) -> str:
@@ -158,7 +57,7 @@ def filter_sdp_for_whatsapp(sdp: str) -> str:
     return "\r\n".join(filtered) + "\r\n"
 
 
-async def handle_connect_event(call: ConnectCall, background_tasks: BackgroundTasks):
+async def handle_connect_event(call: WhatsAppConnectCall, background_tasks: BackgroundTasks):
     """Handle a CONNECT event: pre-accept and accept the call."""
     logger.info(f"Incoming call from {call.from_}, call_id: {call.id}")
 
@@ -170,14 +69,19 @@ async def handle_connect_event(call: ConnectCall, background_tasks: BackgroundTa
 
     logger.info(f"SDP answer: {sdp_answer}")
 
-    pre_accept_resp = await answer_call_to_whatsapp(call.id, "pre_accept", sdp_answer, call.from_)
-    if not pre_accept_resp.is_success:
-        logger.error(f"Failed to pre-accept call: {pre_accept_resp.json()}")
+    pre_accept_resp = await whatsapp_api.answer_call_to_whatsapp(
+        call.id, "pre_accept", sdp_answer, call.from_
+    )
+    if not pre_accept_resp.get("success", False):
+        logger.error(f"Failed to pre-accept call: {pre_accept_resp}")
         return {"status": "failed"}
     logger.info("Pre-accept response:", pre_accept_resp)
-    accept_resp = await answer_call_to_whatsapp(call.id, "accept", sdp_answer, call.from_)
-    if not accept_resp.is_success:
-        logger.error(f"Failed to accept call: {accept_resp.json()}")
+
+    accept_resp = await whatsapp_api.answer_call_to_whatsapp(
+        call.id, "accept", sdp_answer, call.from_
+    )
+    if not accept_resp.get("success", False):
+        logger.error(f"Failed to accept call: {accept_resp}")
         return {"status": "failed"}
     logger.info("Accept response:", accept_resp)
 
@@ -187,7 +91,7 @@ async def handle_connect_event(call: ConnectCall, background_tasks: BackgroundTa
     return {"status": "success", "message": "Call pre-accepted and accepted"}
 
 
-async def handle_terminate_event(call: TerminateCall):
+async def handle_terminate_event(call: WhatsAppTerminateCall):
     """Handle a TERMINATE event: clean up resources and log call completion."""
     logger.info(f"Call terminated from {call.from_}, call_id: {call.id}")
     logger.info(f"Call status: {call.status}")
@@ -206,6 +110,24 @@ async def handle_terminate_event(call: TerminateCall):
 # ----------------------------
 # Webhook Endpoint
 # ----------------------------
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    global whatsapp_api
+    # Create the session and initialize WhatsApp API
+    async with aiohttp.ClientSession() as session:
+        whatsapp_api = WhatsAppApi(
+            whatsapp_token=WHATSAPP_TOKEN, phone_number_id=PHONE_NUMBER_ID, session=session
+        )
+        yield  # Run app
+    # Clean up
+    peers_to_disconnect = [pc.disconnect() for pc in ongoing_calls_map.values()]
+    await asyncio.gather(*peers_to_disconnect)
+    ongoing_calls_map.clear()
+
+
+app = FastAPI(lifespan=lifespan)
+
+
 @app.get("/")
 async def verify_webhook(request: Request):
     params = dict(request.query_params)
@@ -220,7 +142,7 @@ async def verify_webhook(request: Request):
 
 
 @app.post("/")
-async def whatsapp_call_webhook(body: WebhookRequest, background_tasks: BackgroundTasks):
+async def whatsapp_call_webhook(body: WhatsAppWebhookRequest, background_tasks: BackgroundTasks):
     if body.object != "whatsapp_business_account":
         raise HTTPException(status_code=400, detail="Invalid object type")
 
@@ -229,26 +151,18 @@ async def whatsapp_call_webhook(body: WebhookRequest, background_tasks: Backgrou
     for entry in body.entry:
         for change in entry.changes:
             # Handle connect events
-            if isinstance(change.value, ConnectCallValue):
+            if isinstance(change.value, WhatsAppConnectCallValue):
                 for call in change.value.calls:
                     if call.event == "connect":
                         return await handle_connect_event(call, background_tasks)
 
             # Handle terminate events
-            elif isinstance(change.value, TerminateCallValue):
+            elif isinstance(change.value, WhatsAppTerminateCallValue):
                 for call in change.value.calls:
                     if call.event == "terminate":
                         return await handle_terminate_event(call)
 
     raise HTTPException(status_code=400, detail="No supported event found")
-
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    yield  # Run app
-    peers_to_disconnect = [pc.disconnect() for pc in ongoing_calls_map.values()]
-    await asyncio.gather(*peers_to_disconnect)
-    ongoing_calls_map.clear()
 
 
 if __name__ == "__main__":
