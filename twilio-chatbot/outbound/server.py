@@ -12,13 +12,11 @@ and handle subsequent WebSocket connections for Media Streams.
 
 import argparse
 import base64
-import json
 import os
 from contextlib import asynccontextmanager
 
 import aiohttp
 import uvicorn
-from bot import run_bot
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Request, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
@@ -183,21 +181,15 @@ async def websocket_endpoint(websocket: WebSocket):
     print("WebSocket connection accepted for outbound call")
 
     try:
-        # Get the initial connection data from Twilio
-        start_data = websocket.iter_text()
-        await start_data.__anext__()  # Skip the first message (connected event)
-        call_data = json.loads(await start_data.__anext__())  # Get the start event
+        # Import the bot function from the bot module
+        from bot import bot
+        from pipecat.runner.types import WebSocketRunnerArguments
 
-        print(f"Call data received: {call_data}", flush=True)
+        # Create runner arguments and run the bot
+        runner_args = WebSocketRunnerArguments(websocket=websocket)
+        runner_args.handle_sigint = False
 
-        # Extract stream and call IDs
-        stream_sid = call_data["start"]["streamSid"]
-        call_sid = call_data["start"]["callSid"]
-
-        print(f"Starting bot for outbound call - Stream SID: {stream_sid}, Call SID: {call_sid}")
-
-        # Start the bot with the WebSocket connection
-        await run_bot(websocket, stream_sid, call_sid, app.state.testing)
+        await bot(runner_args)
 
     except Exception as e:
         print(f"Error in WebSocket endpoint: {e}")
