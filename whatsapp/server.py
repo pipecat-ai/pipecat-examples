@@ -6,6 +6,7 @@
 
 import argparse
 import asyncio
+import signal
 import sys
 from contextlib import asynccontextmanager
 
@@ -45,6 +46,9 @@ WHATSAPP_TOKEN = os.getenv("WHATSAPP_TOKEN")
 WHATSAPP_WEBHOOK_VERIFICATION_TOKEN = os.getenv("WHATSAPP_WEBHOOK_VERIFICATION_TOKEN")
 PHONE_NUMBER_ID = os.getenv("PHONE_NUMBER_ID")
 whatsapp_api: WhatsAppApi = None
+
+# Global flag to handle shutdown
+shutdown_event = asyncio.Event()
 
 
 def filter_sdp_for_whatsapp(sdp: str) -> str:
@@ -91,6 +95,10 @@ async def handle_connect_event(call: WhatsAppConnectCall, background_tasks: Back
     # Storing the connection so we can disconnect later
     ongoing_calls_map[call.id] = pipecat_connection
 
+    @pipecat_connection.event_handler("closed")
+    async def handle_disconnected(webrtc_connection: SmallWebRTCConnection):
+        logger.info(f"Peer has disconnected: {webrtc_connection.pc_id}")
+
     background_tasks.add_task(run_bot, pipecat_connection)
     return {"status": "success", "message": "Call pre-accepted and accepted"}
 
@@ -126,7 +134,8 @@ async def terminate_all_calls():
     for call_id, pipecat_connection in ongoing_calls_map.items():
         logger.info(f"Terminating call {call_id}")
         # Call WhatsApp API to terminate the call
-        termination_tasks.append(whatsapp_api.terminate_call_to_whatsapp(call_id))
+        if whatsapp_api:
+            termination_tasks.append(whatsapp_api.terminate_call_to_whatsapp(call_id))
         # Disconnect the pipecat connection
         termination_tasks.append(pipecat_connection.disconnect())
 
@@ -136,6 +145,12 @@ async def terminate_all_calls():
     # Clear the ongoing calls map
     ongoing_calls_map.clear()
     logger.info("All calls terminated successfully")
+
+
+def signal_handler():
+    """Handle SIGINT and SIGTERM signals"""
+    logger.info("Received shutdown signal, initiating graceful shutdown...")
+    shutdown_event.set()
 
 
 @asynccontextmanager
@@ -149,8 +164,6 @@ async def lifespan(app: FastAPI):
         yield  # Run app
         # Clean up
         await terminate_all_calls()
-
-
 
 
 app = FastAPI(lifespan=lifespan)
@@ -196,6 +209,32 @@ async def whatsapp_call_webhook(body: WhatsAppWebhookRequest, background_tasks: 
     raise HTTPException(status_code=400, detail="No supported event found")
 
 
+async def run_server_with_signal_handling(host: str, port: int):
+    """Run the server with proper signal handling"""
+    # Set up signal handlers
+    loop = asyncio.get_running_loop()
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        loop.add_signal_handler(sig, signal_handler)
+    
+    # Create server config
+    config = uvicorn.Config(app, host=host, port=port, log_config=None)
+    server = uvicorn.Server(config)
+    
+    # Start server in background
+    server_task = asyncio.create_task(server.serve())
+
+    logger.info(f"Server started on {host}:{port}...")
+    # Wait for shutdown signal
+    await shutdown_event.wait()
+    
+    # Initiate graceful shutdown
+    logger.info("Shutting down server...")
+    await terminate_all_calls()
+    
+    # Wait for server to finish
+    await server_task
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="WebRTC demo")
     parser.add_argument(
@@ -213,4 +252,5 @@ if __name__ == "__main__":
     else:
         logger.add(sys.stderr, level="DEBUG")
 
-    uvicorn.run(app, host=args.host, port=args.port)
+    # Use asyncio.run with the new signal handling function
+    asyncio.run(run_server_with_signal_handling(args.host, args.port))
