@@ -2,16 +2,16 @@ import {
   PipecatClientAudio,
   PipecatClientVideo,
   usePipecatClientTransportState,
-} from '@pipecat-ai/client-react';
-import { PipecatProvider } from './providers/PipecatProvider';
-import { ConnectButton } from './components/ConnectButton';
-import { StatusDisplay } from './components/StatusDisplay';
-import { DebugDisplay } from './components/DebugDisplay';
-import './App.css';
+} from "@pipecat-ai/client-react";
+import { PipecatProvider } from "./providers/PipecatProvider";
+import { ConnectButton } from "./components/ConnectButton";
+import { StatusDisplay } from "./components/StatusDisplay";
+import { DebugDisplay } from "./components/DebugDisplay";
+import "./App.css";
 
 function BotVideo() {
   const transportState = usePipecatClientTransportState();
-  const isConnected = transportState !== 'disconnected';
+  const isConnected = transportState !== "disconnected";
 
   return (
     <div className="bot-container">
