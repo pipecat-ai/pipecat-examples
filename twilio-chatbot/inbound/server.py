@@ -5,10 +5,8 @@
 #
 
 import argparse
-import json
 
 import uvicorn
-from bot import run_bot
 from fastapi import FastAPI, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.responses import HTMLResponse
@@ -32,15 +30,24 @@ async def start_call():
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
+    """Handle WebSocket connections for inbound calls."""
     await websocket.accept()
-    start_data = websocket.iter_text()
-    await start_data.__anext__()
-    call_data = json.loads(await start_data.__anext__())
-    print(call_data, flush=True)
-    stream_sid = call_data["start"]["streamSid"]
-    call_sid = call_data["start"]["callSid"]
-    print("WebSocket connection accepted")
-    await run_bot(websocket, stream_sid, call_sid, app.state.testing)
+    print("WebSocket connection accepted for inbound call")
+
+    try:
+        # Import the bot function from the bot module
+        from bot import bot
+        from pipecat.runner.types import WebSocketRunnerArguments
+
+        # Create runner arguments and run the bot
+        runner_args = WebSocketRunnerArguments(websocket=websocket)
+        runner_args.handle_sigint = False
+
+        await bot(runner_args, app.state.testing)
+
+    except Exception as e:
+        print(f"Error in WebSocket endpoint: {e}")
+        await websocket.close()
 
 
 if __name__ == "__main__":

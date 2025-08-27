@@ -118,9 +118,3 @@ async def bot(runner_args: RunnerArguments):
     )
 
     await run_bot(transport)
-
-
-if __name__ == "__main__":
-    from pipecat.runner.run import main
-
-    main()
