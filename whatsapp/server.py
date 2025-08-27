@@ -65,7 +65,6 @@ async def handle_connect_event(call: WhatsAppConnectCall, background_tasks: Back
     await pipecat_connection.initialize(sdp=call.session.sdp, type=call.session.sdp_type)
     sdp_answer = pipecat_connection.get_answer().get("sdp")
     sdp_answer = filter_sdp_for_whatsapp(sdp_answer)
-    background_tasks.add_task(run_bot, pipecat_connection)
 
     logger.info(f"SDP answer: {sdp_answer}")
 
@@ -74,7 +73,9 @@ async def handle_connect_event(call: WhatsAppConnectCall, background_tasks: Back
     )
     if not pre_accept_resp.get("success", False):
         logger.error(f"Failed to pre-accept call: {pre_accept_resp}")
+        await pipecat_connection.disconnect()
         return {"status": "failed"}
+
     logger.info("Pre-accept response:", pre_accept_resp)
 
     accept_resp = await whatsapp_api.answer_call_to_whatsapp(
@@ -82,12 +83,15 @@ async def handle_connect_event(call: WhatsAppConnectCall, background_tasks: Back
     )
     if not accept_resp.get("success", False):
         logger.error(f"Failed to accept call: {accept_resp}")
+        await pipecat_connection.disconnect()
         return {"status": "failed"}
+
     logger.info("Accept response:", accept_resp)
 
     # Storing the connection so we can disconnect later
     ongoing_calls_map[call.id] = pipecat_connection
 
+    background_tasks.add_task(run_bot, pipecat_connection)
     return {"status": "success", "message": "Call pre-accepted and accepted"}
 
 
@@ -107,9 +111,33 @@ async def handle_terminate_event(call: WhatsAppTerminateCall):
     return {"status": "success", "message": "Call termination handled"}
 
 
-# ----------------------------
-# Webhook Endpoint
-# ----------------------------
+async def terminate_all_calls():
+    """Terminate all ongoing WhatsApp calls."""
+    logger.info("Will terminate all ongoing WhatsApp calls")
+
+    if not ongoing_calls_map:
+        logger.info("No ongoing calls to terminate")
+        return
+
+    logger.info(f"Terminating {len(ongoing_calls_map)} ongoing calls")
+
+    # Terminate each call via WhatsApp API
+    termination_tasks = []
+    for call_id, pipecat_connection in ongoing_calls_map.items():
+        logger.info(f"Terminating call {call_id}")
+        # Call WhatsApp API to terminate the call
+        termination_tasks.append(whatsapp_api.terminate_call_to_whatsapp(call_id))
+        # Disconnect the pipecat connection
+        termination_tasks.append(pipecat_connection.disconnect())
+
+    # Execute all terminations concurrently
+    await asyncio.gather(*termination_tasks, return_exceptions=True)
+
+    # Clear the ongoing calls map
+    ongoing_calls_map.clear()
+    logger.info("All calls terminated successfully")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global whatsapp_api
@@ -119,15 +147,18 @@ async def lifespan(app: FastAPI):
             whatsapp_token=WHATSAPP_TOKEN, phone_number_id=PHONE_NUMBER_ID, session=session
         )
         yield  # Run app
-    # Clean up
-    peers_to_disconnect = [pc.disconnect() for pc in ongoing_calls_map.values()]
-    await asyncio.gather(*peers_to_disconnect)
-    ongoing_calls_map.clear()
+        # Clean up
+        await terminate_all_calls()
+
+
 
 
 app = FastAPI(lifespan=lifespan)
 
 
+# ----------------------------
+# Webhook Endpoint
+# ----------------------------
 @app.get("/")
 async def verify_webhook(request: Request):
     params = dict(request.query_params)
