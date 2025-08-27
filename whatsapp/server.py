@@ -16,7 +16,7 @@ from bot import run_bot
 from dotenv import load_dotenv
 from fastapi import BackgroundTasks
 from loguru import logger
-from pipecat.transports.network.webrtc_connection import IceServer, SmallWebRTCConnection
+from pipecat.transports.network.webrtc_connection import SmallWebRTCConnection
 from pipecat.utils.whatsapp.api import (
     WhatsAppWebhookRequest,
 )
@@ -25,7 +25,6 @@ from pipecat.utils.whatsapp.client import WhatsAppClient
 # Load environment variables
 load_dotenv(override=True)
 import os
-from typing import Dict
 
 from fastapi import FastAPI, HTTPException, Request
 
@@ -83,10 +82,30 @@ async def whatsapp_call_webhook(body: WhatsAppWebhookRequest, background_tasks: 
         raise HTTPException(status_code=400, detail="Invalid object type")
 
     logger.info(f"Webhook received: {body}")
-    # TODO need to handle in case of error
-    result = await whatsapp_client.handle_webhook_request(body)
-    if isinstance(result, SmallWebRTCConnection):
-        background_tasks.add_task(run_bot, result)
+
+    async def connection_callback(connection: SmallWebRTCConnection):
+        """Callback to handle new WebRTC connections"""
+        try:
+            logger.debug(f"Starting bot for connection: {connection.pc_id}")
+            background_tasks.add_task(run_bot, connection)
+        except Exception as e:
+            logger.error(f"Failed to start bot for connection {connection.pc_id}: {e}")
+            # Optionally disconnect the connection on error
+            try:
+                await connection.disconnect()
+            except Exception as disconnect_error:
+                logger.error(f"Failed to disconnect connection after error: {disconnect_error}")
+
+    try:
+        result = await whatsapp_client.handle_webhook_request(body, connection_callback)
+        logger.debug(f"Webhook processed successfully: {result}")
+        return {"status": "success", "message": "Webhook processed successfully"}
+    except ValueError as ve:
+        logger.warning(f"Invalid webhook request: {ve}")
+        raise HTTPException(status_code=400, detail=str(ve))
+    except Exception as e:
+        logger.error(f"Failed to process webhook request: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error processing webhook")
 
 
 async def run_server_with_signal_handling(host: str, port: int):
