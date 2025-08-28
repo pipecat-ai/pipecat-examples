@@ -304,7 +304,7 @@ async def run_example(websocket_client):
         await rtvi.set_bot_ready()
         # Kick off the conversation.
         # messages.append({"role": "system", "content": "Please introduce yourself to the user."})
-        # await task.queue_frames([context_aggregator.user().get_context_frame()])
+        # await task.queue_frames([LLMRunFrame()])
 
     @transport.event_handler("on_client_disconnected")
     async def on_client_disconnected(transport, client):
