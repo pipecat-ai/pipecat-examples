@@ -19,6 +19,7 @@ from pipecat.frames.frames import (
     EndTaskFrame,
     Frame,
     LLMMessagesAppendFrame,
+    LLMRunFrame,
     TranscriptionFrame,
 )
 from pipecat.pipeline.pipeline import Pipeline
@@ -460,7 +461,7 @@ async def run_bot(
     async def on_first_participant_joined(transport, participant):
         await transport.capture_participant_transcription(participant["id"])
         # For the dialin case, we want the bot to answer the phone and greet the user
-        await task.queue_frames([context_aggregator.user().get_context_frame()])
+        await task.queue_frames([LLMRunFrame()])
 
     @transport.event_handler("on_dialout_answered")
     async def on_dialout_answered(transport, data):
