@@ -10,7 +10,7 @@ import numpy as np
 from dotenv import load_dotenv
 from loguru import logger
 from pipecat.audio.vad.silero import SileroVADAnalyzer
-from pipecat.frames.frames import Frame, InputImageRawFrame, OutputImageRawFrame
+from pipecat.frames.frames import Frame, InputImageRawFrame, LLMRunFrame, OutputImageRawFrame
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineParams, PipelineTask
@@ -132,7 +132,7 @@ async def run_bot(webrtc_connection):
         logger.info("Pipecat client ready.")
         await rtvi.set_bot_ready()
         # Kick off the conversation.
-        await task.queue_frames([context_aggregator.user().get_context_frame()])
+        await task.queue_frames([LLMRunFrame()])
 
     @pipecat_transport.event_handler("on_client_connected")
     async def on_client_connected(transport, client):
