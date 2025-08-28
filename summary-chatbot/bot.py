@@ -27,7 +27,10 @@ from pipecat.frames.frames import (
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineParams, PipelineTask
-from pipecat.processors.aggregators.openai_llm_context import OpenAILLMContext
+from pipecat.processors.aggregators.openai_llm_context import (
+    OpenAILLMContext,
+    OpenAILLMContextFrame,
+)
 from pipecat.processors.filters.stt_mute_filter import STTMuteConfig, STTMuteFilter, STTMuteStrategy
 from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
 from pipecat.processors.transcript_processor import TranscriptProcessor
@@ -64,6 +67,8 @@ class LLMTextLogger(FrameProcessor):
             logger.info("LLMFullResponseStartFrame: LLM response started")
         elif isinstance(frame, LLMFullResponseEndFrame):
             logger.info("LLMFullResponseEndFrame: LLM response ended")
+        elif isinstance(frame, OpenAILLMContextFrame):
+            logger.info(f"OpenAILLMContextFrame: {frame.context.messages}")
 
         await self.push_frame(frame)
 
@@ -182,11 +187,12 @@ async def main():
                 transport.input(),
                 stt,
                 transcript.user(),  # User transcripts
+                context_aggregator.user(),  # Process user context for LLM
                 llm,
-                llm_text_logger,  # Log LLM text frames
                 # No TTS or audio output - silent bot
                 # transcript.assistant(),  # Summary transcripts
-                # context_aggregator.assistant(),
+                context_aggregator.assistant(),
+                llm_text_logger,
             ]
         )
 
@@ -220,16 +226,36 @@ async def main():
                 participant_name = transcript_handler.get_participant_name(msg.user_id)
                 conversation_text += f"{participant_name}: {msg.content}\n"
 
-            logger.debug(f"conversation_text: {conversation_text}")
+            logger.debug(f"""conversation_text: 
+            {conversation_text}
+            """)
 
-            messages = [
+            # Set the context with our messages first
+            from typing import cast
+
+            from openai.types.chat import ChatCompletionMessageParam
+
+            messages_for_context: list[ChatCompletionMessageParam] = [
                 {
                     "role": "system",
                     "content": "You will be provided with a conversation. Provide a summary.",
                 },
                 {"role": "user", "content": conversation_text},
             ]
-            await task.queue_frame(LLMMessagesUpdateFrame(messages, run_llm=True))
+
+            messages_for_frame = [
+                {
+                    "role": "system",
+                    "content": "You will be provided with a conversation. Provide a summary.",
+                },
+                {"role": "user", "content": conversation_text},
+            ]
+
+            logger.debug(f"Generated messages for LLM: {messages_for_frame}")
+
+            # Set the context messages and then trigger LLM
+            context.set_messages(messages_for_context)
+            await task.queue_frame(LLMMessagesUpdateFrame(messages_for_frame, run_llm=True))
             await task.queue_frame(EndFrame())
 
         runner = PipelineRunner()
