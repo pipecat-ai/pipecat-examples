@@ -32,6 +32,7 @@ from pipecat.frames.frames import (
     Frame,
     InputAudioRawFrame,
     LLMFullResponseEndFrame,
+    LLMRunFrame,
     LLMTextFrame,
     StartFrame,
     TTSAudioRawFrame,
@@ -706,7 +707,7 @@ Important guidelines:
     async def on_client_connected(transport, client):
         logger.info(f"Client connected: {client}")
         # Kick off the conversation
-        await task.queue_frames([context_aggregator.user().get_context_frame()])
+        await task.queue_frames([LLMRunFrame()])
         # Start the game timer
         game_timer.start()
 
