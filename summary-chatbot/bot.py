@@ -32,6 +32,7 @@ from pipecat.processors.aggregators.openai_llm_context import (
 )
 from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
 from pipecat.processors.transcript_processor import TranscriptProcessor
+from pipecat.services.cerebras import ChatCompletionMessageParam
 from pipecat.services.deepgram.stt import DeepgramSTTService
 from pipecat.services.openai.llm import OpenAILLMService
 from pipecat.transports.services.daily import DailyParams, DailyTransport
@@ -176,7 +177,7 @@ async def main():
 
         transport = DailyTransport(
             room_url,
-            token,
+            token,  # TODO: Make this a token where presence is false
             "Summary Bot",
             DailyParams(
                 audio_in_enabled=True,
@@ -188,7 +189,13 @@ async def main():
         stt = DeepgramSTTService(api_key=os.getenv("DEEPGRAM_API_KEY", ""))
 
         llm = OpenAILLMService(api_key=os.getenv("OPENAI_API_KEY", ""))
-        context = OpenAILLMContext()
+        messages: list[ChatCompletionMessageParam] = [
+            {
+                "role": "system",
+                "content": "You will be provided with a conversation. Provide a summary.",
+            }
+        ]
+        context = OpenAILLMContext(messages)
         context_aggregator = llm.create_context_aggregator(context)
 
         transcript = TranscriptProcessor()
@@ -210,7 +217,6 @@ async def main():
                 summary_processor,  # Log OpenAILLMContextFrame objects
                 llm,
                 # No TTS or audio output - silent bot
-                # transcript.assistant(),  # Summary transcripts
                 transcript.assistant(),  # Full transcript including summaries
                 context_aggregator.assistant(),
                 # llm_text_logger,
@@ -256,14 +262,6 @@ async def main():
 
             from openai.types.chat import ChatCompletionMessageParam
 
-            messages_for_context: list[ChatCompletionMessageParam] = [
-                {
-                    "role": "system",
-                    "content": "You will be provided with a conversation. Provide a summary.",
-                },
-                {"role": "user", "content": conversation_text},
-            ]
-
             messages_for_frame = [
                 {
                     "role": "system",
@@ -272,10 +270,7 @@ async def main():
                 {"role": "user", "content": conversation_text},
             ]
 
-            logger.debug(f"Generated messages for LLM: {messages_for_frame}")
-
             # Set the context messages and then trigger LLM
-            context.set_messages(messages_for_context)
             await task.queue_frame(LLMMessagesUpdateFrame(messages_for_frame, run_llm=True))
             await task.queue_frame(EndFrame())
 
