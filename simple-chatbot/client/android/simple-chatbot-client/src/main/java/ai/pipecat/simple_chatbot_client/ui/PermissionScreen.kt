@@ -51,7 +51,7 @@ fun PermissionScreen() {
             Column(
                 Modifier
                     .shadow(6.dp, dialogShape)
-                    .border(2.dp, Colors.logoBorder, dialogShape)
+                    .border(1.dp, Colors.logoBorder, dialogShape)
                     .clip(dialogShape)
                     .background(Color.White)
                     .padding(28.dp)

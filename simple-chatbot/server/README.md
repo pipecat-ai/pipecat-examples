@@ -9,11 +9,11 @@ The server supports two bot implementations:
 1. **OpenAI Bot**
 
    - Uses gpt-4o for conversation
-   - Requires OPENAI_API_KEY
+   - Requires `OPENAI_API_KEY`
 
 2. **Gemini Bot**
    - Uses Google's Gemini model
-   - Requires GOOGLE_API_KEY
+   - Requires `GOOGLE_API_KEY`
 
 Select your preferred bot by running the corresponding bot.py file:
 
@@ -65,7 +65,7 @@ Select your preferred bot by running the corresponding bot.py file:
 
 ## Troubleshooting
 
-If you encounred this error:
+If you encounter this error:
 
 ```bash
 aiohttp.client_exceptions.ClientConnectorCertificateError: Cannot connect to host api.daily.co:443 ssl:True [SSLCertVerificationError: (1, '[SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: unable to get local issuer certificate (_ssl.c:1000)')]
