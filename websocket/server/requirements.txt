@@ -1,4 +1,4 @@
 python-dotenv
 fastapi[all]
 uvicorn
-pipecat-ai[silero,websocket,google]
+pipecat-ai[silero,websocket,google]>=0.0.82
