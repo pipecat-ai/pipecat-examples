@@ -1,23 +1,19 @@
 package ai.pipecat.simple_chatbot_client
 
-import ai.pipecat.client.RTVIClient
-import ai.pipecat.client.RTVIClientOptions
-import ai.pipecat.client.RTVIClientParams
-import ai.pipecat.client.RTVIEventCallbacks
+import ai.pipecat.client.PipecatClient
+import ai.pipecat.client.PipecatClientOptions
+import ai.pipecat.client.PipecatEventCallbacks
 import ai.pipecat.client.daily.DailyTransport
 import ai.pipecat.client.result.Future
 import ai.pipecat.client.result.RTVIError
-import ai.pipecat.client.result.Result
-import ai.pipecat.client.types.ActionDescription
+import ai.pipecat.client.types.APIRequest
+import ai.pipecat.client.types.BotReadyData
 import ai.pipecat.client.types.Participant
 import ai.pipecat.client.types.PipecatMetrics
-import ai.pipecat.client.types.RTVIURLEndpoints
-import ai.pipecat.client.types.ServiceConfig
 import ai.pipecat.client.types.Tracks
 import ai.pipecat.client.types.Transcript
 import ai.pipecat.client.types.TransportState
 import ai.pipecat.client.types.Value
-import ai.pipecat.simple_chatbot_client.utils.Timestamp
 import android.content.Context
 import android.util.Log
 import androidx.compose.runtime.Immutable
@@ -36,16 +32,11 @@ class VoiceClientManager(private val context: Context) {
         private const val TAG = "VoiceClientManager"
     }
 
-    private val client = mutableStateOf<RTVIClient?>(null)
+    private val client = mutableStateOf<PipecatClient?>(null)
 
     val state = mutableStateOf<TransportState?>(null)
 
     val errors = mutableStateListOf<Error>()
-
-    val actionDescriptions =
-        mutableStateOf<Result<List<ActionDescription>, RTVIError>?>(null)
-
-    val expiryTime = mutableStateOf<Timestamp?>(null)
 
     val botReady = mutableStateOf(false)
     val botIsTalking = mutableStateOf(false)
@@ -68,16 +59,11 @@ class VoiceClientManager(private val context: Context) {
             return
         }
 
-        val options = RTVIClientOptions(
-            params = RTVIClientParams(
-                baseUrl = baseUrl,
-                endpoints = RTVIURLEndpoints(),
-            )
-        )
+        val url = if (baseUrl.endsWith("/")) { baseUrl } else { "$baseUrl/" } + "start"
 
         state.value = TransportState.Disconnected
 
-        val callbacks = object : RTVIEventCallbacks() {
+        val callbacks = object : PipecatEventCallbacks() {
             override fun onTransportStateChanged(state: TransportState) {
                 this@VoiceClientManager.state.value = state
             }
@@ -93,19 +79,15 @@ class VoiceClientManager(private val context: Context) {
                 Log.i(TAG, "onServerMessage: $data")
             }
 
-            override fun onBotReady(version: String, config: List<ServiceConfig>) {
+            override fun onBotReady(data: BotReadyData) {
 
-                Log.i(TAG, "Bot ready. Version $version, config: $config")
+                Log.i(TAG, "Bot ready. Version ${data.version}")
 
                 botReady.value = true
-
-                client.value?.describeActions()?.withCallback {
-                    actionDescriptions.value = it
-                }
             }
 
-            override fun onPipecatMetrics(data: PipecatMetrics) {
-                Log.i(TAG, "Pipecat metrics: $data")
+            override fun onMetrics(data: PipecatMetrics) {
+                Log.i(TAG, "Bot metrics: $data")
             }
 
             override fun onUserTranscript(data: Transcript) {
@@ -145,17 +127,10 @@ class VoiceClientManager(private val context: Context) {
                 this@VoiceClientManager.mic.value = mic
             }
 
-            override fun onConnected() {
-                expiryTime.value = client.value?.expiry?.let(Timestamp::ofEpochSecs)
-            }
-
             override fun onDisconnected() {
-                expiryTime.value = null
-                actionDescriptions.value = null
                 botIsTalking.value = false
                 userIsTalking.value = false
                 state.value = null
-                actionDescriptions.value = null
                 botReady.value = false
                 tracks.value = null
 
@@ -172,9 +147,17 @@ class VoiceClientManager(private val context: Context) {
             }
         }
 
-        val client = RTVIClient(DailyTransport.Factory(context), callbacks, options)
+        val options = PipecatClientOptions(
+            transport = DailyTransport(context),
+            callbacks = callbacks
+        )
 
-        client.connect().displayErrors().withErrorCallback {
+        val client = PipecatClient(options)
+
+        client.startBotAndConnect(APIRequest(
+            endpoint = url,
+            requestData = Value.Object()
+        )).displayErrors().withErrorCallback {
             callbacks.onDisconnected()
         }
 
