@@ -27,6 +27,7 @@ from pipecat.frames.frames import (
     BotStartedSpeakingFrame,
     BotStoppedSpeakingFrame,
     Frame,
+    LLMRunFrame,
     OutputImageRawFrame,
     SpriteFrame,
 )
@@ -163,7 +164,7 @@ async def run_bot(transport: BaseTransport):
     async def on_client_ready(rtvi):
         await rtvi.set_bot_ready()
         # Kick off the conversation
-        await task.queue_frames([context_aggregator.user().get_context_frame()])
+        await task.queue_frames([LLMRunFrame()])
 
     @transport.event_handler("on_client_connected")
     async def on_client_connected(transport, participant):
