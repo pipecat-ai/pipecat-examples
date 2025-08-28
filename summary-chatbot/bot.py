@@ -20,7 +20,6 @@ from pipecat.frames.frames import (
     LLMFullResponseStartFrame,
     LLMMessagesUpdateFrame,
     LLMTextFrame,
-    TranscriptionFrame,
     TranscriptionMessage,
     TranscriptionUpdateFrame,
 )
@@ -31,7 +30,6 @@ from pipecat.processors.aggregators.openai_llm_context import (
     OpenAILLMContext,
     OpenAILLMContextFrame,
 )
-from pipecat.processors.filters.stt_mute_filter import STTMuteConfig, STTMuteFilter, STTMuteStrategy
 from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
 from pipecat.processors.transcript_processor import TranscriptProcessor
 from pipecat.services.deepgram.stt import DeepgramSTTService
@@ -67,8 +65,28 @@ class LLMTextLogger(FrameProcessor):
             logger.info("LLMFullResponseStartFrame: LLM response started")
         elif isinstance(frame, LLMFullResponseEndFrame):
             logger.info("LLMFullResponseEndFrame: LLM response ended")
-        elif isinstance(frame, OpenAILLMContextFrame):
-            logger.info(f"OpenAILLMContextFrame: {frame.context.messages}")
+
+        await self.push_frame(frame)
+
+
+class SummaryProcessor(FrameProcessor):
+    """A processor that logs OpenAILLMContextFrame content."""
+
+    def __init__(self):
+        """Initialize the SummaryProcessor."""
+        super().__init__()
+
+    async def process_frame(self, frame: Frame, direction: FrameDirection):
+        """Process a frame and log OpenAILLMContextFrame content.
+
+        Args:
+            frame (Frame): The frame to process.
+            direction (FrameDirection): The direction of the frame.
+        """
+        await super().process_frame(frame, direction)
+
+        if isinstance(frame, OpenAILLMContextFrame):
+            logger.info(f"OpenAILLMContextFrame: {frame.context}")
 
         await self.push_frame(frame)
 
@@ -176,6 +194,7 @@ async def main():
         transcript = TranscriptProcessor()
         transcript_handler = TranscriptHandler(transport)
         llm_text_logger = LLMTextLogger()
+        summary_processor = SummaryProcessor()
 
         # Register event handler for transcript updates
         @transcript.event_handler("on_transcript_update")
@@ -188,11 +207,13 @@ async def main():
                 stt,
                 transcript.user(),  # User transcripts
                 context_aggregator.user(),  # Process user context for LLM
+                summary_processor,  # Log OpenAILLMContextFrame objects
                 llm,
                 # No TTS or audio output - silent bot
                 # transcript.assistant(),  # Summary transcripts
+                transcript.assistant(),  # Full transcript including summaries
                 context_aggregator.assistant(),
-                llm_text_logger,
+                # llm_text_logger,
             ]
         )
 
