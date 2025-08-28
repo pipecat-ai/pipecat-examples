@@ -1,1 +1,1 @@
-pipecat-ai[openai,daily,deepgram,cartesia,silero,webrtc,websocket,runner]>=0.0.80
+pipecat-ai[openai,daily,deepgram,cartesia,silero,webrtc,websocket,runner]>=0.0.82
