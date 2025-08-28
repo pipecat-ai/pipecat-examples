@@ -5,9 +5,10 @@ import ai.pipecat.client.types.MediaTrackId
 import ai.pipecat.simple_chatbot_client.R
 import ai.pipecat.simple_chatbot_client.ui.theme.Colors
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -26,9 +27,11 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun UserCamButton(
     onClick: () -> Unit,
+    onLongClick: () -> Unit,
     camEnabled: Boolean,
     camTrackId: MediaTrackId?,
     modifier: Modifier,
@@ -53,7 +56,10 @@ fun UserCamButton(
                 .border(1.dp, Colors.lightGrey, CircleShape)
                 .clip(CircleShape)
                 .background(color)
-                .clickable(onClick = onClick),
+                .combinedClickable(
+                    onClick = onClick,
+                    onLongClick = onLongClick
+                ),
             contentAlignment = Alignment.Center,
         ) {
             if (camTrackId != null) {
@@ -92,6 +98,7 @@ fun UserCamButton(
 fun PreviewUserCamButton() {
     UserCamButton(
         onClick = {},
+        onLongClick = {},
         camTrackId = null,
         camEnabled = true,
         modifier = Modifier,
@@ -103,6 +110,7 @@ fun PreviewUserCamButton() {
 fun PreviewUserCamButtonMuted() {
     UserCamButton(
         onClick = {},
+        onLongClick = {},
         camTrackId = null,
         camEnabled = false,
         modifier = Modifier,
