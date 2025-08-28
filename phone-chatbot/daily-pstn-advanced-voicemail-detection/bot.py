@@ -26,6 +26,7 @@ from pipecat.frames.frames import (
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineParams, PipelineTask
+from pipecat.processors.aggregators.llm_response import OpenAILLMContextFrame
 from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
 from pipecat.services.cartesia.tts import CartesiaTTSService
 from pipecat.services.deepgram.stt import DeepgramSTTService
@@ -105,7 +106,7 @@ class UserAudioCollector(FrameProcessor):
             self._user_speaking = False
             self._context.add_audio_frames_message(audio_frames=self._audio_frames)
             await self._user_context_aggregator.push_frame(
-                self._user_context_aggregator.get_context_frame()
+                OpenAILLMContextFrame(context=self._context)
             )
         elif isinstance(frame, InputAudioRawFrame):
             if self._user_speaking:
