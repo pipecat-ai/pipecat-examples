@@ -175,6 +175,16 @@ class VoiceClientManager(private val context: Context) {
     fun toggleCamera() = enableCamera(!camera.value)
     fun toggleMic() = enableMic(!mic.value)
 
+    fun flipCamera() {
+        client.value?.let { pipecatClient ->
+            val currentCam = pipecatClient.selectedCam?.id
+            pipecatClient.getAllCams().withCallback { result ->
+                val newCam = result.valueOrNull?.filterNot { it.id == currentCam }?.firstOrNull()
+                newCam?.let { pipecatClient.updateCam(it.id) }
+            }
+        }
+    }
+
     fun stop() {
         client.value?.disconnect()?.displayErrors()
     }

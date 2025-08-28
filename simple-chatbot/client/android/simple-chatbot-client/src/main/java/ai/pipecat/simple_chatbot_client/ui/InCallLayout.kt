@@ -55,6 +55,7 @@ fun InCallLayout(voiceClientManager: VoiceClientManager) {
 
                     UserCamButton(
                         onClick = voiceClientManager::toggleCamera,
+                        onLongClick = voiceClientManager::flipCamera,
                         camEnabled = voiceClientManager.camera.value,
                         camTrackId = localCam,
                         modifier = Modifier
