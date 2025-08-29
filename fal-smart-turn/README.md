@@ -14,20 +14,26 @@ Try the hosted version of the demo here: https://pcc-smart-turn.vercel.app/.
 
 ### Run the Server
 
-1. Set up and activate your virtual environment:
+1. Open a terminal and navigate to the server directory:
+
+   ```bash
+   cd server
+   ```
+
+2. Set up and activate your virtual environment:
 
    ```bash
    python3 -m venv venv
    source venv/bin/activate  # On Windows: venv\Scripts\activate
    ```
 
-2. Install dependencies:
+3. Install dependencies:
 
    ```bash
    pip install -r requirements.txt
    ```
 
-3. Create your .env file and set your env vars:
+4. Create your .env file and set your env vars:
 
    ```bash
    cp env.example .env
