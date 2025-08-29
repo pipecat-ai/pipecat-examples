@@ -7,24 +7,14 @@
 import asyncio
 import os
 import sys
-from typing import List
+from typing import Any, Dict, List, override
 
 import aiohttp
 from dotenv import load_dotenv
 from loguru import logger
 from openai.types.chat import ChatCompletionMessageParam
 from pipecat.audio.vad.silero import SileroVADAnalyzer
-from pipecat.frames.frames import (
-    EndFrame,
-    Frame,
-    LLMFullResponseEndFrame,
-    LLMFullResponseStartFrame,
-    LLMMessagesAppendFrame,
-    LLMMessagesUpdateFrame,
-    LLMTextFrame,
-    TranscriptionMessage,
-    TranscriptionUpdateFrame,
-)
+from pipecat.frames.frames import EndFrame, Frame, TranscriptionMessage, TranscriptionUpdateFrame
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineParams, PipelineTask
@@ -41,18 +31,15 @@ from runner import configure
 
 load_dotenv(override=True)
 
-logger.remove(0)
-logger.add(sys.stderr, level="DEBUG")
+logger.remove(handler_id=0)
+logger.add(sink=sys.stderr, level="DEBUG")
 
 
 class SummaryProcessor(FrameProcessor):
     """A processor that logs LLMTextFrame content."""
 
-    def __init__(self):
-        """Initialize the LLMTextLogger."""
-        super().__init__()
-
-    async def process_frame(self, frame: Frame, direction: FrameDirection):
+    @override
+    async def process_frame(self, frame: Frame, direction: FrameDirection) -> None:
         """Process a frame and log LLMTextFrame content.
 
         Args:
@@ -64,9 +51,9 @@ class SummaryProcessor(FrameProcessor):
         if isinstance(frame, OpenAILLMContextFrame):
             if len(frame.context.messages) > 1:
                 content = frame.context.messages[-1].get("content", "No summary available")
-                logger.info(f"OpenAILLMContextFrame: {content}")
+                logger.info(f"{content}")
             else:
-                logger.info("OpenAILLMContextFrame: No messages available")
+                logger.info("No summary available.")
 
         await self.push_frame(frame)
 
@@ -86,42 +73,33 @@ class TranscriptHandler:
         """
         self.messages: List[TranscriptionMessage] = []
         self.transport = transport
-        self.participants = {}  # user_id -> participant info
+        self.participants: Dict[str, str] = {}  # user_id -> participant info
 
-    def update_participant(self, participant_id: str, participant_info: dict):
+    def update_participant(self, participant_id: str, user_name: str | None):
         """Update participant information.
 
         Args:
             participant_id: The participant's user ID
-            participant_info: Dictionary containing participant details
+            user_name: The participant's user name
         """
-        self.participants[participant_id] = participant_info
-        logger.info(f"Updated participant info: {participant_id} -> {participant_info}")
+        logger.debug(f"Updating participant {participant_id} with name {user_name}")
+        self.participants[participant_id] = user_name if user_name else participant_id
+        logger.info(f"Updated participant info: {participant_id} -> {user_name}")
 
-    def get_participant_name(self, user_id: str | None) -> str:
+    def get_participant_name(self, participant_id: str | None) -> str:
         """Get participant name from user ID.
 
         Args:
-            user_id: The user ID to look up (can be None)
+            participant_id: The participant ID to look up
 
         Returns:
             Participant name or fallback identifier
         """
-        if not user_id:
-            return "Unknown-User"
 
-        if user_id in self.participants:
-            participant = self.participants[user_id]
-            # Try different name fields that might be available
-            name = (
-                participant.get("info", {}).get("userName")
-                or participant.get("info", {}).get("user_name")
-                or participant.get("userName")
-                or participant.get("user_name")
-                or f"Participant-{user_id[:8]}"
-            )
-            return name
-        return f"Unknown-{user_id[:8]}"
+        if participant_id is None:
+            return "Unknown"
+
+        return self.participants.get(participant_id, participant_id)
 
     async def on_transcript_update(
         self, processor: TranscriptProcessor, frame: TranscriptionUpdateFrame
@@ -139,14 +117,9 @@ class TranscriptHandler:
         for msg in frame.messages:
             timestamp = f"[{msg.timestamp}] " if msg.timestamp else ""
 
-            if msg.role == "user":
-                # Get participant name for user messages
-                participant_name = self.get_participant_name(msg.user_id)
-                role_display = f"{participant_name}"
-            else:
-                role_display = "Summary"
+            participant_name = self.get_participant_name(msg.user_id)
 
-            logger.info(f"{timestamp}{role_display}: {msg.content}")
+            logger.info(f"{timestamp} {participant_name}: {msg.content}")
 
 
 async def main():
@@ -155,10 +128,10 @@ async def main():
         (room_url, token) = await configure(session)
 
         transport = DailyTransport(
-            room_url,
-            token,  # TODO: Make this a token where presence is false
-            "Summary Bot",
-            DailyParams(
+            room_url=room_url,
+            token=token,  # TODO: Make this a token where presence is false
+            bot_name="Summary Bot",
+            params=DailyParams(
                 audio_in_enabled=True,
                 audio_out_enabled=False,  # Silent bot - no audio output
                 vad_analyzer=SileroVADAnalyzer(),
@@ -183,7 +156,9 @@ async def main():
 
         # Register event handler for transcript updates
         @transcript.event_handler("on_transcript_update")
-        async def on_transcript_update(processor, frame):
+        async def on_transcript_update(
+            processor: TranscriptProcessor, frame: TranscriptionUpdateFrame
+        ) -> None:
             await transcript_handler.on_transcript_update(processor, frame)
 
         pipeline = Pipeline(
@@ -209,26 +184,34 @@ async def main():
         )
 
         @transport.event_handler("on_first_participant_joined")
-        async def on_first_participant_joined(transport, participant):
+        async def on_first_participant_joined(
+            transport: DailyTransport, participant: Dict[str, Any]
+        ):
             logger.info("First participant joined - starting summary generation")
-            transcript_handler.update_participant(participant["id"], participant)
+            transcript_handler.update_participant(
+                participant["id"], participant.get("info", {}).get("userName", None)
+            )
 
         @transport.event_handler("on_participant_joined")
-        async def on_participant_joined(transport, participant):
+        async def on_participant_joined(
+            transport: DailyTransport, participant: Dict[str, Any]
+        ) -> None:
             logger.info(f"Participant joined: {participant}")
-            transcript_handler.update_participant(participant["id"], participant)
+            transcript_handler.update_participant(
+                participant["id"], participant.get("info", {}).get("userName", None)
+            )
 
         @transport.event_handler("on_participant_left")
-        async def on_participant_left(transport, participant, reason):
+        async def on_participant_left(
+            transport: DailyTransport, participant: Dict[str, Any], reason: str
+        ) -> None:
             logger.info(f"Participant left: {participant}")
-
-            logger.debug(f"Generating summary")
 
             # Convert messages list to a formatted string
             conversation_text = ""
             for msg in transcript_handler.messages:
                 participant_name = transcript_handler.get_participant_name(msg.user_id)
-                conversation_text += f"{participant_name}: {msg.content}\n"
+                conversation_text += f"{msg.timestamp} {participant_name}: {msg.content}\n"
 
             messages.append({"role": "user", "content": conversation_text})
             await task.queue_frames(
