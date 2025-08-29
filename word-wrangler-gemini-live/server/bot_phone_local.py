@@ -36,6 +36,7 @@ from pipecat.frames.frames import (
     Frame,
     InputAudioRawFrame,
     LLMFullResponseEndFrame,
+    LLMRunFrame,
     LLMTextFrame,
     StartFrame,
     TTSAudioRawFrame,
@@ -689,7 +690,7 @@ Important guidelines:
     async def on_first_participant_joined(transport, participant):
         logger.info("First participant joined: {}", participant["id"])
         # Kick off the conversation
-        await task.queue_frames([context_aggregator.user().get_context_frame()])
+        await task.queue_frames([LLMRunFrame()])
         # Start the game timer
         game_timer.start()
 

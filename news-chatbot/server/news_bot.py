@@ -13,7 +13,7 @@ import aiohttp
 from dotenv import load_dotenv
 from loguru import logger
 from pipecat.audio.vad.silero import SileroVADAnalyzer
-from pipecat.frames.frames import Frame
+from pipecat.frames.frames import Frame, LLMRunFrame
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineParams, PipelineTask
@@ -150,7 +150,7 @@ async def main():
         async def on_client_ready(rtvi):
             await rtvi.set_bot_ready()
             # Kick off the conversation
-            await task.queue_frames([context_aggregator.user().get_context_frame()])
+            await task.queue_frames([LLMRunFrame()])
 
         @transport.event_handler("on_first_participant_joined")
         async def on_first_participant_joined(transport, participant):

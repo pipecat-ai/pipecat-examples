@@ -13,7 +13,7 @@ import aiohttp
 from dotenv import load_dotenv
 from loguru import logger
 from pipecat.audio.vad.silero import SileroVADAnalyzer
-from pipecat.frames.frames import EndFrame
+from pipecat.frames.frames import EndFrame, LLMRunFrame
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineParams, PipelineTask
@@ -117,7 +117,7 @@ async def main(room_url, token=None):
             await main_task.queue_frames(
                 [
                     images["book1"],
-                    context_aggregator.user().get_context_frame(),
+                    LLMRunFrame(),
                     DailyTransportMessageFrame(CUE_USER_TURN),
                     # sounds["listening"],
                     images["book2"],

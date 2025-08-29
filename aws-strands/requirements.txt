@@ -1,6 +1,7 @@
 fastapi
 uvicorn
 python-dotenv
-pipecat-ai[webrtc,daily,deepgram,cartesia]
+pipecat-ai[webrtc,daily,deepgram,cartesia,silero]>=0.0.82
+# -e ../../pipecat/[webrtc,daily,deepgram,cartesia,silero]
 pipecat-ai-small-webrtc-prebuilt
 strands-agents
