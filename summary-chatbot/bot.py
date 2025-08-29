@@ -203,7 +203,9 @@ async def main():
             params=PipelineParams(
                 enable_metrics=True,
                 enable_usage_metrics=True,
+                allow_interruptions=True,
             ),
+            idle_timeout_secs=None,  # Disable idle timeout for summary bot
         )
 
         @transport.event_handler("on_first_participant_joined")
