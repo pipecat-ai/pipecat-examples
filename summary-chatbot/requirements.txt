@@ -1,4 +1,4 @@
 python-dotenv
 fastapi[all]
-pipecat-ai[daily,deepgram,openai,silero]
+pipecat-ai[daily,openai,silero]
 aiohttp
