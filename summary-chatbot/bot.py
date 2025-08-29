@@ -12,12 +12,14 @@ from typing import List
 import aiohttp
 from dotenv import load_dotenv
 from loguru import logger
+from openai.types.chat import ChatCompletionMessageParam
 from pipecat.audio.vad.silero import SileroVADAnalyzer
 from pipecat.frames.frames import (
     EndFrame,
     Frame,
     LLMFullResponseEndFrame,
     LLMFullResponseStartFrame,
+    LLMMessagesAppendFrame,
     LLMMessagesUpdateFrame,
     LLMTextFrame,
     TranscriptionMessage,
@@ -32,7 +34,6 @@ from pipecat.processors.aggregators.openai_llm_context import (
 )
 from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
 from pipecat.processors.transcript_processor import TranscriptProcessor
-from pipecat.services.cerebras import ChatCompletionMessageParam
 from pipecat.services.deepgram.stt import DeepgramSTTService
 from pipecat.services.openai.llm import OpenAILLMService
 from pipecat.transports.services.daily import DailyParams, DailyTransport
@@ -62,6 +63,12 @@ class LLMTextLogger(FrameProcessor):
 
         if isinstance(frame, LLMTextFrame):
             logger.info(f"LLMTextFrame: {frame.text}")
+        elif isinstance(frame, OpenAILLMContextFrame):
+            if len(frame.context.messages) > 1:
+                content = frame.context.messages[-1].get("content", "No content")
+                logger.info(f"OpenAILLMContextFrame: {content}")
+            else:
+                logger.info("OpenAILLMContextFrame: No messages available")
         elif isinstance(frame, LLMFullResponseStartFrame):
             logger.info("LLMFullResponseStartFrame: LLM response started")
         elif isinstance(frame, LLMFullResponseEndFrame):
@@ -201,7 +208,6 @@ async def main():
         transcript = TranscriptProcessor()
         transcript_handler = TranscriptHandler(transport)
         llm_text_logger = LLMTextLogger()
-        summary_processor = SummaryProcessor()
 
         # Register event handler for transcript updates
         @transcript.event_handler("on_transcript_update")
@@ -213,13 +219,13 @@ async def main():
                 transport.input(),
                 stt,
                 transcript.user(),  # User transcripts
-                context_aggregator.user(),  # Process user context for LLM
-                summary_processor,  # Log OpenAILLMContextFrame objects
+                # context_aggregator.user(),  # Process user context for LLM
+                # gate_processor,  # Gate OpenAILLMContextFrames until participant leaves
                 llm,
                 # No TTS or audio output - silent bot
-                transcript.assistant(),  # Full transcript including summaries
+                # transcript.assistant() is not needed since we don't have TTS
                 context_aggregator.assistant(),
-                # llm_text_logger,
+                llm_text_logger,  # Log LLM text frames
             ]
         )
 
@@ -253,26 +259,13 @@ async def main():
                 participant_name = transcript_handler.get_participant_name(msg.user_id)
                 conversation_text += f"{participant_name}: {msg.content}\n"
 
-            logger.debug(f"""conversation_text: 
-            {conversation_text}
-            """)
-
-            # Set the context with our messages first
-            from typing import cast
-
-            from openai.types.chat import ChatCompletionMessageParam
-
-            messages_for_frame = [
-                {
-                    "role": "system",
-                    "content": "You will be provided with a conversation. Provide a summary.",
-                },
-                {"role": "user", "content": conversation_text},
-            ]
-
-            # Set the context messages and then trigger LLM
-            await task.queue_frame(LLMMessagesUpdateFrame(messages_for_frame, run_llm=True))
-            await task.queue_frame(EndFrame())
+            messages.append({"role": "user", "content": conversation_text})
+            await task.queue_frames(
+                [
+                    context_aggregator.user().get_context_frame(),  # Trigger bot response
+                    EndFrame(),
+                ]
+            )
 
         runner = PipelineRunner()
 
