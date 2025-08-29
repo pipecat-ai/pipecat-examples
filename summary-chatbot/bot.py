@@ -45,7 +45,7 @@ logger.remove(0)
 logger.add(sys.stderr, level="DEBUG")
 
 
-class LLMTextLogger(FrameProcessor):
+class SummaryProcessor(FrameProcessor):
     """A processor that logs LLMTextFrame content."""
 
     def __init__(self):
@@ -61,40 +61,12 @@ class LLMTextLogger(FrameProcessor):
         """
         await super().process_frame(frame, direction)
 
-        if isinstance(frame, LLMTextFrame):
-            logger.info(f"LLMTextFrame: {frame.text}")
-        elif isinstance(frame, OpenAILLMContextFrame):
+        if isinstance(frame, OpenAILLMContextFrame):
             if len(frame.context.messages) > 1:
-                content = frame.context.messages[-1].get("content", "No content")
+                content = frame.context.messages[-1].get("content", "No summary available")
                 logger.info(f"OpenAILLMContextFrame: {content}")
             else:
                 logger.info("OpenAILLMContextFrame: No messages available")
-        elif isinstance(frame, LLMFullResponseStartFrame):
-            logger.info("LLMFullResponseStartFrame: LLM response started")
-        elif isinstance(frame, LLMFullResponseEndFrame):
-            logger.info("LLMFullResponseEndFrame: LLM response ended")
-
-        await self.push_frame(frame)
-
-
-class SummaryProcessor(FrameProcessor):
-    """A processor that logs OpenAILLMContextFrame content."""
-
-    def __init__(self):
-        """Initialize the SummaryProcessor."""
-        super().__init__()
-
-    async def process_frame(self, frame: Frame, direction: FrameDirection):
-        """Process a frame and log OpenAILLMContextFrame content.
-
-        Args:
-            frame (Frame): The frame to process.
-            direction (FrameDirection): The direction of the frame.
-        """
-        await super().process_frame(frame, direction)
-
-        if isinstance(frame, OpenAILLMContextFrame):
-            logger.info(f"OpenAILLMContextFrame: {frame.context}")
 
         await self.push_frame(frame)
 
@@ -194,8 +166,8 @@ async def main():
         )
 
         stt = DeepgramSTTService(api_key=os.getenv("DEEPGRAM_API_KEY", ""))
-
         llm = OpenAILLMService(api_key=os.getenv("OPENAI_API_KEY", ""))
+
         messages: list[ChatCompletionMessageParam] = [
             {
                 "role": "system",
@@ -207,7 +179,7 @@ async def main():
 
         transcript = TranscriptProcessor()
         transcript_handler = TranscriptHandler(transport)
-        llm_text_logger = LLMTextLogger()
+        summary = SummaryProcessor()
 
         # Register event handler for transcript updates
         @transcript.event_handler("on_transcript_update")
@@ -219,13 +191,10 @@ async def main():
                 transport.input(),
                 stt,
                 transcript.user(),  # User transcripts
-                # context_aggregator.user(),  # Process user context for LLM
-                # gate_processor,  # Gate OpenAILLMContextFrames until participant leaves
                 llm,
                 # No TTS or audio output - silent bot
-                # transcript.assistant() is not needed since we don't have TTS
                 context_aggregator.assistant(),
-                llm_text_logger,  # Log LLM text frames
+                summary,  # Log LLM text frames
             ]
         )
 
