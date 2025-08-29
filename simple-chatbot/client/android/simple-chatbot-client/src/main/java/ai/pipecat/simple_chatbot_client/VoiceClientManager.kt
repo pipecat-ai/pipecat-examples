@@ -4,6 +4,8 @@ import ai.pipecat.client.PipecatClient
 import ai.pipecat.client.PipecatClientOptions
 import ai.pipecat.client.PipecatEventCallbacks
 import ai.pipecat.client.daily.DailyTransport
+import ai.pipecat.client.daily.DailyTransportConnectParams
+import ai.pipecat.client.daily.PipecatClientDaily
 import ai.pipecat.client.result.Future
 import ai.pipecat.client.result.RTVIError
 import ai.pipecat.client.types.APIRequest
@@ -32,7 +34,7 @@ class VoiceClientManager(private val context: Context) {
         private const val TAG = "VoiceClientManager"
     }
 
-    private val client = mutableStateOf<PipecatClient?>(null)
+    private val client = mutableStateOf<PipecatClientDaily?>(null)
 
     val state = mutableStateOf<TransportState?>(null)
 
@@ -59,7 +61,11 @@ class VoiceClientManager(private val context: Context) {
             return
         }
 
-        val url = if (baseUrl.endsWith("/")) { baseUrl } else { "$baseUrl/" } + "start"
+        val url = if (baseUrl.endsWith("/")) {
+            baseUrl
+        } else {
+            "$baseUrl/"
+        } + "start"
 
         state.value = TransportState.Disconnected
 
@@ -148,16 +154,17 @@ class VoiceClientManager(private val context: Context) {
         }
 
         val options = PipecatClientOptions(
-            transport = DailyTransport(context),
             callbacks = callbacks
         )
 
-        val client = PipecatClient(options)
+        val client = PipecatClient(DailyTransport(context), options)
 
-        client.startBotAndConnect(APIRequest(
-            endpoint = url,
-            requestData = Value.Object()
-        )).displayErrors().withErrorCallback {
+        client.startBotAndConnect(
+            APIRequest(
+                endpoint = url,
+                requestData = Value.Object()
+            )
+        ).displayErrors().withErrorCallback {
             callbacks.onDisconnected()
         }
 
