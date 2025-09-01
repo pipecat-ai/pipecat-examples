@@ -212,7 +212,7 @@ class WebsocketClientApp {
           ? this.recordingSerializer
           : new ProtobufFrameSerializer(),
         recorderSampleRate: 8000,
-        playerSampleRate: 8000,
+        playerSampleRate: 24000,
       };
 
       const RTVIConfig: PipecatClientOptions = {
