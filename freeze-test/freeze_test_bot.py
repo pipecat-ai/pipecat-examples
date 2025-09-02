@@ -16,8 +16,8 @@ import uvicorn
 from dotenv import load_dotenv
 from fastapi import FastAPI, Request, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import RedirectResponse
 from loguru import logger
+from pipecat.audio.mixers.soundfile_mixer import SoundfileMixer
 from pipecat.audio.vad.silero import SileroVADAnalyzer
 from pipecat.frames.frames import (
     CancelFrame,
@@ -29,7 +29,6 @@ from pipecat.frames.frames import (
     StartFrame,
     StartInterruptionFrame,
     StopFrame,
-    StopInterruptionFrame,
     TranscriptionFrame,
     TTSSpeakFrame,
     UserStartedSpeakingFrame,
@@ -126,7 +125,6 @@ class SimulateFreezeInput(FrameProcessor):
             self._send_frames_task = None
 
     async def _send_user_text(self, text: str):
-        self.reset_watchdog()
         # Emulation as if the user has spoken and the stt transcribed
         await self.push_frame(UserStartedSpeakingFrame())
         await self.push_frame(StartInterruptionFrame())
@@ -142,7 +140,6 @@ class SimulateFreezeInput(FrameProcessor):
         # later than the UserStoppedSpeakingFrame
         await asyncio.sleep(0.1)
         await self.push_frame(UserStoppedSpeakingFrame())
-        await self.push_frame(StopInterruptionFrame())
 
     async def _send_frames(self):
         try:
@@ -162,6 +159,9 @@ class SimulateFreezeInput(FrameProcessor):
             logger.error(f"{self} exception receiving data: {e.__class__.__name__} ({e})")
 
 
+OFFICE_SOUND_FILE = os.path.join(os.path.dirname(__file__), "office-ambience-24000-mono.mp3")
+
+
 async def run_example(websocket_client):
     logger.info(f"Starting bot")
 
@@ -174,6 +174,11 @@ async def run_example(websocket_client):
             add_wav_header=False,
             vad_analyzer=SileroVADAnalyzer(),
             serializer=ProtobufFrameSerializer(),
+            audio_out_mixer=SoundfileMixer(
+                sound_files={"office": OFFICE_SOUND_FILE},
+                default_sound="office",
+                volume=2.0,
+            ),
         ),
     )
 
@@ -265,7 +270,7 @@ async def run_example(websocket_client):
             enable_usage_metrics=True,
             report_only_initial_ttfb=True,
             audio_in_sample_rate=8000,
-            audio_out_sample_rate=8000,
+            audio_out_sample_rate=24000,
         ),
         idle_timeout_secs=120,
         observers=[
@@ -280,7 +285,7 @@ async def run_example(websocket_client):
                     UserStartedSpeakingFrame: None,
                     UserStoppedSpeakingFrame: None,
                     StartInterruptionFrame: None,
-                    StopInterruptionFrame: None,
+                    CancelFrame: None,
                 },
                 exclude_fields={
                     "result",
@@ -291,7 +296,6 @@ async def run_example(websocket_client):
                 },
             ),
         ],
-        enable_watchdog_timers=True,
     )
 
     @transport.event_handler("on_client_connected")
@@ -314,11 +318,6 @@ async def run_example(websocket_client):
     runner = PipelineRunner(handle_sigint=False)
 
     await runner.run(task)
-
-
-@app.get("/", include_in_schema=False)
-async def root_redirect():
-    return RedirectResponse(url="/client/")
 
 
 @app.websocket("/ws")
