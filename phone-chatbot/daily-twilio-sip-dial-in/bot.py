@@ -1,7 +1,11 @@
+#
+# Copyright (c) 2024–2025, Daily
+#
+# SPDX-License-Identifier: BSD 2-Clause License
+#
+
 """Twilio + Daily voice bot implementation."""
 
-import argparse
-import asyncio
 import os
 import sys
 
@@ -13,8 +17,11 @@ from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineParams, PipelineTask
 from pipecat.processors.aggregators.openai_llm_context import OpenAILLMContext
+from pipecat.runner.types import RunnerArguments
 from pipecat.services.cartesia.tts import CartesiaTTSService
+from pipecat.services.deepgram.stt import DeepgramSTTService
 from pipecat.services.openai.llm import OpenAILLMService
+from pipecat.transports.base_transport import BaseTransport
 from pipecat.transports.daily.transport import DailyParams, DailyTransport
 from twilio.rest import Client
 
@@ -27,41 +34,22 @@ logger.add(sys.stderr, level="DEBUG")
 twilio_client = Client(os.getenv("TWILIO_ACCOUNT_SID"), os.getenv("TWILIO_AUTH_TOKEN"))
 
 
-async def run_bot(room_url: str, token: str, call_id: str, sip_uri: str) -> None:
+async def run_bot(transport: BaseTransport, call_id: str, sip_uri: str) -> None:
     """Run the voice bot with the given parameters.
 
     Args:
-        room_url: The Daily room URL
-        token: The Daily room token
+        transport: The Daily transport instance
         call_id: The Twilio call ID
         sip_uri: The Daily SIP URI for forwarding the call
     """
-    logger.info(f"Starting bot with room: {room_url}")
-    logger.info(f"SIP endpoint: {sip_uri}")
-
     call_already_forwarded = False
 
-    # Setup the Daily transport
-    transport = DailyTransport(
-        room_url,
-        token,
-        "Phone Bot",
-        DailyParams(
-            audio_in_enabled=True,
-            audio_out_enabled=True,
-            transcription_enabled=True,
-            vad_analyzer=SileroVADAnalyzer(),
-        ),
-    )
-
-    # Setup TTS service
+    stt = DeepgramSTTService(api_key=os.getenv("DEEPGRAM_API_KEY"))
+    llm = OpenAILLMService(api_key=os.getenv("OPENAI_API_KEY"))
     tts = CartesiaTTSService(
         api_key=os.getenv("CARTESIA_API_KEY"),
         voice_id="71a7ad14-091c-4e8e-a314-022ece01c121",  # British Reading Lady
     )
-
-    # Setup LLM service
-    llm = OpenAILLMService(api_key=os.getenv("OPENAI_API_KEY"))
 
     # Initialize LLM context with system prompt
     messages = [
@@ -83,6 +71,7 @@ async def run_bot(room_url: str, token: str, call_id: str, sip_uri: str) -> None
     pipeline = Pipeline(
         [
             transport.input(),
+            stt,
             context_aggregator.user(),
             llm,
             tts,
@@ -101,21 +90,20 @@ async def run_bot(room_url: str, token: str, call_id: str, sip_uri: str) -> None
     )
 
     # Handle participant joining
-    @transport.event_handler("on_first_participant_joined")
-    async def on_first_participant_joined(transport, participant):
-        logger.info(f"First participant joined: {participant['id']}")
-        await transport.capture_participant_transcription(participant["id"])
+    @transport.event_handler("on_client_connected")
+    async def on_client_connected(transport, client):
+        logger.info(f"Client connected")
         await task.queue_frames([LLMRunFrame()])
 
     # Handle participant leaving
-    @transport.event_handler("on_participant_left")
-    async def on_participant_left(transport, participant, reason):
-        logger.info(f"Participant left: {participant['id']}, reason: {reason}")
+    @transport.event_handler("on_client_disconnected")
+    async def on_client_disconnected(transport, client):
+        logger.info(f"Client disconnected")
         await task.cancel()
 
     # Handle call ready to forward
     @transport.event_handler("on_dialin_ready")
-    async def on_dialin_ready(transport, cdata):
+    async def on_dialin_ready(transport, sip_endpoint):
         nonlocal call_already_forwarded
 
         # We only want to forward the call once
@@ -157,28 +145,37 @@ async def run_bot(room_url: str, token: str, call_id: str, sip_uri: str) -> None
         logger.warning(f"Dial-in warning: {data}")
 
     # Run the pipeline
-    runner = PipelineRunner()
+    runner = PipelineRunner(handle_sigint=False)
     await runner.run(task)
 
 
-async def main():
-    """Parse command line arguments and run the bot."""
-    parser = argparse.ArgumentParser(description="Daily + Twilio Voice Bot")
-    parser.add_argument("-u", type=str, required=True, help="Daily room URL")
-    parser.add_argument("-t", type=str, required=True, help="Daily room token")
-    parser.add_argument("-i", type=str, required=True, help="Twilio call ID")
-    parser.add_argument("-s", type=str, required=True, help="Daily SIP URI")
+async def bot(runner_args: RunnerArguments):
+    """Main bot entry point compatible with Pipecat Cloud."""
 
-    args = parser.parse_args()
+    # Extract all details from the body parameter
+    body = getattr(runner_args, "body", {})
+    room_url = body.get("room_url")
+    token = body.get("token")
+    call_id = body.get("call_id")
+    sip_uri = body.get("sip_uri")
 
-    # Validate required arguments
-    if not all([args.u, args.t, args.i, args.s]):
-        logger.error("All arguments (-u, -t, -i, -s) are required")
-        parser.print_help()
-        sys.exit(1)
+    if not call_id or not sip_uri:
+        logger.error(f"Missing required parameters in body: call_id={call_id}, sip_uri={sip_uri}")
+        raise ValueError("call_id and sip_uri are required in the body parameter")
 
-    await run_bot(args.u, args.t, args.i, args.s)
+    if not room_url or not token:
+        logger.error(f"Missing room connection details: room_url={room_url}, token={token}")
+        raise ValueError("room_url and token are required")
 
+    transport = DailyTransport(
+        room_url,
+        token,
+        "Pipecat Bot",
+        params=DailyParams(
+            audio_in_enabled=True,
+            audio_out_enabled=True,
+            vad_analyzer=SileroVADAnalyzer(),
+        ),
+    )
 
-if __name__ == "__main__":
-    asyncio.run(main())
+    await run_bot(transport, call_id, sip_uri)
