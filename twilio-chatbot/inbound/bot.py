@@ -12,7 +12,6 @@ import wave
 
 import aiofiles
 from dotenv import load_dotenv
-from fastapi import WebSocket
 from loguru import logger
 from pipecat.audio.vad.silero import SileroVADAnalyzer
 from pipecat.frames.frames import LLMRunFrame
@@ -21,10 +20,13 @@ from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineParams, PipelineTask
 from pipecat.processors.aggregators.openai_llm_context import OpenAILLMContext
 from pipecat.processors.audio.audio_buffer_processor import AudioBufferProcessor
+from pipecat.runner.types import RunnerArguments
+from pipecat.runner.utils import parse_telephony_websocket
 from pipecat.serializers.twilio import TwilioFrameSerializer
 from pipecat.services.cartesia.tts import CartesiaTTSService
 from pipecat.services.deepgram.stt import DeepgramSTTService
 from pipecat.services.openai.llm import OpenAILLMService
+from pipecat.transports.base_transport import BaseTransport
 from pipecat.transports.network.fastapi_websocket import (
     FastAPIWebsocketParams,
     FastAPIWebsocketTransport,
@@ -36,11 +38,9 @@ logger.remove(0)
 logger.add(sys.stderr, level="DEBUG")
 
 
-async def save_audio(server_name: str, audio: bytes, sample_rate: int, num_channels: int):
+async def save_audio(audio: bytes, sample_rate: int, num_channels: int):
     if len(audio) > 0:
-        filename = (
-            f"{server_name}_recording_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.wav"
-        )
+        filename = f"recording_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.wav"
         with io.BytesIO() as buffer:
             with wave.open(buffer, "wb") as wf:
                 wf.setsampwidth(2)
@@ -54,25 +54,7 @@ async def save_audio(server_name: str, audio: bytes, sample_rate: int, num_chann
         logger.info("No audio data to save")
 
 
-async def run_bot(websocket_client: WebSocket, stream_sid: str, call_sid: str, testing: bool):
-    serializer = TwilioFrameSerializer(
-        stream_sid=stream_sid,
-        call_sid=call_sid,
-        account_sid=os.getenv("TWILIO_ACCOUNT_SID", ""),
-        auth_token=os.getenv("TWILIO_AUTH_TOKEN", ""),
-    )
-
-    transport = FastAPIWebsocketTransport(
-        websocket=websocket_client,
-        params=FastAPIWebsocketParams(
-            audio_in_enabled=True,
-            audio_out_enabled=True,
-            add_wav_header=False,
-            vad_analyzer=SileroVADAnalyzer(),
-            serializer=serializer,
-        ),
-    )
-
+async def run_bot(transport: BaseTransport, handle_sigint: bool, testing: bool):
     llm = OpenAILLMService(api_key=os.getenv("OPENAI_API_KEY"))
 
     stt = DeepgramSTTService(api_key=os.getenv("DEEPGRAM_API_KEY"), audio_passthrough=True)
@@ -134,13 +116,41 @@ async def run_bot(websocket_client: WebSocket, stream_sid: str, call_sid: str, t
 
     @audiobuffer.event_handler("on_audio_data")
     async def on_audio_data(buffer, audio, sample_rate, num_channels):
-        server_name = f"server_{websocket_client.client.port}"
-        await save_audio(server_name, audio, sample_rate, num_channels)
+        await save_audio(audio, sample_rate, num_channels)
 
     # We use `handle_sigint=False` because `uvicorn` is controlling keyboard
     # interruptions. We use `force_gc=True` to force garbage collection after
     # the runner finishes running a task which could be useful for long running
     # applications with multiple clients connecting.
-    runner = PipelineRunner(handle_sigint=False, force_gc=True)
+    runner = PipelineRunner(handle_sigint=handle_sigint, force_gc=True)
 
     await runner.run(task)
+
+
+async def bot(runner_args: RunnerArguments, testing: bool):
+    """Main bot entry point compatible with Pipecat Cloud."""
+
+    transport_type, call_data = await parse_telephony_websocket(runner_args.websocket)
+    logger.info(f"Auto-detected transport: {transport_type}")
+
+    serializer = TwilioFrameSerializer(
+        stream_sid=call_data["stream_id"],
+        call_sid=call_data["call_id"],
+        account_sid=os.getenv("TWILIO_ACCOUNT_SID", ""),
+        auth_token=os.getenv("TWILIO_AUTH_TOKEN", ""),
+    )
+
+    transport = FastAPIWebsocketTransport(
+        websocket=runner_args.websocket,
+        params=FastAPIWebsocketParams(
+            audio_in_enabled=True,
+            audio_out_enabled=True,
+            add_wav_header=False,
+            vad_analyzer=SileroVADAnalyzer(),
+            serializer=serializer,
+        ),
+    )
+
+    handle_sigint = runner_args.handle_sigint
+
+    await run_bot(transport, handle_sigint, testing)
