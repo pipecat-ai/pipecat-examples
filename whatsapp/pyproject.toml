@@ -1,0 +1,22 @@
+[project]
+name = "whatsapp"
+version = "0.1.0"
+description = "A real-time voice bot that integrates with WhatsApp Business API"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "pipecat-ai[google,silero, webrtc]>=0.0.83",
+]
+
+[dependency-groups]
+dev = [
+    "ruff~=0.12.1",
+    "uvicorn>=0.32.0,<1.0.0",
+    "python-dotenv>=1.0.1,<2.0.0",
+    "fastapi>=0.115.6,<0.117.0"
+]
+
+[tool.ruff]
+line-length = 100
+[tool.ruff.lint]
+select = ["I"]
