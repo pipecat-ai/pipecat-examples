@@ -1,6 +1,0 @@
-pipecat-ai[daily,cartesia,openai,silero]>=0.0.82
-fastapi==0.115.6
-uvicorn
-python-dotenv
-twilio
-aiohttp

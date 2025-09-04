@@ -1,35 +1,33 @@
-<!-- @format -->
-
 # Daily + Twilio SIP dial-out Voice Bot
 
-This project demonstrates how to create a voice bot that can make phone calls via Twilio and use Daily's SIP capabilities to enable voice conversations.
+This project demonstrates how to create a voice bot that can make phone calls via Twilio and use Daily's SIP capabilities to enable voice conversations. It supports both local development and Pipecat Cloud deployment.
 
-## How it works
+## How It Works
 
-1. The server file receives a curl request with the SIP uri to dial out to
+1. The server receives a POST request with the SIP URI to dial out to
 2. The server creates a Daily room with SIP capabilities
-3. The server starts the bot process with the room details
-4. When the bot has joined, it starts the dial-out process and dials out to the SIP uri provided in the curl request
-5. Twilio receives the request, and the provided TWIML processes the SIP uri
-6. Twilio then rings the number found within the SIP uri
-7. When the user answers the phone, the user is brought into the call
-8. The end user and the bot are connected, and the bot handles the conversation
+3. The server starts the bot with the room details and dial-out configuration
+4. When the bot joins the room, it starts the dial-out process to the provided SIP URI
+5. Twilio receives the request and processes the SIP URI via configured TwiML
+6. Twilio rings the number found within the SIP URI
+7. When the user answers the phone, they are connected to the bot
+8. The end user and bot are connected, and the bot handles the conversation
 
 ## Prerequisites
 
-- A Daily account with an API key
+- A Daily account with an API key for room creation
 - A Twilio account with a phone number that supports voice and a correctly configured SIP domain
 - OpenAI API key for the bot's intelligence
 - Cartesia API key for text-to-speech
+- Deepgram API key for speech-to-text
+- [uv](https://docs.astral.sh/uv/getting-started/installation/) package manager installed
 
 ## Setup
 
 1. Create a virtual environment and install dependencies
 
 ```bash
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-pip install -r requirements.txt
+uv sync
 ```
 
 2. Set up environment variables
@@ -60,93 +58,133 @@ Visit this link to create your [TwiML Bin](https://www.twilio.com/docs/serverles
 - callerId must be a valid number that you own on [Twilio](https://console.twilio.com/us1/develop/phone-numbers/manage/incoming)
 - Save the file. We will use this when creating the SIP domain
 
-4. Create and configure a programmable SIP domain
+4. Create and configure a SIP domain
 
-- Visit this link to [create a new SIP domain:](https://console.twilio.com/us1/develop/voice/manage/sip-domains?frameUrl=%2Fconsole%2Fvoice%2Fsip%2Fendpoints%3Fx-target-region%3Dus1)
-- Press the plus button to create a new SIP domain
-- Give the SIP domain a friendly name. For example "Daily SIP domain"
-- Specify a SIP URI, for example "daily.sip.twilio.com"
-- Under "Voice Authentication", press the plus button next to IP Access Control Lists. We are going to white list the entire IP spectrum
-- Give it a friendly name such as "first half"
-- For CIDR Network Address specify 0.0.0.0 and for the subnet specify 1
-- Again, specify "first half" for the friendly name and click "Create ACL"
-- Now let's do the same again and add another IP Access Control List by pressing the plus button
-- Give it a friendly name such as "second half".
-- For the CIDR Network Address specify 128.0.0.0 and for the subnet specify 1
-- Lastly, specify the friendly name "second half" again
-- Make sure both IP Access control list appears selected in the dropdown
-- Under "Call Control Configuration", specify the following:
-- Configure with: Webhooks, TwiML Bins, Functions, Studio, Proxy
-- A call comes in: TwiML Bin > Select the name of the TwiML bin you made earlier
-- Leave everything else blank and scroll to the bottom of the page. Click save
+This allows Daily to make outbound calls through Twilio.
 
-## Running the Server
+**Create the SIP Domain:**
 
-Start the webhook server:
+- Go to [Twilio Console > Voice > SIP Domains](https://console.twilio.com/us1/develop/voice/manage/sip-domains)
+- Click the **+** button to create a new domain
+- **Domain Name**: Choose something like `daily.sip.twilio.com`
+- **Friendly Name**: `Daily SIP Domain`
+
+**Configure Authentication (Allow all traffic):**
+
+- Under "Voice Authentication", click **+** next to "IP Access Control Lists"
+- Create **first ACL**:
+  - **Friendly Name**: `Allow All - Part 1`
+  - **CIDR**: `0.0.0.0/1` (covers 0.0.0.0 to 127.255.255.255)
+- Create **second ACL**:
+  - **Friendly Name**: `Allow All - Part 2`
+  - **CIDR**: `128.0.0.0/1` (covers 128.0.0.0 to 255.255.255.255)
+- Make sure both ACLs are selected in the dropdown
+
+**Configure Call Handling:**
+
+- Under "Call Control Configuration":
+  - **Configure with**: `TwiML Bins`
+  - **A call comes in**: Select your TwiML bin from step 3
+- Click **Save**
+
+> **Why these settings?** The IP ranges allow Daily's servers to connect from anywhere, and the TwiML bin tells Twilio how to handle the calls.
+
+## Running the Bot Locally
+
+1. In your `.env` file, set `ENVIRONMENT=local`
+
+2. Start the server (handles dial-out requests and bot starting):
+
+   ```bash
+   uv run server.py
+   ```
+
+3. Send a curl request to initiate a call:
 
 ```bash
-python server.py
-```
-
-## Testing
-
-With server.py running, send the following curl command from your terminal:
-
-```bash
-curl -X POST "http://127.0.0.1:7860/start" \
+curl -X POST "http://localhost:7860/start" \
   -H "Content-Type: application/json" \
   -d '{
     "dialout_settings": {
-      "sip_uri": "sip:+1234567891@daily.sip.twilio.com"
+      "sip_uri": "sip:+1234567890@daily.sip.twilio.com"
     }
   }'
 ```
 
-- Replace the phone number (Starting with +1) with the phone number you want to ring
-- Replace daily with the SIP domain you configured previously
+Replace:
 
-The server should make a room. The bot will join the room and then dial out to the SIP URI provided. Answer the call to speak with the bot.
+- The phone number (starting with +1) with the phone number you want to call
+- `daily` with the SIP domain you configured previously
 
-## Customizing the Bot
+The server will create a room, start the bot, and the bot will dial out to the provided SIP URI. Answer the call to speak with the bot.
 
-You can customize the bot's behavior by modifying the system prompt in `bot.py`.
+## Deploy to Pipecat Cloud
 
-## Handling Multiple SIP Endpoints
+### Prerequisites
 
-Note that normally calls only require a single SIP endpoint. If you are planning to forward the call to a different number, you will need to set up 2 SIP endpoints: one for the initial call and one for the forwarded call.
+Configure your machine with the required Pipecat Cloud and Docker prerequisites. See the [Quickstart](https://docs.pipecat.ai/getting-started/quickstart#prerequisites-2) guide for details.
 
-## Daily dial-out configuration
+### Configure your Deployment
 
-The bot configures the Daily rooms with dial-out capabilities using these settings. Note: You also need dial-out to be enabled on the domain, as mentioned earlier on in the README.
+Update the `pcc-deploy.toml` file with:
 
-```python
-properties = DailyRoomProperties(
-        sip=sip_params,
-        enable_dialout=True,  # Needed for outbound calls if you expand the bot
-        enable_chat=False,  # No need for chat in a voice bot
-        start_video_off=True,  # Voice only
-)
+- `agent_name`: Your bot’s name in Pipecat Cloud
+- `image`: The Docker image to deploy (format: username/image:version)
+- `image_credentials`: Your Docker registry image pull secret to authenticate your image pull
+- `secret_set`: Where your API keys are stored securely
+
+### Create a Secrets Set
+
+Create the secrets set from your .env file:
+
+```bash
+uv run pcc secrets set daily-twilio-sip-secrets --file .env
 ```
 
-## Troubleshooting
+### Build and deploy
 
-### I get an error about dial-out not being enabled
+Build your Docker image and push to Docker Hub:
 
-- Check that your room has `enable_dialout=True` set
-- Check that your meeting token is an owner token (The bot does this for you automatically)
-- Check that the SIP URI is correct
-- Check that the phone number you are trying to ring is correct
+```bash
+uv run pcc docker build-push
+```
 
-### I'm stuck setting up my Twilio account
+Deploy to Pipecat Cloud:
 
-- You can reference this [Notion doc](https://dailyco.notion.site/PUBLIC-Doc-Integration-Twilio-PSTN-Daily-s-SIP-Dialout-1cfdaed630f5458d9d4fc0e3f29ec559) to find more information on how to set up Twilio, as well as use webhooks instead of TwiML Bins
+```bash
+uv run pcc deploy
+```
 
-### Call connects but no bot is heard
+### Run your Server
 
-- Ensure your Daily API key is correct and has SIP capabilities
-- Verify that the Cartesia API key and voice ID are correct
+The `server.py` file is a FastAPI server that handles the Twilio incoming webhook. For a production deployment, this server should be run separately from your Pipecat Cloud bot. This would be a server environment that runs the FastAPI server persistently, so that it can handle inbound requests.
 
-### Bot starts but disconnects immediately
+For the sake of testing the Pipecat Cloud deployment, we'll run the server locally and expose it to the internet via ngrok:
 
-- Check the Daily logs for any error messages
-- Ensure your server has stable internet connectivity
+In terminal 1:
+
+```bash
+uv run server.py
+```
+
+In terminal 2:
+
+```bash
+ngrok http 7860
+```
+
+> Note: Ensure that the `ENVIRONMENT` variable is set to `production` to use the Pipecat Cloud hosted bot.
+
+### Test your Deployment
+
+Send a curl request to initiate a call:
+
+```bash
+curl -X POST "http://localhost:7860/start" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "dialout_settings": {
+      "sip_uri": "sip:+1234567890@daily.sip.twilio.com"
+    }
+  }'
+```
