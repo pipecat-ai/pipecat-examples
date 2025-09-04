@@ -107,7 +107,7 @@ async def bot(runner_args: RunnerArguments):
     transport = None
 
     if isinstance(runner_args, DailyRunnerArguments):
-        from pipecat.transports.services.daily import DailyParams, DailyTransport
+        from pipecat.transports.daily.transport import DailyParams, DailyTransport
 
         if os.environ.get("ENV") != "local":
             from pipecat.audio.filters.krisp_filter import KrispFilter
@@ -130,7 +130,7 @@ async def bot(runner_args: RunnerArguments):
 
     elif isinstance(runner_args, SmallWebRTCRunnerArguments):
         from pipecat.transports.base_transport import TransportParams
-        from pipecat.transports.network.small_webrtc import SmallWebRTCTransport
+        from pipecat.transports.smallwebrtc.transport import SmallWebRTCTransport
 
         transport = SmallWebRTCTransport(
             params=TransportParams(

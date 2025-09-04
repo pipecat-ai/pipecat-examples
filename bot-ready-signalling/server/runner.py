@@ -9,7 +9,7 @@ import os
 from typing import Optional
 
 import aiohttp
-from pipecat.transports.services.helpers.daily_rest import DailyRESTHelper
+from pipecat.transports.daily.utils import DailyRESTHelper
 
 
 async def configure(aiohttp_session: aiohttp.ClientSession):

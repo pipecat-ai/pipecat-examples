@@ -30,7 +30,7 @@ from pipecat.serializers.twilio import TwilioFrameSerializer
 from pipecat.services.cartesia.tts import CartesiaTTSService
 from pipecat.services.deepgram.stt import DeepgramSTTService
 from pipecat.services.openai.llm import OpenAILLMService
-from pipecat.transports.network.websocket_client import (
+from pipecat.transports.websocket.client import (
     WebsocketClientParams,
     WebsocketClientTransport,
 )

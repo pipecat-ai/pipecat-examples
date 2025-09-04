@@ -26,7 +26,7 @@ from pipecat.processors.frameworks.rtvi import (
     RTVIProcessor,
 )
 from pipecat.services.gemini_multimodal_live.gemini import GeminiMultimodalLiveLLMService
-from pipecat.transports.services.daily import DailyParams, DailyTransport
+from pipecat.transports.daily.transport import DailyParams, DailyTransport
 from pipecatcloud.agent import DailySessionArguments
 
 load_dotenv(override=True)

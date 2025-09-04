@@ -17,7 +17,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
-from pipecat.transports.services.helpers.daily_rest import (
+from pipecat.transports.daily.utils import (
     DailyRESTHelper,
     DailyRoomObject,
     DailyRoomParams,

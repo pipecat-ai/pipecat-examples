@@ -25,7 +25,7 @@ from pipecat.pipeline.task import PipelineParams, PipelineTask
 from pipecat.processors.aggregators.openai_llm_context import OpenAILLMContext
 from pipecat.services.cartesia.tts import CartesiaTTSService
 from pipecat.services.openai.llm import OpenAILLMService
-from pipecat.transports.services.daily import DailyDialinSettings, DailyParams, DailyTransport
+from pipecat.transports.daily.transport import DailyDialinSettings, DailyParams, DailyTransport
 
 # Setup logging
 load_dotenv()

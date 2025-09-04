@@ -20,8 +20,8 @@ from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineParams, PipelineTask
 from pipecat.processors.frame_processor import Frame, FrameDirection, FrameProcessor
 from pipecat.transports.base_transport import TransportParams
-from pipecat.transports.network.small_webrtc import SmallWebRTCTransport
-from pipecat.transports.services.daily import DailyParams, DailyTransport
+from pipecat.transports.daily.transport import DailyParams, DailyTransport
+from pipecat.transports.smallwebrtc.transport import SmallWebRTCTransport
 
 load_dotenv(override=True)
 

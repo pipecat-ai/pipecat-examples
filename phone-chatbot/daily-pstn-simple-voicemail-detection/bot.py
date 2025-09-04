@@ -22,7 +22,7 @@ from pipecat.services.cartesia.tts import CartesiaTTSService
 from pipecat.services.google.google import GoogleLLMContext
 from pipecat.services.google.llm import GoogleLLMService
 from pipecat.services.llm_service import FunctionCallParams
-from pipecat.transports.services.daily import DailyParams, DailyTransport
+from pipecat.transports.daily.transport import DailyParams, DailyTransport
 
 load_dotenv(override=True)
 
