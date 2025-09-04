@@ -89,7 +89,7 @@ Update the `pcc-deploy.toml` file with:
 Create the secrets set from your .env file:
 
 ```bash
-uv run pcc secrets set quickstart-secrets --file .env
+uv run pcc secrets set daily-twilio-sip-secrets --file .env
 ```
 
 ### Build and deploy

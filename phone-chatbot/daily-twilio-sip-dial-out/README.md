@@ -19,6 +19,7 @@ This project demonstrates how to create a voice bot that can make phone calls vi
 - A Twilio account with a phone number that supports voice and a correctly configured SIP domain
 - OpenAI API key for the bot's intelligence
 - Cartesia API key for text-to-speech
+- Deepgram API key for speech-to-text
 - [uv](https://docs.astral.sh/uv/getting-started/installation/) package manager installed
 
 ## Setup
@@ -57,25 +58,36 @@ Visit this link to create your [TwiML Bin](https://www.twilio.com/docs/serverles
 - callerId must be a valid number that you own on [Twilio](https://console.twilio.com/us1/develop/phone-numbers/manage/incoming)
 - Save the file. We will use this when creating the SIP domain
 
-4. Create and configure a programmable SIP domain
+4. Create and configure a SIP domain
 
-- Visit this link to [create a new SIP domain:](https://console.twilio.com/us1/develop/voice/manage/sip-domains?frameUrl=%2Fconsole%2Fvoice%2Fsip%2Fendpoints%3Fx-target-region%3Dus1)
-- Press the plus button to create a new SIP domain
-- Give the SIP domain a friendly name. For example "Daily SIP domain"
-- Specify a SIP URI, for example "daily.sip.twilio.com"
-- Under "Voice Authentication", press the plus button next to IP Access Control Lists. We are going to white list the entire IP spectrum
-- Give it a friendly name such as "first half"
-- For CIDR Network Address specify 0.0.0.0 and for the subnet specify 1
-- Again, specify "first half" for the friendly name and click "Create ACL"
-- Now let's do the same again and add another IP Access Control List by pressing the plus button
-- Give it a friendly name such as "second half".
-- For the CIDR Network Address specify 128.0.0.0 and for the subnet specify 1
-- Lastly, specify the friendly name "second half" again
-- Make sure both IP Access control list appears selected in the dropdown
-- Under "Call Control Configuration", specify the following:
-  - Configure with: Webhooks, TwiML Bins, Functions, Studio, Proxy
-  - A call comes in: TwiML Bin > Select the name of the TwiML bin you made earlier
-- Leave everything else blank and scroll to the bottom of the page. Click Save
+This allows Daily to make outbound calls through Twilio.
+
+**Create the SIP Domain:**
+
+- Go to [Twilio Console > Voice > SIP Domains](https://console.twilio.com/us1/develop/voice/manage/sip-domains)
+- Click the **+** button to create a new domain
+- **Domain Name**: Choose something like `daily.sip.twilio.com`
+- **Friendly Name**: `Daily SIP Domain`
+
+**Configure Authentication (Allow all traffic):**
+
+- Under "Voice Authentication", click **+** next to "IP Access Control Lists"
+- Create **first ACL**:
+  - **Friendly Name**: `Allow All - Part 1`
+  - **CIDR**: `0.0.0.0/1` (covers 0.0.0.0 to 127.255.255.255)
+- Create **second ACL**:
+  - **Friendly Name**: `Allow All - Part 2`
+  - **CIDR**: `128.0.0.0/1` (covers 128.0.0.0 to 255.255.255.255)
+- Make sure both ACLs are selected in the dropdown
+
+**Configure Call Handling:**
+
+- Under "Call Control Configuration":
+  - **Configure with**: `TwiML Bins`
+  - **A call comes in**: Select your TwiML bin from step 3
+- Click **Save**
+
+> **Why these settings?** The IP ranges allow Daily's servers to connect from anywhere, and the TwiML bin tells Twilio how to handle the calls.
 
 ## Running the Bot Locally
 
@@ -126,7 +138,7 @@ Update the `pcc-deploy.toml` file with:
 Create the secrets set from your .env file:
 
 ```bash
-uv run pcc secrets set quickstart-secrets --file .env
+uv run pcc secrets set daily-twilio-sip-secrets --file .env
 ```
 
 ### Build and deploy
