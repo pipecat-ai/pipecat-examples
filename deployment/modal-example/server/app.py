@@ -125,7 +125,7 @@ async def create_room_and_token() -> tuple[str, str]:
     Raises:
         HTTPException: If room creation or token generation fails.
     """
-    from pipecat.transports.services.helpers.daily_rest import DailyRoomParams
+    from pipecat.transports.daily.utils import DailyRoomParams
 
     room_url = os.getenv("DAILY_SAMPLE_ROOM_URL", None)
     token = os.getenv("DAILY_SAMPLE_ROOM_TOKEN", None)
@@ -173,7 +173,7 @@ async def lifespan(app: FastAPI):
     - Initializes Daily API helper
     - Cleans up resources on shutdown
     """
-    from pipecat.transports.services.helpers.daily_rest import DailyRESTHelper
+    from pipecat.transports.daily.utils import DailyRESTHelper
 
     aiohttp_session = aiohttp.ClientSession()
     daily_helpers["rest"] = DailyRESTHelper(

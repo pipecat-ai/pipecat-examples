@@ -58,7 +58,7 @@ from pipecat.services.gemini_multimodal_live.gemini import (
 from pipecat.services.google.tts import GoogleTTSService
 from pipecat.sync.base_notifier import BaseNotifier
 from pipecat.sync.event_notifier import EventNotifier
-from pipecat.transports.network.fastapi_websocket import (
+from pipecat.transports.websocket.fastapi import (
     FastAPIWebsocketParams,
     FastAPIWebsocketTransport,
 )

@@ -18,7 +18,7 @@ from pipecat.frames.frames import (
 )
 from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
 from pipecat.services.google.llm import GoogleLLMService
-from pipecat.transports.services.daily import DailyTransportMessageFrame
+from pipecat.transports.daily.transport import DailyTransportMessageFrame
 from prompts import (
     CUE_ASSISTANT_TURN,
     CUE_USER_TURN,

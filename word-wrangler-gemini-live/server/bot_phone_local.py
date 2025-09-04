@@ -61,7 +61,7 @@ from pipecat.services.gemini_multimodal_live.gemini import (
 from pipecat.services.google.tts import GoogleTTSService
 from pipecat.sync.base_notifier import BaseNotifier
 from pipecat.sync.event_notifier import EventNotifier
-from pipecat.transports.services.daily import DailyParams, DailyTransport
+from pipecat.transports.daily.transport import DailyParams, DailyTransport
 from pipecat.utils.text.base_text_filter import BaseTextFilter
 from pipecatcloud.agent import DailySessionArguments
 from word_list import generate_game_words
