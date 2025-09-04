@@ -34,7 +34,9 @@ logger.add(sys.stderr, level="DEBUG")
 twilio_client = Client(os.getenv("TWILIO_ACCOUNT_SID"), os.getenv("TWILIO_AUTH_TOKEN"))
 
 
-async def run_bot(transport: BaseTransport, call_id: str, sip_uri: str) -> None:
+async def run_bot(
+    transport: BaseTransport, call_id: str, sip_uri: str, handle_sigint: bool
+) -> None:
     """Run the voice bot with the given parameters.
 
     Args:
@@ -145,7 +147,7 @@ async def run_bot(transport: BaseTransport, call_id: str, sip_uri: str) -> None:
         logger.warning(f"Dial-in warning: {data}")
 
     # Run the pipeline
-    runner = PipelineRunner(handle_sigint=False)
+    runner = PipelineRunner(handle_sigint=handle_sigint)
     await runner.run(task)
 
 
@@ -158,6 +160,7 @@ async def bot(runner_args: RunnerArguments):
     token = body.get("token")
     call_id = body.get("call_id")
     sip_uri = body.get("sip_uri")
+    handle_sigint = body.get("handle_sigint", False)
 
     if not call_id or not sip_uri:
         logger.error(f"Missing required parameters in body: call_id={call_id}, sip_uri={sip_uri}")
@@ -178,4 +181,4 @@ async def bot(runner_args: RunnerArguments):
         ),
     )
 
-    await run_bot(transport, call_id, sip_uri)
+    await run_bot(transport, call_id, sip_uri, handle_sigint)

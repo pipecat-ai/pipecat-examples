@@ -51,9 +51,7 @@ ngrok http 7860
 # Then use the provided URL (e.g., https://abc123.ngrok.io/call) in Twilio
 ```
 
-## Running the Bot
-
-### Local Development
+## Running the Bot Locally
 
 Running the bot locally requires two terminal windows:
 

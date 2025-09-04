@@ -4,14 +4,8 @@
 # SPDX-License-Identifier: BSD 2-Clause License
 #
 
-"""simple_dialout.py.
+"""Daily + Twilio SIP dial-out voice bot implementation."""
 
-Simple Dial-out Bot.
-"""
-
-import argparse
-import asyncio
-import json
 import os
 import sys
 from typing import Any
@@ -23,7 +17,9 @@ from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineParams, PipelineTask
 from pipecat.processors.aggregators.openai_llm_context import OpenAILLMContext
+from pipecat.runner.types import RunnerArguments
 from pipecat.services.cartesia.tts import CartesiaTTSService
+from pipecat.services.deepgram.stt import DeepgramSTTService
 from pipecat.services.openai.llm import OpenAILLMService
 from pipecat.transports.daily.transport import DailyParams, DailyTransport
 
@@ -36,34 +32,15 @@ daily_api_key = os.getenv("DAILY_API_KEY", "")
 daily_api_url = os.getenv("DAILY_API_URL", "https://api.daily.co/v1")
 
 
-async def run_bot(
-    room_url: str,
-    token: str,
-    body: dict,
-) -> None:
+async def run_bot(transport: DailyTransport, dialout_settings: dict, handle_sigint: bool) -> None:
     """Run the voice bot with the given parameters.
 
     Args:
-        room_url: The Daily room URL
-        token: The Daily room token
-        body: Body passed to the bot from the webhook
-
+        transport: The Daily transport instance
+        dialout_settings: Dial-out configuration containing SIP URI
     """
-    # ------------ CONFIGURATION AND SETUP ------------
-    logger.info(f"Starting bot with room: {room_url}")
-    logger.info(f"Token: {token}")
-    logger.info(f"Body: {body}")
-    # Parse the body to get the dial-in settings
-    body_data = json.loads(body)
-
-    # Check if the body contains dial-in settings
-    logger.debug(f"Body data: {body_data}")
-
-    if not body_data.get("dialout_settings"):
-        logger.error("Dial-out settings not found in the body data")
-        return
-
-    dialout_settings = body_data["dialout_settings"]
+    logger.info(f"Starting dial-out bot")
+    logger.debug(f"Dialout settings: {dialout_settings}")
 
     if not dialout_settings.get("sip_uri"):
         logger.error("Dial-out sip_uri not found in the dial-out settings")
@@ -71,37 +48,14 @@ async def run_bot(
 
     # Extract sip_uri
     sip_uri = dialout_settings["sip_uri"]
+    logger.info(f"Will dial out to: {sip_uri}")
 
-    # ------------ TRANSPORT SETUP ------------
-
-    transport_params = DailyParams(
-        api_url=daily_api_url,
-        api_key=daily_api_key,
-        audio_in_enabled=True,
-        audio_out_enabled=True,
-        video_out_enabled=False,
-        vad_analyzer=SileroVADAnalyzer(),
-        transcription_enabled=True,
-    )
-
-    # Initialize transport with Daily
-    transport = DailyTransport(
-        room_url,
-        token,
-        "Phone Bot",
-        transport_params,
-    )
-
-    # Initialize TTS
-    tts = CartesiaTTSService(
-        api_key=os.getenv("CARTESIA_API_KEY", ""),
-        voice_id="b7d50908-b17c-442d-ad8d-810c63997ed9",  # Use Helpful Woman voice by default
-    )
-
-    # ------------ LLM AND CONTEXT SETUP ------------
-
-    # Initialize LLM
+    stt = DeepgramSTTService(api_key=os.getenv("DEEPGRAM_API_KEY"))
     llm = OpenAILLMService(api_key=os.getenv("OPENAI_API_KEY"))
+    tts = CartesiaTTSService(
+        api_key=os.getenv("CARTESIA_API_KEY"),
+        voice_id="71a7ad14-091c-4e8e-a314-022ece01c121",  # British Reading Lady
+    )
 
     # Create system message and initialize messages list
     messages = [
@@ -114,16 +68,15 @@ async def run_bot(
             ),
         },
     ]
-    # Initialize LLM context and aggregator
+
     context = OpenAILLMContext(messages)
     context_aggregator = llm.create_context_aggregator(context)
-
-    # ------------ PIPELINE SETUP ------------
 
     # Build pipeline
     pipeline = Pipeline(
         [
             transport.input(),  # Transport user input
+            stt,
             context_aggregator.user(),  # User responses
             llm,  # LLM
             tts,  # TTS
@@ -141,7 +94,6 @@ async def run_bot(
         ),
     )
 
-    # ------------ RETRY LOGIC VARIABLES ------------
     max_retries = 5
     retry_count = 0
     dialout_successful = False
@@ -161,8 +113,6 @@ async def run_bot(
             await transport.start_dialout(dialout_params)
         else:
             logger.error(f"Maximum retry attempts ({max_retries}) reached. Giving up on dialout.")
-
-    # ------------ EVENT HANDLERS ------------
 
     @transport.event_handler("on_joined")
     async def on_joined(transport, data):
@@ -203,31 +153,42 @@ async def run_bot(
         logger.debug(f"Participant left: {participant}, reason: {reason}")
         await task.cancel()
 
-    # ------------ RUN PIPELINE ------------
-
-    runner = PipelineRunner()
+    runner = PipelineRunner(handle_sigint=handle_sigint)
     await runner.run(task)
 
 
-async def main():
-    """Parse command line arguments and run the bot."""
-    parser = argparse.ArgumentParser(description="Simple Dial-out Bot")
-    parser.add_argument("-u", "--url", type=str, help="Room URL")
-    parser.add_argument("-t", "--token", type=str, help="Room Token")
-    parser.add_argument("-b", "--body", type=str, help="JSON configuration string")
+async def bot(runner_args: RunnerArguments):
+    """Main bot entry point compatible with Pipecat Cloud."""
 
-    args = parser.parse_args()
+    # Extract all details from the body parameter
+    body = getattr(runner_args, "body", {})
+    room_url = body.get("room_url")
+    token = body.get("token")
+    dialout_settings = body.get("dialout_settings", {})
+    handle_sigint = body.get("handle_sigint", False)
 
-    logger.debug(f"url: {args.url}")
-    logger.debug(f"token: {args.token}")
-    logger.debug(f"body: {args.body}")
-    if not all([args.url, args.token, args.body]):
-        logger.error("All arguments (-u, -t, -b) are required")
-        parser.print_help()
-        sys.exit(1)
+    if not dialout_settings:
+        logger.error("Missing dialout_settings in body")
+        raise ValueError("dialout_settings are required in the body parameter")
 
-    await run_bot(args.url, args.token, args.body)
+    if not room_url or not token:
+        logger.error(f"Missing room connection details: room_url={room_url}, token={token}")
+        raise ValueError("room_url and token are required")
 
+    logger.info(f"Starting bot for room: {room_url}")
 
-if __name__ == "__main__":
-    asyncio.run(main())
+    transport = DailyTransport(
+        room_url,
+        token,
+        "Dial-out Bot",
+        params=DailyParams(
+            api_url=daily_api_url,
+            api_key=daily_api_key,
+            audio_in_enabled=True,
+            audio_out_enabled=True,
+            video_out_enabled=False,
+            vad_analyzer=SileroVADAnalyzer(),
+        ),
+    )
+
+    await run_bot(transport, dialout_settings, handle_sigint)
