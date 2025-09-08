@@ -1,33 +1,32 @@
 # Daily + Twilio SIP dial-in Voice Bot
 
-This project demonstrates how to create a voice bot that can receive phone calls via Twilio and use Daily's SIP capabilities to enable voice conversations.
+This project demonstrates how to create a voice bot that can receive phone calls via Twilio and use Daily's SIP capabilities to enable voice conversations. It supports both local development and Pipecat Cloud deployment.
 
 ## How It Works
 
 1. Twilio receives an incoming call to your phone number
-2. Twilio calls your webhook server (`/start` endpoint)
+2. Twilio calls your webhook server (`/call` endpoint)
 3. The server creates a Daily room with SIP capabilities
-4. The server starts the bot process with the room details
-5. The caller is put on hold with music
+4. The server starts the bot with the room details and call information
+5. The caller is put on hold with music, in this case a US ringtone
 6. The bot joins the Daily room and signals readiness
 7. Twilio forwards the call to Daily's SIP endpoint
 8. The caller and bot are connected, and the bot handles the conversation
 
 ## Prerequisites
 
-- A Daily account with an API key
+- A Daily account with an API key for room creation
 - A Twilio account with a phone number that supports voice
 - OpenAI API key for the bot's intelligence
 - Cartesia API key for text-to-speech
+- [uv](https://docs.astral.sh/uv/getting-started/installation/) package manager installed
 
 ## Setup
 
 1. Create a virtual environment and install dependencies
 
 ```bash
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-pip install -r requirements.txt
+uv sync
 ```
 
 2. Set up environment variables
@@ -44,95 +43,89 @@ cp .env.example .env
 In the Twilio console:
 
 - Go to your phone number's configuration
-- Set the webhook for "A Call Comes In" to your server's URL + "/start"
+- Set the webhook for "A call comes in" to your server's URL + "/call"
 - For local testing, you can use ngrok to expose your local server
 
 ```bash
 ngrok http 7860
-# Then use the provided URL (e.g., https://abc123.ngrok.io/start) in Twilio
+# Then use the provided URL (e.g., https://abc123.ngrok.io/call) in Twilio
 ```
 
-## Running the Server
+## Running the Bot Locally
 
-Start the webhook server:
+Running the bot locally requires two terminal windows:
+
+1. In terminal 1, start the server (handles both webhooks and bot starting):
+
+   ```bash
+   uv run server.py
+   ```
+
+2. In terminal 2, use ngrok to expose the server:
+
+   ```bash
+   ngrok http 7860
+   ```
+
+3. Call the Twilio phone number to talk to your bot.
+
+## Deploy to Pipecat Cloud
+
+### Prerequisites
+
+Configure your machine with the required Pipecat Cloud and Docker prerequisites. See the [Quickstart](https://docs.pipecat.ai/getting-started/quickstart#prerequisites-2) guide for details.
+
+### Configure your Deployment
+
+Update the `pcc-deploy.toml` file with:
+
+- `agent_name`: Your bot’s name in Pipecat Cloud
+- `image`: The Docker image to deploy (format: username/image:version)
+- `image_credentials`: Your Docker registry image pull secret to authenticate your image pull
+- `secret_set`: Where your API keys are stored securely
+
+### Create a Secrets Set
+
+Create the secrets set from your .env file:
 
 ```bash
-python server.py
+uv run pcc secrets set daily-twilio-sip-secrets --file .env
 ```
 
-## Testing
+### Build and deploy
 
-Call your Twilio phone number. The system should answer the call, put you on hold briefly, then connect you with the bot.
+Build your Docker image and push to Docker Hub:
 
-## Customizing the Bot
-
-You can customize the bot's behavior by modifying the system prompt in `bot.py`.
-
-### Changing the Hold Music
-
-To change the ringing sound or hold music that callers hear while waiting to be connected to the bot, update the URL in `server.py`:
-
-```python
-resp = VoiceResponse()
-resp.play(
-    url="https://your-custom-audio-file-url.mp3",
-    loop=10,
-)
+```bash
+uv run pcc docker build-push
 ```
 
-> Read [Twilio's guide](https://www.twilio.com/en-us/blog/adding-mp3-to-voice-call-using-twilio) on how to set up an mp3 in a voice call.
+Deploy to Pipecat Cloud:
 
-## Handling Multiple SIP Endpoints
-
-The bot is configured to handle multiple `on_dialin_ready` events that might occur with multiple SIP endpoints. It ensures that each call is only forwarded once using a simple flag:
-
-```python
-# Flag to track if call has been forwarded
-call_already_forwarded = False
-
-@transport.event_handler("on_dialin_ready")
-async def on_dialin_ready(transport, cdata):
-    nonlocal call_already_forwarded
-
-    # Skip if already forwarded
-    if call_already_forwarded:
-        logger.info("Call already forwarded, ignoring this event.")
-        return
-
-    # ... forwarding code ...
-    call_already_forwarded = True
+```bash
+uv run pcc deploy
 ```
 
-Note that normally calls only require a single SIP endpoint. If you are planning to forward the call to a different number, you will need to set up 2 SIP endpoints: one for the initial call and one for the forwarded call. IMPORTANT: ensure that your `on_dialin_ready` handler only handles the first call.
+### Run your Server
 
-## Daily SIP Configuration
+The `server.py` file is a FastAPI server that handles the Twilio incoming webhook. For a production deployment, this server should be run separately from your Pipecat Cloud bot. This would be a server environment that runs the FastAPI server persistently, so that it can handle inbound requests.
 
-The bot configures Daily rooms with SIP capabilities using these settings:
+For the sake of testing the Pipecat Cloud deployment, we'll run the server locally and expose it to the internet via ngrok:
 
-```python
-sip_params = DailyRoomSipParams(
-    display_name="phone-user",  # This will show up in the Daily UI; optional display the dialer's number
-    video=False,                # Audio-only call
-    sip_mode="dial-in",         # For receiving calls (vs. dial-out)
-    num_endpoints=1,            # Number of SIP endpoints to create
-)
+In terminal 1:
+
+```bash
+uv run server.py
 ```
 
-## Troubleshooting
+In terminal 2:
 
-### Call is not being answered
+```bash
+ngrok http 7860
+```
 
-- Check that your Twilio webhook is correctly configured
-- Verify your Twilio account has sufficient funds
-- Check the logs of both the server and bot processes
+> Note: Ensure that the `ENVIRONMENT` variable is set to `production` to use the Pipecat Cloud hosted bot.
 
-### Call connects but no bot is heard
+### Test your Deployment
 
-- Ensure your Daily API key is correct and has SIP capabilities
-- Check that the SIP endpoint is being correctly passed to the bot
-- Verify that the Cartesia API key and voice ID are correct
-
-### Bot starts but disconnects immediately
-
-- Check the Daily and Twilio logs for any error messages
-- Ensure your server has stable internet connectivity
+Call your Twilio number to talk to your bot!
