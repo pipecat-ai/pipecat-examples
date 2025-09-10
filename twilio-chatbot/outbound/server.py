@@ -27,6 +27,52 @@ load_dotenv(override=True)
 # ----------------- HELPERS ----------------- #
 
 
+def get_websocket_url(host: str) -> str:
+    """Get the appropriate WebSocket URL based on environment."""
+    env = os.getenv("ENV", "local").lower()
+
+    if env == "production":
+        return "wss://api.pipecat.daily.co/ws/twilio"
+    else:
+        return f"wss://{host}/ws"
+
+
+def build_parameters(from_number: str, to_number: str) -> list[str]:
+    """Build TwiML Parameter elements."""
+    parameters = []
+
+    # Add Pipecat Cloud service host for production
+    env = os.getenv("ENV", "local").lower()
+    if env == "production":
+        agent_name = os.getenv("AGENT_NAME")
+        org_name = os.getenv("ORGANIZATION_NAME")
+        service_host = f"{agent_name}.{org_name}"
+        parameters.append(f'<Parameter name="_pipecatCloudServiceHost" value="{service_host}"/>')
+
+    # Always add from and to parameters
+    parameters.append(f'<Parameter name="from" value="{from_number}"/>')
+    parameters.append(f'<Parameter name="to" value="{to_number}"/>')
+
+    return parameters
+
+
+def generate_twiml(host: str, from_number: str, to_number: str) -> str:
+    """Generate TwiML response with WebSocket streaming."""
+    websocket_url = get_websocket_url(host)
+    parameters = build_parameters(from_number, to_number)
+    parameters_str = "\n      ".join(parameters)
+
+    return f"""<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Connect>
+    <Stream url="{websocket_url}">
+      {parameters_str}
+    </Stream>
+  </Connect>
+  <Pause length="20"/>
+</Response>"""
+
+
 async def make_twilio_call(
     session: aiohttp.ClientSession, to_number: str, from_number: str, twiml_url: str
 ):
@@ -150,22 +196,35 @@ async def get_twiml(request: Request) -> HTMLResponse:
     """Return TwiML instructions for connecting call to WebSocket."""
     print("Serving TwiML for outbound call")
 
+    # Parse form data from Twilio webhook
+    form_data = await request.form()
+
+    # Extract call information
+    from_number = form_data.get("From", "")
+    to_number = form_data.get("To", "")
+    call_sid = form_data.get("CallSid", "")
+
+    # Log call details
+    if call_sid:
+        print(f"Twilio outbound call: {from_number} → {to_number}, SID: {call_sid}")
+
+    # Validate environment configuration for production
+    env = os.getenv("ENV", "local").lower()
+    if env == "production":
+        if not os.getenv("AGENT_NAME") or not os.getenv("ORGANIZATION_NAME"):
+            raise HTTPException(
+                status_code=500,
+                detail="AGENT_NAME and ORGANIZATION_NAME must be set for production deployment",
+            )
+
     try:
         # Get the server host to construct WebSocket URL
         host = request.headers.get("host")
         if not host:
             raise HTTPException(status_code=400, detail="Unable to determine server host")
 
-        ws_url = f"wss://{host}/ws"
-
-        # Generate TwiML response
-        twiml_content = f'''<?xml version="1.0" encoding="UTF-8"?>
-<Response>
-    <Connect>
-        <Stream url="{ws_url}"></Stream>
-    </Connect>
-    <Pause length="40"/>
-</Response>'''
+        # Generate TwiML with phone number parameters
+        twiml_content = generate_twiml(host, from_number, to_number)
 
         return HTMLResponse(content=twiml_content, media_type="application/xml")
 
@@ -209,6 +268,6 @@ if __name__ == "__main__":
     app.state.testing = args.test
 
     # Run the server
-    port = int(os.getenv("PORT", "8765"))
+    port = int(os.getenv("PORT", "7860"))
     print(f"Starting Twilio outbound chatbot server on port {port}")
     uvicorn.run(app, host="0.0.0.0", port=port)
