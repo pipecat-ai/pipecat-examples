@@ -9,6 +9,7 @@ import io
 import os
 import sys
 import wave
+from typing import Optional
 
 import aiofiles
 from dotenv import load_dotenv
@@ -33,9 +34,6 @@ from pipecat.transports.websocket.fastapi import (
 )
 
 load_dotenv(override=True)
-
-logger.remove(0)
-logger.add(sys.stderr, level="DEBUG")
 
 
 async def save_audio(audio: bytes, sample_rate: int, num_channels: int):
@@ -127,7 +125,7 @@ async def run_bot(transport: BaseTransport, handle_sigint: bool, testing: bool):
     await runner.run(task)
 
 
-async def bot(runner_args: RunnerArguments, testing: bool):
+async def bot(runner_args: RunnerArguments, testing: Optional[bool] = False):
     """Main bot entry point compatible with Pipecat Cloud."""
 
     transport_type, call_data = await parse_telephony_websocket(runner_args.websocket)

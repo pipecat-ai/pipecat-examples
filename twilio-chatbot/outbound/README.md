@@ -1,14 +1,17 @@
-# Twilio Chatbot: Outbound Calling
+# Twilio Chatbot: Outbound
 
-This project demonstrates how to create a voice bot that can make outbound phone calls using Twilio's Programmable Voice API and Media Streams, powered by Pipecat.
+This project is a Pipecat-based chatbot that integrates with Twilio to make outbound calls with personalized call information. The project includes FastAPI endpoints for initiating outbound calls and handling WebSocket connections with call context.
 
-## How it works
+## How It Works
 
-1. The server receives a POST request with a phone number to call
-2. The server uses Twilio's REST API to initiate an outbound call
-3. When the call is answered, Twilio fetches TwiML from the server
-4. The TwiML connects the call to a WebSocket for real-time audio streaming
-5. The bot engages in conversation with the person who answered the call
+When you want to make an outbound call:
+
+1. **Send POST request**: `POST /start` with a phone number to call
+2. **Server initiates call**: Uses Twilio's REST API to make the outbound call
+3. **Call answered**: When answered, Twilio fetches TwiML from your server's `/twiml` endpoint
+4. **Server returns TwiML**: Tells Twilio to start a WebSocket stream to your bot
+5. **WebSocket connection**: Audio streams between the called person and your bot
+6. **Call information**: Phone numbers are passed via TwiML Parameters to your bot
 
 ## Architecture
 
@@ -35,68 +38,77 @@ TwiML fetched → WebSocket connection → Bot conversation
 
 - Python 3.10+
 - `uv` package manager
+- ngrok (for local development)
+- Docker (for production deployment)
 
 ## Setup
 
-1. **Install dependencies**
+1. Set up a virtual environment and install dependencies:
 
 ```bash
-cd twilio-chatbot
+cd outbound
 uv sync
 ```
 
-2. **Set up environment variables**
+2. Get your Twilio credentials:
+
+- **Account SID & Auth Token**: Found in your [Twilio Console Dashboard](https://console.twilio.com/)
+- **Phone Number**: [Purchase a phone number](https://console.twilio.com/us1/develop/phone-numbers/manage/search) that supports voice calls
+
+3. Set up environment variables:
 
 ```bash
 cp env.example .env
 # Edit .env with your API keys
 ```
 
-Your `.env` file should contain:
+## Environment Configuration
 
-```bash
-OPENAI_API_KEY=sk-your-openai-key
-DEEPGRAM_API_KEY=your-deepgram-key
-CARTESIA_API_KEY=your-cartesia-key
-TWILIO_ACCOUNT_SID=ACyour-twilio-account-sid
-TWILIO_AUTH_TOKEN=your-twilio-auth-token
-TWILIO_PHONE_NUMBER=+1234567890
-```
+The bot supports two deployment modes controlled by the `ENV` variable:
 
-3. **Get your Twilio credentials**
+### Local Development (`ENV=local`)
 
-- **Account SID & Auth Token**: Found in your [Twilio Console Dashboard](https://console.twilio.com/)
-- **Phone Number**: [Purchase a phone number](https://console.twilio.com/us1/develop/phone-numbers/manage/search) that supports voice calls
+- Uses your local server or ngrok URL for WebSocket connections
+- Default configuration for development and testing
+- WebSocket connections go directly to your running server
 
-## Running the Server
+### Production (`ENV=production`)
 
-1. **Start the outbound bot server**
+- Uses Pipecat Cloud WebSocket URLs automatically
+- Requires `AGENT_NAME` and `ORGANIZATION_NAME` from your Pipecat Cloud deployment
+- Set these when deploying to production environments
+- WebSocket connections route through Pipecat Cloud infrastructure
 
-```bash
-cd outbound
-uv run server.py
-```
+## Local Development
 
-The server will start on port 8765.
+1. Start the outbound bot server:
 
-2. **Expose your server to the internet** (for development)
+   ```bash
+   uv run server.py
+   ```
 
-In another terminal:
+The server will start on port 7860.
 
-```bash
-ngrok http 8765
-```
+2. Using a new terminal, expose your server to the internet (for development)
 
-Copy the ngrok URL (e.g., `https://abc123.ngrok.io`)
+   ```bash
+   ngrok http 7860
+   ```
 
-> 💡 Tip: Use `--subdomain` in your `ngrok` command for a reusable URL.
+   > Tip: Use the `--subdomain` flag for a reusable ngrok URL.
+
+   Copy the ngrok URL (e.g., `https://abc123.ngrok.io`)
+
+3. No additional Twilio configuration needed
+
+   Unlike inbound calling, outbound calls don't require webhook configuration in the Twilio console. The server will make direct API calls to Twilio to initiate calls.
 
 ## Making an Outbound Call
 
 With the server running and exposed via ngrok, you can initiate an outbound call to a specified number:
 
 ```bash
-curl -X POST "https://your-ngrok-url.ngrok.io/start" \
+curl -X POST https://your-ngrok-url.ngrok.io/start \
   -H "Content-Type: application/json" \
   -d '{
     "dialout_settings": {
@@ -110,24 +122,44 @@ Replace:
 - `your-ngrok-url.ngrok.io` with your actual ngrok URL
 - `+1234567890` with the phone number you want to call
 
-## What Happens During a Call
+## Production Deployment
 
-1. **Call Initiation**: The server receives your request and calls Twilio's API
-2. **Phone Rings**: Twilio places the call to the specified number
-3. **Call Answered**: When someone picks up, Twilio requests TwiML from your server
-4. **WebSocket Connection**: TwiML instructs Twilio to connect audio to your WebSocket
-5. **Bot Conversation**: The bot immediately greets the person and explains why it's calling
-6. **Real-time Audio**: Audio flows bidirectionally through Twilio Media Streams
+### 1. Deploy your Bot to Pipecat Cloud
 
-## API Endpoints
+Follow the [quickstart instructions](https://docs.pipecat.ai/getting-started/quickstart#step-2%3A-deploy-to-production) to deploy your bot to Pipecat Cloud.
 
-- **`POST /start`** - Initiate an outbound call
+### 2. Configure Production Environment
 
-  - Body: `{"dialout_settings": {"phone_number": "+1234567890"}}`
-  - Response: `{"call_sid": "CA...", "status": "call_initiated", "phone_number": "+1234567890"}`
+Update your production `.env` file with the Pipecat Cloud details:
 
-- **`POST /twiml`** - Serves TwiML instructions (called by Twilio)
+```bash
+# Set to production mode
+ENV=production
 
-  - Returns XML that connects the call to the WebSocket
+# Your Pipecat Cloud deployment details
+AGENT_NAME=your-agent-name
+ORGANIZATION_NAME=your-org-name
 
-- **`WebSocket /ws`** - Handles real-time audio streaming with Twilio
+# Keep your existing Twilio and AI service keys
+```
+
+### 3. Deploy the Server
+
+The `server.py` handles outbound call initiation and should be deployed separately from your bot:
+
+- **Bot**: Runs on Pipecat Cloud (handles the conversation)
+- **Server**: Runs on your infrastructure (initiates calls, serves TwiML responses)
+
+When `ENV=production`, the server automatically routes WebSocket connections to your Pipecat Cloud bot.
+
+> Alternatively, you can test your Pipecat Cloud deployment by running your server locally.
+
+### Call your Bot
+
+As you did before, initiate a call via `curl` command to trigger your bot to dial a number.
+
+## Accessing Call Information in Your Bot
+
+Your bot automatically receives call information through Twilio's Parameters. The server extracts the `from` and `to` phone numbers and makes them available to your bot.
+
+In your `bot.py`, you can access this information from the WebSocket connection. The Pipecat development runner extracts this data using the `parse_telephony_websocket` function. This allows your bot to provide personalized responses based on who's calling and which number they called.

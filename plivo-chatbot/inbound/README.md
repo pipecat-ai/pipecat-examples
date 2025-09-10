@@ -1,6 +1,6 @@
 # Plivo Chatbot
 
-This project is a FastAPI-based chatbot that integrates with Plivo to handle WebSocket connections and provide real-time communication. The project includes endpoints for starting a call and handling WebSocket connections.
+This project is a Pipecat-based chatbot that integrates with Plivo to handle WebSocket connections and provide real-time communication. The project includes FastAPI endpoints for starting a call and handling WebSocket connections.
 
 ## Table of Contents
 

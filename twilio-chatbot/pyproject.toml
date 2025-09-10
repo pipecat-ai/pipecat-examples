@@ -1,9 +1,0 @@
-[project]
-name = "twilio-chatbot"
-version = "0.1.0"
-description = "Twilio calling examples for Pipecat"
-readme = "README.md"
-requires-python = ">=3.10"
-dependencies = [
-  "pipecat-ai[websocket,cartesia,openai,silero,deepgram,runner]>=0.0.79",
-]

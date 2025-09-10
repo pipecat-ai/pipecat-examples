@@ -1,0 +1,7 @@
+agent_name = "twilio-chatbot-dial-out"
+image = "your_username/twilio-chatbot-dial-out:0.1"
+image_credentials = "your_dockerhub_image_pull_secret"
+secret_set = "twilio-chatbot"
+
+[scaling]
+	min_agents = 1
