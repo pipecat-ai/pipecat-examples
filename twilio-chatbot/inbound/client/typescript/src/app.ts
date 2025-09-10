@@ -175,7 +175,7 @@ class WebsocketClientApp {
         serializer: new TwilioSerializer(),
         recorderSampleRate: 8000,
         playerSampleRate: 8000,
-        wsUrl: 'http://localhost:8765/ws',
+        wsUrl: 'http://localhost:7860/ws',
       };
       const pcConfig: PipecatClientOptions = {
         transport: new WebSocketTransport(ws_opts),

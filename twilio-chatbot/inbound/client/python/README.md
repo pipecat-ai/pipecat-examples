@@ -12,7 +12,7 @@ Edit the `templates/streams.xml` file to point to your server’s WebSocket endp
 <?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <Connect>
-    <Stream url="ws://localhost:8765/ws" />
+    <Stream url="ws://localhost:7860/ws" />
   </Connect>
   <Pause length="40"/>
 </Response>
@@ -32,8 +32,8 @@ python server.py -t
 Start the client and point it to the server URL:
 
 ```sh
-python client.py -u http://localhost:8765 -c 2
+python client.py -u http://localhost:7860 -c 2
 ```
 
-- `-u`: Server URL (default is `http://localhost:8765`)
+- `-u`: Server URL (default is `http://localhost:7860`)
 - `-c`: Number of concurrent client connections (e.g., 2)
