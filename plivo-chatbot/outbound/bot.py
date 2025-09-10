@@ -5,7 +5,6 @@
 #
 
 import os
-import sys
 
 from dotenv import load_dotenv
 from loguru import logger
@@ -16,7 +15,7 @@ from pipecat.pipeline.task import PipelineParams, PipelineTask
 from pipecat.processors.aggregators.openai_llm_context import OpenAILLMContext
 from pipecat.runner.types import RunnerArguments
 from pipecat.runner.utils import parse_telephony_websocket
-from pipecat.serializers.twilio import TwilioFrameSerializer
+from pipecat.serializers.plivo import PlivoFrameSerializer
 from pipecat.services.cartesia.tts import CartesiaTTSService
 from pipecat.services.deepgram.stt import DeepgramSTTService
 from pipecat.services.openai.llm import OpenAILLMService
@@ -27,9 +26,6 @@ from pipecat.transports.websocket.fastapi import (
 )
 
 load_dotenv(override=True)
-
-logger.remove(0)
-logger.add(sys.stderr, level="DEBUG")
 
 
 async def run_bot(transport: BaseTransport, handle_sigint: bool):
@@ -46,9 +42,10 @@ async def run_bot(transport: BaseTransport, handle_sigint: bool):
         {
             "role": "system",
             "content": (
-                "You are a friendly assistant making an outbound phone call. Your responses will be read aloud, "
-                "so keep them concise and conversational. Avoid special characters or formatting. "
-                "Begin by politely greeting the person and explaining why you're calling."
+                "You are a friendly assistant. "
+                "Your responses will be read aloud, so keep them concise and conversational. "
+                "Avoid special characters or formatting. "
+                "Begin by saying: 'Hello! This is an automated call from our Plivo chatbot demo.' "
             ),
         },
     ]
@@ -99,11 +96,11 @@ async def bot(runner_args: RunnerArguments):
     transport_type, call_data = await parse_telephony_websocket(runner_args.websocket)
     logger.info(f"Auto-detected transport: {transport_type}")
 
-    serializer = TwilioFrameSerializer(
-        stream_sid=call_data["stream_id"],
-        call_sid=call_data["call_id"],
-        account_sid=os.getenv("TWILIO_ACCOUNT_SID", ""),
-        auth_token=os.getenv("TWILIO_AUTH_TOKEN", ""),
+    serializer = PlivoFrameSerializer(
+        stream_id=call_data["stream_id"],
+        call_id=call_data["call_id"],
+        auth_id=os.getenv("PLIVO_AUTH_ID", ""),
+        auth_token=os.getenv("PLIVO_AUTH_TOKEN", ""),
     )
 
     transport = FastAPIWebsocketTransport(

@@ -6,7 +6,7 @@
 
 """server.py
 
-Webhook server to handle outbound call requests, initiate calls via Telnyx API,
+Webhook server to handle outbound call requests, initiate calls via Plivo API,
 and handle subsequent WebSocket connections for Media Streams.
 """
 
@@ -16,7 +16,7 @@ from contextlib import asynccontextmanager
 import aiohttp
 import uvicorn
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException, Request, WebSocket
+from fastapi import FastAPI, HTTPException, Query, Request, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse
 
@@ -26,46 +26,39 @@ load_dotenv(override=True)
 # ----------------- HELPERS ----------------- #
 
 
-async def make_telnyx_call(
-    session: aiohttp.ClientSession, to_number: str, from_number: str, texml_url: str
+async def make_plivo_call(
+    session: aiohttp.ClientSession, to_number: str, from_number: str, answer_url: str
 ):
-    """Make an outbound call using Telnyx's TeXML API."""
-    api_key = os.getenv("TELNYX_API_KEY")
-    account_sid = os.getenv("TELNYX_ACCOUNT_SID")
-    application_sid = os.getenv("TELNYX_APPLICATION_SID")  # This is your TeXML Application ID
+    """Make an outbound call using Plivo's REST API."""
+    auth_id = os.getenv("PLIVO_AUTH_ID")
+    auth_token = os.getenv("PLIVO_AUTH_TOKEN")
 
-    if not api_key:
-        raise ValueError("Missing Telnyx API key (TELNYX_API_KEY)")
+    if not auth_id:
+        raise ValueError("Missing Plivo Auth ID (PLIVO_AUTH_ID)")
 
-    if not account_sid:
-        raise ValueError(
-            "Missing Telnyx Account SID (TELNYX_ACCOUNT_SID) - required for TeXML calls"
-        )
-
-    if not application_sid:
-        raise ValueError(
-            "Missing Telnyx TeXML Application SID (TELNYX_APPLICATION_SID) - required for TeXML calls"
-        )
+    if not auth_token:
+        raise ValueError("Missing Plivo Auth Token (PLIVO_AUTH_TOKEN)")
 
     headers = {
-        "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",
-        "Accept": "application/json",
     }
 
     data = {
-        "ApplicationSid": application_sid,
-        "To": to_number,
-        "From": from_number,
-        "Url": texml_url,
+        "to": to_number,
+        "from": from_number,
+        "answer_url": answer_url,
+        "answer_method": "GET",
     }
 
-    url = f"https://api.telnyx.com/v2/texml/Accounts/{account_sid}/Calls"
+    url = f"https://api.plivo.com/v1/Account/{auth_id}/Call/"
 
-    async with session.post(url, headers=headers, json=data) as response:
-        if response.status != 200:
+    # Use HTTP Basic Auth
+    auth = aiohttp.BasicAuth(auth_id, auth_token)
+
+    async with session.post(url, headers=headers, json=data, auth=auth) as response:
+        if response.status != 201:
             error_text = await response.text()
-            raise Exception(f"Telnyx API error ({response.status}): {error_text}")
+            raise Exception(f"Plivo API error ({response.status}): {error_text}")
 
         result = await response.json()
         return result
@@ -78,7 +71,7 @@ def get_websocket_url(host: str):
     if env == "production":
         agent_name = os.getenv("AGENT_NAME")
         org_name = os.getenv("ORGANIZATION_NAME")
-        return f"wss://api.pipecat.daily.co/ws/telnyx?serviceHost={agent_name}.{org_name}"
+        return f"wss://api.pipecat.daily.co/ws/plivo?serviceHost={agent_name}.{org_name}"
     else:
         return f"wss://{host}/ws"
 
@@ -88,7 +81,7 @@ def get_websocket_url(host: str):
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Create aiohttp session for Telnyx API calls
+    # Create aiohttp session for Plivo API calls
     app.state.session = aiohttp.ClientSession()
     yield
     # Close session when shutting down
@@ -108,7 +101,7 @@ app.add_middleware(
 
 @app.post("/start")
 async def initiate_outbound_call(request: Request) -> JSONResponse:
-    """Handle outbound call request and initiate call via Telnyx."""
+    """Handle outbound call request and initiate call via Plivo."""
     print("Received outbound call request")
 
     try:
@@ -129,7 +122,7 @@ async def initiate_outbound_call(request: Request) -> JSONResponse:
         phone_number = str(data["dialout_settings"]["phone_number"])
         print(f"Processing outbound call to {phone_number}")
 
-        # Get server URL for TeXML webhook
+        # Get server URL for answer URL
         host = request.headers.get("host")
         if not host:
             raise HTTPException(status_code=400, detail="Unable to determine server host")
@@ -140,26 +133,24 @@ async def initiate_outbound_call(request: Request) -> JSONResponse:
             if not host.startswith("localhost") and not host.startswith("127.0.0.1")
             else "http"
         )
-        texml_url = f"{protocol}://{host}/answer"
+        answer_url = f"{protocol}://{host}/answer"
 
-        # Initiate outbound call via Telnyx
+        # Initiate outbound call via Plivo
         try:
-            call_result = await make_telnyx_call(
+            call_result = await make_plivo_call(
                 session=request.app.state.session,
                 to_number=phone_number,
-                from_number=os.getenv("TELNYX_PHONE_NUMBER"),
-                texml_url=texml_url,
+                from_number=os.getenv("PLIVO_PHONE_NUMBER"),
+                answer_url=answer_url,
             )
-            # Handle different response formats
-            if "data" in call_result:
-                call_sid = call_result["data"].get("call_control_id") or call_result["data"].get(
-                    "sid"
-                )
-            else:
-                call_sid = call_result.get("sid") or call_result.get("call_control_id") or "unknown"
+
+            # Extract call UUID from Plivo response
+            call_uuid = (
+                call_result.get("request_uuid") or call_result.get("message_uuid") or "unknown"
+            )
 
         except Exception as e:
-            print(f"Error initiating Telnyx call: {e}")
+            print(f"Error initiating Plivo call: {e}")
             raise HTTPException(status_code=500, detail=f"Failed to initiate call: {str(e)}")
 
     except HTTPException:
@@ -170,17 +161,26 @@ async def initiate_outbound_call(request: Request) -> JSONResponse:
 
     return JSONResponse(
         {
-            "call_control_id": call_sid,
+            "call_uuid": call_uuid,
             "status": "call_initiated",
             "phone_number": phone_number,
         }
     )
 
 
-@app.post("/answer")
-async def get_answer_xml(request: Request) -> HTMLResponse:
-    """Return TeXML instructions for connecting call to WebSocket."""
-    print("Serving TeXML for outbound call")
+@app.get("/answer")
+async def get_answer_xml(
+    request: Request,
+    CallUUID: str = Query(None, description="Plivo call UUID"),
+    From: str = Query(None, description="Caller's phone number"),
+    To: str = Query(None, description="Called phone number"),
+) -> HTMLResponse:
+    """Return XML instructions for connecting call to WebSocket."""
+    print("Serving answer XML for outbound call")
+
+    # Log call details (optional - useful for debugging)
+    if CallUUID:
+        print(f"Plivo outbound call: {From} → {To}, UUID: {CallUUID}")
 
     try:
         # Get the server host to construct WebSocket URL
@@ -191,25 +191,41 @@ async def get_answer_xml(request: Request) -> HTMLResponse:
         # Get dynamic WebSocket URL based on environment
         ws_url = get_websocket_url(host)
 
-        # Generate TeXML response
-        texml_content = f'''<?xml version="1.0" encoding="UTF-8"?>
-<Response>
-    <Connect>
-        <Stream url="{ws_url}" bidirectionalMode="rtp"></Stream>
-    </Connect>
-    <Pause length="40"/>
-</Response>'''
+        # Build extraHeaders for Plivo (comma-separated key=value pairs)
+        extra_headers = []
+        if From:
+            extra_headers.append(f"from={From}")
+        if To:
+            extra_headers.append(f"to={To}")
 
-        return HTMLResponse(content=texml_content, media_type="application/xml")
+        extra_headers_str = ",".join(extra_headers) if extra_headers else ""
+
+        # Generate XML response for Plivo with extraHeaders if we have call information
+        if extra_headers_str:
+            xml_content = f"""<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+    <Stream bidirectional="true" keepCallAlive="true" contentType="audio/x-mulaw;rate=8000" extraHeaders="{extra_headers_str}">
+        {ws_url}
+    </Stream>
+</Response>"""
+        else:
+            xml_content = f"""<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+    <Stream bidirectional="true" keepCallAlive="true" contentType="audio/x-mulaw;rate=8000">
+        {ws_url}
+    </Stream>
+</Response>"""
+
+        return HTMLResponse(content=xml_content, media_type="application/xml")
 
     except Exception as e:
-        print(f"Error generating TeXML: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to generate TeXML: {str(e)}")
+        print(f"Error generating answer XML: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to generate XML: {str(e)}")
 
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
-    """Handle WebSocket connection from Telnyx Media Streams."""
+    """Handle WebSocket connection from Plivo Media Streams."""
     await websocket.accept()
     print("WebSocket connection accepted for outbound call")
 

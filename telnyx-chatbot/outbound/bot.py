@@ -28,7 +28,7 @@ from pipecat.transports.websocket.fastapi import (
 load_dotenv(override=True)
 
 
-async def run_bot(transport: BaseTransport):
+async def run_bot(transport: BaseTransport, handle_sigint: bool):
     llm = OpenAILLMService(api_key=os.getenv("OPENAI_API_KEY"))
 
     stt = DeepgramSTTService(api_key=os.getenv("DEEPGRAM_API_KEY"), audio_passthrough=True)
@@ -85,7 +85,7 @@ async def run_bot(transport: BaseTransport):
         logger.info("Outbound call ended")
         await task.cancel()
 
-    runner = PipelineRunner(handle_sigint=False, force_gc=True)
+    runner = PipelineRunner(handle_sigint=handle_sigint)
 
     await runner.run(task)
 
@@ -115,4 +115,6 @@ async def bot(runner_args: RunnerArguments):
         ),
     )
 
-    await run_bot(transport)
+    handle_sigint = runner_args.handle_sigint
+
+    await run_bot(transport, handle_sigint)

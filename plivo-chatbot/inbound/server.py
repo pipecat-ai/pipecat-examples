@@ -118,17 +118,6 @@ async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
     print("WebSocket connection accepted for inbound call")
 
-    # Extract call information from Plivo extraHeaders
-    extra_headers = websocket.headers.get("X-Plivo-ExtraHeaders", "")
-
-    # Parse extraHeaders (format: "from=+1234567890,to=+0987654321")
-    call_info = {}
-    if extra_headers:
-        for pair in extra_headers.split(","):
-            if "=" in pair:
-                key, value = pair.split("=", 1)
-                call_info[key.strip()] = value.strip()
-
     try:
         # Import the bot function from the bot module
         from bot import bot
