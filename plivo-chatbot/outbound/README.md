@@ -1,6 +1,6 @@
 # Plivo Chatbot: Outbound
 
-This project is a FastAPI-based chatbot that integrates with Plivo to make outbound calls with personalized custom data. The project includes endpoints for initiating outbound calls and handling WebSocket connections with custom data.
+This project is a Pipecat-based chatbot that integrates with Plivo to make outbound calls with personalized custom data. The project includes FastAPI endpoints for initiating outbound calls and handling WebSocket connections with custom data.
 
 ## How It Works
 

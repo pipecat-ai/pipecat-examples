@@ -1,6 +1,6 @@
 # Telnyx Chatbot: Outbound
 
-This project is a FastAPI-based chatbot that integrates with Telnyx to make outbound calls with personalized custom data. The project includes endpoints for initiating outbound calls and handling WebSocket connections with custom data.
+This project is a Pipecat-based chatbot that integrates with Telnyx to make outbound calls with personalized custom data. The project includes FastAPI endpoints for initiating outbound calls and handling WebSocket connections with custom data.
 
 ## How it works
 
