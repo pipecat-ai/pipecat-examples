@@ -118,3 +118,9 @@ async def bot(runner_args: RunnerArguments):
     handle_sigint = runner_args.handle_sigint
 
     await run_bot(transport, handle_sigint)
+
+
+if __name__ == "__main__":
+    from pipecat.runner.run import main
+
+    main()
