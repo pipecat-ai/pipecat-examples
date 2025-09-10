@@ -1,0 +1,236 @@
+#
+# Copyright (c) 2025, Daily
+#
+# SPDX-License-Identifier: BSD 2-Clause License
+#
+
+"""server.py
+
+Webhook server to handle outbound call requests, initiate calls via Telnyx API,
+and handle subsequent WebSocket connections for Media Streams.
+"""
+
+import os
+from contextlib import asynccontextmanager
+
+import aiohttp
+import uvicorn
+from dotenv import load_dotenv
+from fastapi import FastAPI, HTTPException, Request, WebSocket
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse, JSONResponse
+
+load_dotenv(override=True)
+
+
+# ----------------- HELPERS ----------------- #
+
+
+async def make_telnyx_call(
+    session: aiohttp.ClientSession, to_number: str, from_number: str, texml_url: str
+):
+    """Make an outbound call using Telnyx's TeXML API."""
+    api_key = os.getenv("TELNYX_API_KEY")
+    account_sid = os.getenv("TELNYX_ACCOUNT_SID")
+    application_sid = os.getenv("TELNYX_APPLICATION_SID")  # This is your TeXML Application ID
+
+    if not api_key:
+        raise ValueError("Missing Telnyx API key (TELNYX_API_KEY)")
+
+    if not account_sid:
+        raise ValueError(
+            "Missing Telnyx Account SID (TELNYX_ACCOUNT_SID) - required for TeXML calls"
+        )
+
+    if not application_sid:
+        raise ValueError(
+            "Missing Telnyx TeXML Application SID (TELNYX_APPLICATION_SID) - required for TeXML calls"
+        )
+
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+    }
+
+    data = {
+        "ApplicationSid": application_sid,
+        "To": to_number,
+        "From": from_number,
+        "Url": texml_url,
+    }
+
+    url = f"https://api.telnyx.com/v2/texml/Accounts/{account_sid}/Calls"
+
+    async with session.post(url, headers=headers, json=data) as response:
+        if response.status != 200:
+            error_text = await response.text()
+            raise Exception(f"Telnyx API error ({response.status}): {error_text}")
+
+        result = await response.json()
+        return result
+
+
+def get_websocket_url(host: str):
+    """Construct WebSocket URL based on environment variables."""
+    env = os.getenv("ENV", "local").lower()
+
+    if env == "production":
+        agent_name = os.getenv("AGENT_NAME")
+        org_name = os.getenv("ORGANIZATION_NAME")
+        return f"wss://api.pipecat.daily.co/ws/telnyx?serviceHost={agent_name}.{org_name}"
+    else:
+        return f"wss://{host}/ws"
+
+
+# ----------------- API ----------------- #
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Create aiohttp session for Telnyx API calls
+    app.state.session = aiohttp.ClientSession()
+    yield
+    # Close session when shutting down
+    await app.state.session.close()
+
+
+app = FastAPI(lifespan=lifespan)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allow all origins for testing
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+@app.post("/start")
+async def initiate_outbound_call(request: Request) -> JSONResponse:
+    """Handle outbound call request and initiate call via Telnyx."""
+    print("Received outbound call request")
+
+    try:
+        data = await request.json()
+
+        # Validate request data
+        if not data.get("dialout_settings"):
+            raise HTTPException(
+                status_code=400, detail="Missing 'dialout_settings' in the request body"
+            )
+
+        if not data["dialout_settings"].get("phone_number"):
+            raise HTTPException(
+                status_code=400, detail="Missing 'phone_number' in dialout_settings"
+            )
+
+        # Extract the phone number to dial
+        phone_number = str(data["dialout_settings"]["phone_number"])
+        print(f"Processing outbound call to {phone_number}")
+
+        # Get server URL for TeXML webhook
+        host = request.headers.get("host")
+        if not host:
+            raise HTTPException(status_code=400, detail="Unable to determine server host")
+
+        # Use https for production, http for localhost
+        protocol = (
+            "https"
+            if not host.startswith("localhost") and not host.startswith("127.0.0.1")
+            else "http"
+        )
+        texml_url = f"{protocol}://{host}/texml"
+
+        # Initiate outbound call via Telnyx
+        try:
+            call_result = await make_telnyx_call(
+                session=request.app.state.session,
+                to_number=phone_number,
+                from_number=os.getenv("TELNYX_PHONE_NUMBER"),
+                texml_url=texml_url,
+            )
+            # Handle different response formats
+            if "data" in call_result:
+                call_sid = call_result["data"].get("call_control_id") or call_result["data"].get(
+                    "sid"
+                )
+            else:
+                call_sid = call_result.get("sid") or call_result.get("call_control_id") or "unknown"
+
+        except Exception as e:
+            print(f"Error initiating Telnyx call: {e}")
+            raise HTTPException(status_code=500, detail=f"Failed to initiate call: {str(e)}")
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Unexpected error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Server error: {str(e)}")
+
+    return JSONResponse(
+        {
+            "call_control_id": call_sid,
+            "status": "call_initiated",
+            "phone_number": phone_number,
+        }
+    )
+
+
+@app.post("/texml")
+async def get_texml(request: Request) -> HTMLResponse:
+    """Return TeXML instructions for connecting call to WebSocket."""
+    print("Serving TeXML for outbound call")
+
+    try:
+        # Get the server host to construct WebSocket URL
+        host = request.headers.get("host")
+        if not host:
+            raise HTTPException(status_code=400, detail="Unable to determine server host")
+
+        # Get dynamic WebSocket URL based on environment
+        ws_url = get_websocket_url(host)
+
+        # Generate TeXML response
+        texml_content = f'''<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+    <Connect>
+        <Stream url="{ws_url}" bidirectionalMode="rtp"></Stream>
+    </Connect>
+    <Pause length="40"/>
+</Response>'''
+
+        return HTMLResponse(content=texml_content, media_type="application/xml")
+
+    except Exception as e:
+        print(f"Error generating TeXML: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to generate TeXML: {str(e)}")
+
+
+@app.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket):
+    """Handle WebSocket connection from Telnyx Media Streams."""
+    await websocket.accept()
+    print("WebSocket connection accepted for outbound call")
+
+    try:
+        # Import the bot function from the bot module
+        from bot import bot
+        from pipecat.runner.types import WebSocketRunnerArguments
+
+        # Create runner arguments and run the bot
+        runner_args = WebSocketRunnerArguments(websocket=websocket)
+        runner_args.handle_sigint = False
+
+        await bot(runner_args)
+
+    except Exception as e:
+        print(f"Error in WebSocket endpoint: {e}")
+        await websocket.close()
+
+
+# ----------------- Main ----------------- #
+
+
+if __name__ == "__main__":
+    uvicorn.run(app, host="0.0.0.0", port=7860)

@@ -15,10 +15,13 @@ from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineParams, PipelineTask
 from pipecat.processors.aggregators.openai_llm_context import OpenAILLMContext
+from pipecat.runner.types import RunnerArguments
+from pipecat.runner.utils import parse_telephony_websocket
 from pipecat.serializers.telnyx import TelnyxFrameSerializer
 from pipecat.services.cartesia.tts import CartesiaTTSService
 from pipecat.services.deepgram.stt import DeepgramSTTService
 from pipecat.services.openai.llm import OpenAILLMService
+from pipecat.transports.base_transport import BaseTransport
 from pipecat.transports.websocket.fastapi import (
     FastAPIWebsocketParams,
     FastAPIWebsocketTransport,
@@ -30,32 +33,7 @@ logger.remove(0)
 logger.add(sys.stderr, level="DEBUG")
 
 
-async def run_bot(
-    websocket_client,
-    stream_id: str,
-    call_control_id: str,
-    outbound_encoding: str,
-    inbound_encoding: str,
-):
-    serializer = TelnyxFrameSerializer(
-        stream_id=stream_id,
-        outbound_encoding=outbound_encoding,
-        inbound_encoding=inbound_encoding,
-        call_control_id=call_control_id,
-        api_key=os.getenv("TELNYX_API_KEY"),
-    )
-
-    transport = FastAPIWebsocketTransport(
-        websocket=websocket_client,
-        params=FastAPIWebsocketParams(
-            audio_in_enabled=True,
-            audio_out_enabled=True,
-            add_wav_header=False,
-            vad_analyzer=SileroVADAnalyzer(),
-            serializer=serializer,
-        ),
-    )
-
+async def run_bot(transport: BaseTransport, handle_sigint: bool):
     llm = OpenAILLMService(api_key=os.getenv("OPENAI_API_KEY"))
 
     stt = DeepgramSTTService(api_key=os.getenv("DEEPGRAM_API_KEY"))
@@ -107,6 +85,36 @@ async def run_bot(
     async def on_client_disconnected(transport, client):
         await task.cancel()
 
-    runner = PipelineRunner(handle_sigint=False)
+    runner = PipelineRunner(handle_sigint=handle_sigint)
 
     await runner.run(task)
+
+
+async def bot(runner_args: RunnerArguments):
+    """Main bot entry point compatible with Pipecat Cloud."""
+
+    transport_type, call_data = await parse_telephony_websocket(runner_args.websocket)
+    logger.info(f"Auto-detected transport: {transport_type}")
+
+    serializer = TelnyxFrameSerializer(
+        stream_id=call_data["stream_id"],
+        outbound_encoding=call_data["outbound_encoding"],
+        inbound_encoding="PCMU",
+        call_control_id=call_data["call_control_id"],
+        api_key=os.getenv("TELNYX_API_KEY"),
+    )
+
+    transport = FastAPIWebsocketTransport(
+        websocket=runner_args.websocket,
+        params=FastAPIWebsocketParams(
+            audio_in_enabled=True,
+            audio_out_enabled=True,
+            add_wav_header=False,
+            vad_analyzer=SileroVADAnalyzer(),
+            serializer=serializer,
+        ),
+    )
+
+    handle_sigint = runner_args.handle_sigint
+
+    await run_bot(transport, handle_sigint)
