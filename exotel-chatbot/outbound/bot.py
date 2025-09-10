@@ -5,7 +5,6 @@
 #
 
 import os
-import sys
 
 from dotenv import load_dotenv
 from loguru import logger
@@ -15,10 +14,13 @@ from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineParams, PipelineTask
 from pipecat.processors.aggregators.openai_llm_context import OpenAILLMContext
+from pipecat.runner.types import RunnerArguments
+from pipecat.runner.utils import parse_telephony_websocket
 from pipecat.serializers.exotel import ExotelFrameSerializer
 from pipecat.services.cartesia.tts import CartesiaTTSService
 from pipecat.services.deepgram.stt import DeepgramSTTService
 from pipecat.services.openai.llm import OpenAILLMService
+from pipecat.transports.base_transport import BaseTransport
 from pipecat.transports.websocket.fastapi import (
     FastAPIWebsocketParams,
     FastAPIWebsocketTransport,
@@ -26,31 +28,8 @@ from pipecat.transports.websocket.fastapi import (
 
 load_dotenv(override=True)
 
-logger.remove(0)
-logger.add(sys.stderr, level="DEBUG")
 
-
-async def run_bot(
-    websocket_client,
-    stream_sid: str,
-    call_sid: str,
-):
-    serializer = ExotelFrameSerializer(
-        stream_sid=stream_sid,
-        call_sid=call_sid,
-    )
-
-    transport = FastAPIWebsocketTransport(
-        websocket=websocket_client,
-        params=FastAPIWebsocketParams(
-            audio_in_enabled=True,
-            audio_out_enabled=True,
-            add_wav_header=False,
-            vad_analyzer=SileroVADAnalyzer(),
-            serializer=serializer,
-        ),
-    )
-
+async def run_bot(transport: BaseTransport, handle_sigint: bool):
     llm = OpenAILLMService(api_key=os.getenv("OPENAI_API_KEY"))
 
     stt = DeepgramSTTService(api_key=os.getenv("DEEPGRAM_API_KEY"))
@@ -63,7 +42,12 @@ async def run_bot(
     messages = [
         {
             "role": "system",
-            "content": "You are a helpful LLM in an audio call. Your goal is to demonstrate your capabilities in a succinct way. Your output will be converted to audio so don't include special characters in your answers. Respond to what the user said in a creative and helpful way.",
+            "content": (
+                "You are a friendly assistant. "
+                "Your responses will be read aloud, so keep them concise and conversational. "
+                "Avoid special characters or formatting. "
+                "Begin by saying: 'Hello! This is an automated call from our Exotel chatbot demo.' "
+            ),
         },
     ]
 
@@ -94,14 +78,39 @@ async def run_bot(
 
     @transport.event_handler("on_client_connected")
     async def on_client_connected(transport, client):
-        # Kick off the conversation.
-        messages.append({"role": "system", "content": "Please introduce yourself to the user."})
-        await task.queue_frames([LLMRunFrame()])
+        logger.info("Starting outbound call conversation")
 
     @transport.event_handler("on_client_disconnected")
     async def on_client_disconnected(transport, client):
         await task.cancel()
 
-    runner = PipelineRunner(handle_sigint=False)
+    runner = PipelineRunner(handle_sigint=handle_sigint)
 
     await runner.run(task)
+
+
+async def bot(runner_args: RunnerArguments):
+    """Main bot entry point compatible with Pipecat Cloud."""
+
+    transport_type, call_data = await parse_telephony_websocket(runner_args.websocket)
+    logger.info(f"Auto-detected transport: {transport_type}")
+
+    serializer = ExotelFrameSerializer(
+        stream_sid=call_data["stream_id"],
+        call_sid=call_data["call_id"],
+    )
+
+    transport = FastAPIWebsocketTransport(
+        websocket=runner_args.websocket,
+        params=FastAPIWebsocketParams(
+            audio_in_enabled=True,
+            audio_out_enabled=True,
+            add_wav_header=False,
+            vad_analyzer=SileroVADAnalyzer(),
+            serializer=serializer,
+        ),
+    )
+
+    handle_sigint = runner_args.handle_sigint
+
+    await run_bot(transport, handle_sigint)

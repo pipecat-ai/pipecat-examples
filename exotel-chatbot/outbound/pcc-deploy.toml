@@ -1,0 +1,7 @@
+agent_name = "exotel-chatbot-dial-out"
+image = "markatdaily/exotel-chatbot-dial-out:0.1"
+image_credentials = "dockerhub-access"
+secret_set = "exotel-chatbot"
+
+[scaling]
+	min_agents = 1
