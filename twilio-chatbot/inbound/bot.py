@@ -57,7 +57,7 @@ async def save_audio(audio: bytes, sample_rate: int, num_channels: int):
 async def run_bot(transport: BaseTransport, handle_sigint: bool, testing: bool):
     llm = OpenAILLMService(api_key=os.getenv("OPENAI_API_KEY"))
 
-    stt = DeepgramSTTService(api_key=os.getenv("DEEPGRAM_API_KEY"), audio_passthrough=True)
+    stt = DeepgramSTTService(api_key=os.getenv("DEEPGRAM_API_KEY"))
 
     tts = CartesiaTTSService(
         api_key=os.getenv("CARTESIA_API_KEY"),
