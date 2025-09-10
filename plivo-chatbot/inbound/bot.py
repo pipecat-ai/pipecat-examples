@@ -5,11 +5,9 @@
 #
 
 import os
-import sys
-from typing import Optional
+from asyncio.transports import BaseTransport
 
 from dotenv import load_dotenv
-from fastapi import WebSocket
 from loguru import logger
 from pipecat.audio.vad.silero import SileroVADAnalyzer
 from pipecat.frames.frames import LLMRunFrame
@@ -17,41 +15,21 @@ from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineParams, PipelineTask
 from pipecat.processors.aggregators.openai_llm_context import OpenAILLMContext
+from pipecat.runner.types import RunnerArguments
+from pipecat.runner.utils import parse_telephony_websocket
 from pipecat.serializers.plivo import PlivoFrameSerializer
-from pipecat.services.cartesia import CartesiaTTSService
+from pipecat.services.cartesia.tts import CartesiaTTSService
 from pipecat.services.deepgram.stt import DeepgramSTTService
-from pipecat.services.openai import OpenAILLMService
+from pipecat.services.openai.llm import OpenAILLMService
 from pipecat.transports.websocket.fastapi import (
     FastAPIWebsocketParams,
     FastAPIWebsocketTransport,
 )
 
 load_dotenv()
-logger.remove(0)
-logger.add(sys.stderr, level="DEBUG")
 
 
-async def run_bot(websocket_client: WebSocket, stream_id: str, call_id: Optional[str]):
-    logger.info(f"Starting bot for stream: {stream_id}")
-
-    serializer = PlivoFrameSerializer(
-        stream_id=stream_id,
-        call_id=call_id,
-        auth_id=os.getenv("PLIVO_AUTH_ID"),
-        auth_token=os.getenv("PLIVO_AUTH_TOKEN"),
-    )
-
-    transport = FastAPIWebsocketTransport(
-        websocket=websocket_client,
-        params=FastAPIWebsocketParams(
-            audio_in_enabled=True,
-            audio_out_enabled=True,
-            add_wav_header=False,
-            vad_analyzer=SileroVADAnalyzer(),
-            serializer=serializer,
-        ),
-    )
-
+async def run_bot(transport: BaseTransport, handle_sigint: bool):
     llm = OpenAILLMService(api_key=os.getenv("OPENAI_API_KEY"))
 
     stt = DeepgramSTTService(api_key=os.getenv("DEEPGRAM_API_KEY"))
@@ -103,10 +81,35 @@ async def run_bot(websocket_client: WebSocket, stream_id: str, call_id: Optional
     async def on_client_disconnected(transport, client):
         await task.cancel()
 
-    # We use `handle_sigint=False` because `uvicorn` is controlling keyboard
-    # interruptions. We use `force_gc=True` to force garbage collection after
-    # the runner finishes running a task which could be useful for long running
-    # applications with multiple clients connecting.
-    runner = PipelineRunner(handle_sigint=False, force_gc=True)
+    runner = PipelineRunner(handle_sigint=handle_sigint)
 
     await runner.run(task)
+
+
+async def bot(runner_args: RunnerArguments):
+    """Main bot entry point compatible with Pipecat Cloud."""
+
+    transport_type, call_data = await parse_telephony_websocket(runner_args.websocket)
+    logger.info(f"Auto-detected transport: {transport_type}")
+
+    serializer = PlivoFrameSerializer(
+        stream_id=call_data["stream_id"],
+        call_id=call_data["call_id"],
+        auth_id=os.getenv("PLIVO_AUTH_ID", ""),
+        auth_token=os.getenv("PLIVO_AUTH_TOKEN", ""),
+    )
+
+    transport = FastAPIWebsocketTransport(
+        websocket=runner_args.websocket,
+        params=FastAPIWebsocketParams(
+            audio_in_enabled=True,
+            audio_out_enabled=True,
+            add_wav_header=False,
+            vad_analyzer=SileroVADAnalyzer(),
+            serializer=serializer,
+        ),
+    )
+
+    handle_sigint = runner_args.handle_sigint
+
+    await run_bot(transport, handle_sigint)

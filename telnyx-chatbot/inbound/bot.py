@@ -5,7 +5,6 @@
 #
 
 import os
-import sys
 
 from dotenv import load_dotenv
 from loguru import logger
@@ -28,9 +27,6 @@ from pipecat.transports.websocket.fastapi import (
 )
 
 load_dotenv(override=True)
-
-logger.remove(0)
-logger.add(sys.stderr, level="DEBUG")
 
 
 async def run_bot(transport: BaseTransport, handle_sigint: bool):
