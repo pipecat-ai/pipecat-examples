@@ -21,6 +21,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Request, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse
+from twilio.twiml.voice_response import Connect, Stream, VoiceResponse
 
 load_dotenv(override=True)
 
@@ -37,9 +38,15 @@ def get_websocket_url(host: str) -> str:
         return f"wss://{host}/ws"
 
 
-def build_parameters(from_number: str, to_number: str) -> list[str]:
-    """Build TwiML Parameter elements."""
-    parameters = []
+def generate_twiml(host: str, from_number: str, to_number: str, custom_data: dict = None) -> str:
+    """Generate TwiML response with WebSocket streaming using Twilio SDK."""
+
+    websocket_url = get_websocket_url(host)
+
+    # Create TwiML response
+    response = VoiceResponse()
+    connect = Connect()
+    stream = Stream(url=websocket_url)
 
     # Add Pipecat Cloud service host for production
     env = os.getenv("ENV", "local").lower()
@@ -47,30 +54,31 @@ def build_parameters(from_number: str, to_number: str) -> list[str]:
         agent_name = os.getenv("AGENT_NAME")
         org_name = os.getenv("ORGANIZATION_NAME")
         service_host = f"{agent_name}.{org_name}"
-        parameters.append(f'<Parameter name="_pipecatCloudServiceHost" value="{service_host}"/>')
+        stream.parameter(name="_pipecatCloudServiceHost", value=service_host)
 
     # Always add from and to parameters
-    parameters.append(f'<Parameter name="from" value="{from_number}"/>')
-    parameters.append(f'<Parameter name="to" value="{to_number}"/>')
+    stream.parameter(name="from", value=from_number)
+    stream.parameter(name="to", value=to_number)
 
-    return parameters
+    # Add custom data as individual parameters (if provided)
+    if custom_data:
 
+        def add_parameters(data, prefix=""):
+            """Recursively add parameters from nested dict."""
+            for key, value in data.items():
+                param_name = f"{prefix}_{key}" if prefix else key
+                if isinstance(value, dict):
+                    add_parameters(value, param_name)
+                else:
+                    stream.parameter(name=param_name, value=str(value))
 
-def generate_twiml(host: str, from_number: str, to_number: str) -> str:
-    """Generate TwiML response with WebSocket streaming."""
-    websocket_url = get_websocket_url(host)
-    parameters = build_parameters(from_number, to_number)
-    parameters_str = "\n      ".join(parameters)
+        add_parameters(custom_data)
 
-    return f"""<?xml version="1.0" encoding="UTF-8"?>
-<Response>
-  <Connect>
-    <Stream url="{websocket_url}">
-      {parameters_str}
-    </Stream>
-  </Connect>
-  <Pause length="20"/>
-</Response>"""
+    connect.append(stream)
+    response.append(connect)
+    response.pause(length=20)
+
+    return str(response)
 
 
 async def make_twilio_call(
@@ -138,19 +146,17 @@ async def initiate_outbound_call(request: Request) -> JSONResponse:
         data = await request.json()
 
         # Validate request data
-        if not data.get("dialout_settings"):
+        if not data.get("phone_number"):
             raise HTTPException(
-                status_code=400, detail="Missing 'dialout_settings' in the request body"
-            )
-
-        if not data["dialout_settings"].get("phone_number"):
-            raise HTTPException(
-                status_code=400, detail="Missing 'phone_number' in dialout_settings"
+                status_code=400, detail="Missing 'phone_number' in the request body"
             )
 
         # Extract the phone number to dial
-        phone_number = str(data["dialout_settings"]["phone_number"])
+        phone_number = str(data["phone_number"])
         print(f"Processing outbound call to {phone_number}")
+
+        # Extract custom data if provided
+        custom_data = data.get("custom_data", {})
 
         # Get server URL for TwiML webhook
         host = request.headers.get("host")
@@ -163,7 +169,28 @@ async def initiate_outbound_call(request: Request) -> JSONResponse:
             if not host.startswith("localhost") and not host.startswith("127.0.0.1")
             else "http"
         )
+
+        # Add custom data as query parameters to TwiML URL
         twiml_url = f"{protocol}://{host}/twiml"
+        if custom_data:
+            import json
+            import urllib.parse
+
+            # Flatten the nested dict before URL encoding
+            def flatten_for_url(data, prefix=""):
+                """Flatten nested dict for URL parameters."""
+                params = {}
+                for key, value in data.items():
+                    param_name = f"{prefix}_{key}" if prefix else key
+                    if isinstance(value, dict):
+                        params.update(flatten_for_url(value, param_name))
+                    else:
+                        params[param_name] = str(value)
+                return params
+
+            flattened_params = flatten_for_url(custom_data)
+            query_params = urllib.parse.urlencode(flattened_params)
+            twiml_url = f"{twiml_url}?{query_params}"
 
         # Initiate outbound call via Twilio
         try:
@@ -204,9 +231,16 @@ async def get_twiml(request: Request) -> HTMLResponse:
     to_number = form_data.get("To", "")
     call_sid = form_data.get("CallSid", "")
 
+    # Extract custom data from query parameters
+    custom_data = {}
+    for key, value in request.query_params.items():
+        custom_data[key] = value
+
     # Log call details
     if call_sid:
         print(f"Twilio outbound call: {from_number} → {to_number}, SID: {call_sid}")
+        if custom_data:
+            print(f"Custom data: {custom_data}")
 
     # Validate environment configuration for production
     env = os.getenv("ENV", "local").lower()
@@ -223,8 +257,8 @@ async def get_twiml(request: Request) -> HTMLResponse:
         if not host:
             raise HTTPException(status_code=400, detail="Unable to determine server host")
 
-        # Generate TwiML with phone number parameters
-        twiml_content = generate_twiml(host, from_number, to_number)
+        # Generate TwiML with phone number and custom data parameters
+        twiml_content = generate_twiml(host, from_number, to_number, custom_data)
 
         return HTMLResponse(content=twiml_content, media_type="application/xml")
 

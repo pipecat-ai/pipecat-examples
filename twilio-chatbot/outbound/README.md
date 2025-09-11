@@ -105,17 +105,38 @@ The server will start on port 7860.
 
 ## Making an Outbound Call
 
-With the server running and exposed via ngrok, you can initiate an outbound call to a specified number:
+With the server running and exposed via ngrok, you can initiate outbound calls:
+
+### Basic Call
 
 ```bash
 curl -X POST https://your-ngrok-url.ngrok.io/start \
   -H "Content-Type: application/json" \
   -d '{
-    "dialout_settings": {
-      "phone_number": "+1234567890"
+    "phone_number": "+1234567890"
+  }'
+```
+
+### Call with Custom Data
+
+You can include arbitrary custom data that will be available to your bot:
+
+```bash
+curl -X POST https://your-ngrok-url.ngrok.io/start \
+  -H "Content-Type: application/json" \
+  -d '{
+    "phone_number": "+1234567890",
+    "custom_data": {
+      "user": {
+        "id": "user123",
+        "name": "John Doe",
+        "account_type": "premium"
+      }
     }
   }'
 ```
+
+The custom data can be any JSON structure - nested objects, arrays, etc. Your bot will receive this data automatically.
 
 Replace:
 
@@ -160,6 +181,31 @@ As you did before, initiate a call via `curl` command to trigger your bot to dia
 
 ## Accessing Call Information in Your Bot
 
-Your bot automatically receives call information through Twilio's Parameters. The server extracts the `from` and `to` phone numbers and makes them available to your bot.
+Your bot automatically receives call information and custom data through Twilio's Parameters:
 
-In your `bot.py`, you can access this information from the WebSocket connection. The Pipecat development runner extracts this data using the `parse_telephony_websocket` function. This allows your bot to provide personalized responses based on who's calling and which number they called.
+- **Phone Numbers**: `from` and `to` are always available
+- **Custom Data**: Any data you include in the `custom_data` field
+
+The Pipecat development runner extracts this data using the `parse_telephony_websocket` function:
+
+```python
+async def bot(runner_args: RunnerArguments):
+    transport_type, call_data = await parse_telephony_websocket(runner_args.websocket)
+
+    if transport_type == "twilio":
+        # Phone numbers
+        from_number = call_data["from"]
+        to_number = call_data["to"]
+
+        # Custom data (flattened parameters)
+        params = call_data["custom_parameters"]
+        user_id = params.get("user_id")
+        user_name = params.get("user_name")
+        user_account_type = params.get("user_account_type")
+
+        # Use this data to personalize the conversation
+        print(f"Call from {from_number} to {to_number}")
+        print(f"User: {user_name} (ID: {user_id}, Type: {user_account_type})")
+```
+
+This allows your bot to provide personalized responses based on the caller and context.
