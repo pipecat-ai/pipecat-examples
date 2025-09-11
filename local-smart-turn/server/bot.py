@@ -53,10 +53,6 @@ logger.add(sys.stderr, level="DEBUG")
 sprites = []
 script_dir = os.path.dirname(__file__)
 
-ONNX_MODEL_PATH = os.getenv("SMART_TURN_V3_ONNX_MODEL_PATH")
-if not ONNX_MODEL_PATH:
-    raise ValueError("SMART_TURN_V3_ONNX_MODEL_PATH environment variable not set")
-
 # Load sequential animation frames
 for i in range(1, 26):
     # Build the full path to the image file
@@ -250,7 +246,7 @@ async def bot(args: DailySessionArguments):
                 video_out_width=1024,
                 video_out_height=576,
                 vad_analyzer=SileroVADAnalyzer(params=VADParams(stop_secs=0.2)),
-                turn_analyzer=LocalSmartTurnAnalyzerV3(ONNX_MODEL_PATH),
+                turn_analyzer=LocalSmartTurnAnalyzerV3(),
             ),
         )
 
@@ -281,7 +277,7 @@ async def local_daily():
                     video_out_width=1024,
                     video_out_height=576,
                     vad_analyzer=SileroVADAnalyzer(params=VADParams(stop_secs=0.2)),
-                    turn_analyzer=LocalSmartTurnAnalyzerV3(smart_turn_model_path=ONNX_MODEL_PATH),
+                    turn_analyzer=LocalSmartTurnAnalyzerV3(),
                 ),
             )
 
