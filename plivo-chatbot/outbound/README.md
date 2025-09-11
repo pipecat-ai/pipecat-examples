@@ -105,17 +105,39 @@ The server will start on port 7860.
 
 ## Making an Outbound Call
 
-With the server running and exposed via ngrok, you can initiate an outbound call to a specified number:
+With the server running and exposed via ngrok, you can initiate outbound calls:
+
+### Basic Call
 
 ```bash
 curl -X POST https://your-ngrok-url.ngrok.io/start \
   -H "Content-Type: application/json" \
   -d '{
-    "dialout_settings": {
-      "phone_number": "+1234567890"
+    "phone_number": "+1234567890"
+  }'
+```
+
+### Call with Custom Data
+
+You can include custom data that will be available to your bot. **Note**: Plivo has character restrictions on extraHeaders - see their documentation for supported characters.
+
+```bash
+curl -X POST https://your-ngrok-url.ngrok.io/start \
+  -H "Content-Type: application/json" \
+  -d '{
+    "phone_number": "+1234567890",
+    "custom_data": {
+      "user": {
+        "id": "user123",
+        "firstName": "John",
+        "lastName": "Doe",
+        "accountType": "premium"
+      }
     }
   }'
 ```
+
+**Important**: Plivo has restrictions on which characters are supported in extraHeaders. If certain characters don't appear in your bot, check Plivo's extraHeaders documentation for the current character limitations.
 
 Replace:
 
@@ -160,15 +182,32 @@ As you did before, initiate a call via `curl` command to trigger your bot to dia
 
 ## Accessing Call Information in Your Bot
 
-Your bot automatically receives call information through Plivo's `extraHeaders`. The server extracts the `From` and `To` phone numbers and makes them available to your bot.
+Your bot automatically receives call information and custom data through Plivo's `extraHeaders`:
 
-In your `bot.py`, you can access this information from the WebSocket headers:
+- **Phone Numbers**: `from` and `to` are always available
+- **Custom Data**: Any data you include in the `custom_data` field
+
+The Pipecat development runner extracts this data using the `parse_telephony_websocket` function:
 
 ```python
-# The server already extracts call info and logs it
-# You can access it in your bot logic if needed
-extra_headers = websocket.headers.get("X-Plivo-ExtraHeaders", "")
-# Format: "from=+1234567890,to=+0987654321"
+async def bot(runner_args: RunnerArguments):
+    transport_type, call_data = await parse_telephony_websocket(runner_args.websocket)
+
+    if transport_type == "plivo":
+        # Phone numbers
+        from_number = call_data["from"]
+        to_number = call_data["to"]
+
+        # Custom data
+        params = call_data["custom_parameters"]
+        user_id = params.get("user_id")           # "user123"
+        first_name = params.get("user_firstName") # "John"
+        last_name = params.get("user_lastName")   # "Doe"
+        account_type = params.get("user_accountType") # "premium"
+
+        # Use this data to personalize the conversation
+        print(f"Call from {from_number} to {to_number}")
+        print(f"User: {first_name} {last_name} (ID: {user_id}, Type: {account_type})")
 ```
 
-This allows your bot to provide personalized responses based on who's calling and which number they called.
+This allows your bot to provide personalized responses based on the caller and context.
