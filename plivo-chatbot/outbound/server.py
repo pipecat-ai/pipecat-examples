@@ -108,18 +108,16 @@ async def initiate_outbound_call(request: Request) -> JSONResponse:
         data = await request.json()
 
         # Validate request data
-        if not data.get("dialout_settings"):
+        if not data.get("phone_number"):
             raise HTTPException(
-                status_code=400, detail="Missing 'dialout_settings' in the request body"
-            )
-
-        if not data["dialout_settings"].get("phone_number"):
-            raise HTTPException(
-                status_code=400, detail="Missing 'phone_number' in dialout_settings"
+                status_code=400, detail="Missing 'phone_number' in the request body"
             )
 
         # Extract the phone number to dial
-        phone_number = str(data["dialout_settings"]["phone_number"])
+        phone_number = str(data["phone_number"])
+
+        # Extract custom data if provided
+        custom_data = data.get("custom_data", {})
         print(f"Processing outbound call to {phone_number}")
 
         # Get server URL for answer URL
@@ -133,7 +131,27 @@ async def initiate_outbound_call(request: Request) -> JSONResponse:
             if not host.startswith("localhost") and not host.startswith("127.0.0.1")
             else "http"
         )
+
+        # Add custom data as query parameters to answer URL
         answer_url = f"{protocol}://{host}/answer"
+        if custom_data:
+            import urllib.parse
+
+            # Flatten the nested dict before URL encoding
+            def flatten_for_url(data, prefix=""):
+                """Flatten nested dict for URL parameters."""
+                params = {}
+                for key, value in data.items():
+                    param_name = f"{prefix}_{key}" if prefix else key
+                    if isinstance(value, dict):
+                        params.update(flatten_for_url(value, param_name))
+                    else:
+                        params[param_name] = str(value)
+                return params
+
+            flattened_params = flatten_for_url(custom_data)
+            query_params = urllib.parse.urlencode(flattened_params)
+            answer_url = f"{answer_url}?{query_params}"
 
         # Initiate outbound call via Plivo
         try:
@@ -193,10 +211,17 @@ async def get_answer_xml(
 
         # Build extraHeaders for Plivo (comma-separated key=value pairs)
         extra_headers = []
+
+        # Always add from and to parameters
         if From:
             extra_headers.append(f"from={From}")
         if To:
             extra_headers.append(f"to={To}")
+
+        # Add custom data from query parameters
+        for key, value in request.query_params.items():
+            if key not in ["CallUUID", "From", "To"]:  # Skip Plivo's built-in params
+                extra_headers.append(f"{key}={value}")
 
         extra_headers_str = ",".join(extra_headers) if extra_headers else ""
 
