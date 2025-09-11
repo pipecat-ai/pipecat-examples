@@ -45,9 +45,6 @@ Try the hosted version of the demo here: https://pcc-smart-turn.vercel.app/.
    - CARTESIA_API_KEY
    - DEEPGRAM_API_KEY
    - DAILY_API_KEY
-   - SMART_TURN_V3_ONNX_MODEL_PATH
-
-The `SMART_TURN_V3_ONNX_MODEL_PATH` variable should point to the ONNX model file for Smart Turn V3.
 
 4. Run the server:
 
