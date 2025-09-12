@@ -117,16 +117,16 @@ curl -X POST https://your-ngrok-url.ngrok.io/start \
   }'
 ```
 
-### Call with Custom Data
+### Call with Body Data
 
-You can include arbitrary custom data that will be available to your bot:
+You can include arbitrary body data that will be available to your bot:
 
 ```bash
 curl -X POST https://your-ngrok-url.ngrok.io/start \
   -H "Content-Type: application/json" \
   -d '{
     "phone_number": "+1234567890",
-    "custom_data": {
+    "body": {
       "user": {
         "id": "user123",
         "name": "John Doe",
@@ -136,7 +136,7 @@ curl -X POST https://your-ngrok-url.ngrok.io/start \
   }'
 ```
 
-The custom data can be any JSON structure - nested objects, arrays, etc. Your bot will receive this data automatically.
+The body data can be any JSON structure - nested objects, arrays, etc. Your bot will receive this data automatically.
 
 Replace:
 
@@ -181,10 +181,9 @@ As you did before, initiate a call via `curl` command to trigger your bot to dia
 
 ## Accessing Call Information in Your Bot
 
-Your bot automatically receives call information and custom data through Twilio's Parameters:
+Your bot automatically receives call information and body data through Twilio's Parameters:
 
-- **Phone Numbers**: `from` and `to` are always available
-- **Custom Data**: Any data you include in the `custom_data` field
+- **Body Data**: Any data you include in the `body` field is passed as a JSON string in the `body` parameter
 
 The Pipecat development runner extracts this data using the `parse_telephony_websocket` function:
 
@@ -193,19 +192,20 @@ async def bot(runner_args: RunnerArguments):
     transport_type, call_data = await parse_telephony_websocket(runner_args.websocket)
 
     if transport_type == "twilio":
-        # Phone numbers
-        from_number = call_data["from"]
-        to_number = call_data["to"]
+        # Body data (JSON string parameter)
+        import json
+        body_param = call_data["custom_parameters"].get("body")
+        if body_param:
+            body_data = json.loads(body_param)
 
-        # Custom data (flattened parameters)
-        params = call_data["custom_parameters"]
-        user_id = params.get("user_id")
-        user_name = params.get("user_name")
-        user_account_type = params.get("user_account_type")
+            # Access nested data
+            user_data = body_data.get("user", {})
+            user_id = user_data.get("id")
+            user_name = user_data.get("name")
+            user_account_type = user_data.get("account_type")
 
-        # Use this data to personalize the conversation
-        print(f"Call from {from_number} to {to_number}")
-        print(f"User: {user_name} (ID: {user_id}, Type: {user_account_type})")
+            # Use this data to personalize the conversation
+            print(f"User: {user_name} (ID: {user_id}, Type: {user_account_type})")
 ```
 
-This allows your bot to provide personalized responses based on the caller and context.
+This allows your bot to provide personalized responses based on the body data and context.
