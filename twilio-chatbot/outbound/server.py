@@ -58,9 +58,9 @@ def generate_twiml(host: str, body_data: dict = None) -> str:
 
     # Add body parameter (if provided)
     if body_data:
-        import json
-
-        stream.parameter(name="body", value=json.dumps(body_data))
+        # Pass each key-value pair as separate parameters instead of JSON string
+        for key, value in body_data.items():
+            stream.parameter(name=key, value=value)
 
     connect.append(stream)
     response.append(connect)

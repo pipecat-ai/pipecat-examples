@@ -12,9 +12,13 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Request, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.responses import HTMLResponse
+from twilio.twiml.voice_response import Connect, Stream, VoiceResponse
 
 # Load environment variables from .env file
 load_dotenv()
+
+# In-memory store for body data by call SID
+call_body_data = {}
 
 app = FastAPI()
 
@@ -37,9 +41,14 @@ def get_websocket_url(host: str) -> str:
         return f"wss://{host}/ws"
 
 
-def build_parameters(from_number: str, to_number: str) -> list[str]:
-    """Build TwiML Parameter elements."""
-    parameters = []
+def generate_twiml(host: str, body_data: dict = None) -> str:
+    """Generate TwiML response with WebSocket streaming using Twilio SDK."""
+    websocket_url = get_websocket_url(host)
+
+    # Create TwiML response
+    response = VoiceResponse()
+    connect = Connect()
+    stream = Stream(url=websocket_url)
 
     # Add Pipecat Cloud service host for production
     env = os.getenv("ENV", "local").lower()
@@ -47,30 +56,19 @@ def build_parameters(from_number: str, to_number: str) -> list[str]:
         agent_name = os.getenv("AGENT_NAME")
         org_name = os.getenv("ORGANIZATION_NAME")
         service_host = f"{agent_name}.{org_name}"
-        parameters.append(f'<Parameter name="_pipecatCloudServiceHost" value="{service_host}"/>')
+        stream.parameter(name="_pipecatCloudServiceHost", value=service_host)
 
-    # Always add from and to parameters
-    parameters.append(f'<Parameter name="from" value="{from_number}"/>')
-    parameters.append(f'<Parameter name="to" value="{to_number}"/>')
+    # Add body parameter (if provided)
+    if body_data:
+        # Pass each key-value pair as separate parameters instead of JSON string
+        for key, value in body_data.items():
+            stream.parameter(name=key, value=value)
 
-    return parameters
+    connect.append(stream)
+    response.append(connect)
+    response.pause(length=20)
 
-
-def generate_twiml(host: str, from_number: str, to_number: str) -> str:
-    """Generate TwiML response with WebSocket streaming."""
-    websocket_url = get_websocket_url(host)
-    parameters = build_parameters(from_number, to_number)
-    parameters_str = "\n      ".join(parameters)
-
-    return f"""<?xml version="1.0" encoding="UTF-8"?>
-<Response>
-  <Connect>
-    <Stream url="{websocket_url}">
-      {parameters_str}
-    </Stream>
-  </Connect>
-  <Pause length="20"/>
-</Response>"""
+    return str(response)
 
 
 @app.post("/")
@@ -86,9 +84,20 @@ async def start_call(request: Request):
     from_number = form_data.get("From", "")
     to_number = form_data.get("To", "")
 
+    # Extract body data from query parameters and add phone numbers
+    body_data = {}
+    for key, value in request.query_params.items():
+        body_data[key] = value
+
+    # Always include phone numbers in body data
+    body_data["from"] = from_number
+    body_data["to"] = to_number
+
     # Log call details
     if call_sid:
-        print(f"Twilio call: {from_number} → {to_number}, SID: {call_sid}")
+        print(f"Twilio inbound call SID: {call_sid}")
+        if body_data:
+            print(f"Body data: {body_data}")
 
     # Validate environment configuration for production
     env = os.getenv("ENV", "local").lower()
@@ -104,8 +113,8 @@ async def start_call(request: Request):
     if not host:
         raise HTTPException(status_code=400, detail="Unable to determine server host")
 
-    # Generate TwiML response
-    twiml_content = generate_twiml(host, from_number, to_number)
+    # Generate TwiML response (body_data always contains phone numbers)
+    twiml_content = generate_twiml(host, body_data)
 
     return HTMLResponse(content=twiml_content, media_type="application/xml")
 
