@@ -19,9 +19,9 @@ When someone calls your Twilio number:
 1. **Twilio calls your webhook**: `POST https://your-server.com/` with call info (CallSid, From, To)
 2. **Server returns TwiML**: Tells Twilio to start a WebSocket stream to your bot
 3. **WebSocket connection**: Audio streams between caller and your bot
-4. **Call information**: Phone numbers are passed via Twilio's `Parameters` to your bot
+4. **Body data**: Any query parameters in the webhook URL are passed as body data to your bot
 
-The bot automatically receives the caller's and called phone numbers for personalized responses.
+The bot can receive custom data for personalized responses by including query parameters in the webhook URL.
 
 ## Prerequisites
 
@@ -159,9 +159,7 @@ Place a call to the number associated with your bot. The bot will answer and sta
 
 ## Accessing Call Information in Your Bot
 
-Your bot automatically receives call information through Twilio's `Parameters`. The server extracts the `from` and `to` phone numbers and makes them available to your bot.
-
-In your `bot.py`, you can access this information from the WebSocket connection. The Pipecat development runner extracts this data using the `parse_telephony_websocket` function. This allows your bot to provide personalized responses based on who's calling and which number they called.
+Your bot automatically receives call information through Twilio's `Parameters`. In your `bot.py`, you can access this information from the WebSocket connection. The Pipecat development runner extracts this data using the `parse_telephony_websocket` function. This allows your bot to provide personalized responses based on who's calling and which number they called.
 
 ## Testing
 
