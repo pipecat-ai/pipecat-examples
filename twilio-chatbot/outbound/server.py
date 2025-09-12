@@ -25,6 +25,9 @@ from twilio.twiml.voice_response import Connect, Stream, VoiceResponse
 
 load_dotenv(override=True)
 
+# In-memory store for body data by call SID
+call_body_data = {}
+
 # ----------------- HELPERS ----------------- #
 
 
@@ -38,7 +41,7 @@ def get_websocket_url(host: str) -> str:
         return f"wss://{host}/ws"
 
 
-def generate_twiml(host: str, from_number: str, to_number: str, custom_data: dict = None) -> str:
+def generate_twiml(host: str, body_data: dict = None) -> str:
     """Generate TwiML response with WebSocket streaming using Twilio SDK."""
 
     websocket_url = get_websocket_url(host)
@@ -56,23 +59,11 @@ def generate_twiml(host: str, from_number: str, to_number: str, custom_data: dic
         service_host = f"{agent_name}.{org_name}"
         stream.parameter(name="_pipecatCloudServiceHost", value=service_host)
 
-    # Always add from and to parameters
-    stream.parameter(name="from", value=from_number)
-    stream.parameter(name="to", value=to_number)
+    # Add body parameter (if provided)
+    if body_data:
+        import json
 
-    # Add custom data as individual parameters (if provided)
-    if custom_data:
-
-        def add_parameters(data, prefix=""):
-            """Recursively add parameters from nested dict."""
-            for key, value in data.items():
-                param_name = f"{prefix}_{key}" if prefix else key
-                if isinstance(value, dict):
-                    add_parameters(value, param_name)
-                else:
-                    stream.parameter(name=param_name, value=str(value))
-
-        add_parameters(custom_data)
+        stream.parameter(name="body", value=json.dumps(body_data))
 
     connect.append(stream)
     response.append(connect)
@@ -155,8 +146,8 @@ async def initiate_outbound_call(request: Request) -> JSONResponse:
         phone_number = str(data["phone_number"])
         print(f"Processing outbound call to {phone_number}")
 
-        # Extract custom data if provided
-        custom_data = data.get("custom_data", {})
+        # Extract body data if provided
+        body_data = data.get("body", {})
 
         # Get server URL for TwiML webhook
         host = request.headers.get("host")
@@ -170,27 +161,8 @@ async def initiate_outbound_call(request: Request) -> JSONResponse:
             else "http"
         )
 
-        # Add custom data as query parameters to TwiML URL
+        # Simple TwiML URL without query parameters
         twiml_url = f"{protocol}://{host}/twiml"
-        if custom_data:
-            import json
-            import urllib.parse
-
-            # Flatten the nested dict before URL encoding
-            def flatten_for_url(data, prefix=""):
-                """Flatten nested dict for URL parameters."""
-                params = {}
-                for key, value in data.items():
-                    param_name = f"{prefix}_{key}" if prefix else key
-                    if isinstance(value, dict):
-                        params.update(flatten_for_url(value, param_name))
-                    else:
-                        params[param_name] = str(value)
-                return params
-
-            flattened_params = flatten_for_url(custom_data)
-            query_params = urllib.parse.urlencode(flattened_params)
-            twiml_url = f"{twiml_url}?{query_params}"
 
         # Initiate outbound call via Twilio
         try:
@@ -201,7 +173,10 @@ async def initiate_outbound_call(request: Request) -> JSONResponse:
                 twiml_url=twiml_url,
             )
             call_sid = call_result["sid"]
-            print(f"Initiated call with SID: {call_sid}")
+
+            # Store body data for this call
+            if body_data:
+                call_body_data[call_sid] = body_data
 
         except Exception as e:
             print(f"Error initiating Twilio call: {e}")
@@ -227,20 +202,15 @@ async def get_twiml(request: Request) -> HTMLResponse:
     form_data = await request.form()
 
     # Extract call information
-    from_number = form_data.get("From", "")
-    to_number = form_data.get("To", "")
     call_sid = form_data.get("CallSid", "")
 
-    # Extract custom data from query parameters
-    custom_data = {}
-    for key, value in request.query_params.items():
-        custom_data[key] = value
+    # Retrieve body data for this call
+    body_data = call_body_data.get(call_sid, {})
 
-    # Log call details
-    if call_sid:
-        print(f"Twilio outbound call: {from_number} → {to_number}, SID: {call_sid}")
-        if custom_data:
-            print(f"Custom data: {custom_data}")
+    # Clean up stored data for this call
+    if call_sid and body_data:
+        # Clean up the stored data
+        del call_body_data[call_sid]
 
     # Validate environment configuration for production
     env = os.getenv("ENV", "local").lower()
@@ -257,8 +227,8 @@ async def get_twiml(request: Request) -> HTMLResponse:
         if not host:
             raise HTTPException(status_code=400, detail="Unable to determine server host")
 
-        # Generate TwiML with phone number and custom data parameters
-        twiml_content = generate_twiml(host, from_number, to_number, custom_data)
+        # Generate TwiML with body data parameter
+        twiml_content = generate_twiml(host, body_data)
 
         return HTMLResponse(content=twiml_content, media_type="application/xml")
 
