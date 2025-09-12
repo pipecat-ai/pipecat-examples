@@ -90,7 +90,7 @@ The bot.py file uses the Pipecat development runner, which runs a FastAPI server
 1. To get started, we'll run our bot.py file:
 
 ```bash
-uv run bot.py --transport telynx --proxy your_ngrok_url
+uv run bot.py --transport telnyx --proxy your_ngrok_url
 ```
 
 > Replace `your_ngrok_url` with your ngrok URL (e.g. your-subdomain.ngrok.io)
