@@ -1,20 +1,21 @@
 # Telnyx Chatbot: Outbound
 
-This project is a Pipecat-based chatbot that integrates with Telnyx to make outbound calls with personalized custom data. The project includes FastAPI endpoints for initiating outbound calls and handling WebSocket connections with custom data.
+This project is a Pipecat-based chatbot that integrates with Telnyx to make outbound calls with custom data injection. The project includes FastAPI endpoints for initiating outbound calls and handling WebSocket connections with custom data passed through the `body` parameter.
 
 ## How it works
 
-1. The server receives a POST request with a phone number to call
-2. The server uses Telnyx's REST API to initiate an outbound call
-3. When the call is answered, Telnyx fetches TeXML from the server
-4. The TeXML connects the call to a WebSocket for real-time audio streaming
-5. The bot engages in conversation with the person who answered the call
+1. The server receives a POST request with a phone number and optional custom data (`body`)
+2. The server encodes the custom data as base64 JSON and includes it in the TeXML URL
+3. The server uses Telnyx's REST API to initiate an outbound call
+4. When the call is answered, Telnyx fetches TeXML from the server (with custom data in query parameters)
+5. The TeXML connects the call to a WebSocket with custom data passed through URL parameters
+6. The bot receives the decoded custom data and engages in personalized conversation
 
 ## Architecture
 
 ```
-curl request → /start endpoint → Telnyx REST API → Call initiated →
-TeXML fetched → WebSocket connection → Bot conversation
+curl request (with body) → /start endpoint → Telnyx REST API → Call initiated →
+TeXML fetched (with body in URL) → WebSocket connection (body decoded) → Bot conversation (with custom data)
 ```
 
 ## Prerequisites
@@ -122,12 +123,31 @@ The server will start on port 7860.
 
 With the server running and exposed via ngrok, you can initiate an outbound call to a specified number:
 
+### Basic Call (No Custom Data)
+
 ```bash
 curl -X POST https://your-ngrok-url.ngrok.io/start \
   -H "Content-Type: application/json" \
   -d '{
-    "dialout_settings": {
-      "phone_number": "+1234567890"
+    "phone_number": "+1234567890"
+  }'
+```
+
+### Call with Custom Data
+
+```bash
+curl -X POST https://your-ngrok-url.ngrok.io/start \
+  -H "Content-Type: application/json" \
+  -d '{
+    "phone_number": "+1234567890",
+    "body": {
+      "user_id": "user123",
+      "name": "John Doe",
+      "account_type": "premium",
+      "context": {
+        "last_order": "2024-01-15",
+        "total_spent": 1250.00
+      }
     }
   }'
 ```
@@ -136,6 +156,18 @@ Replace:
 
 - `your-ngrok-url.ngrok.io` with your actual ngrok URL
 - `+1234567890` with the phone number you want to call
+- Customize the `body` object with any data your bot needs for personalized conversation
+
+### Custom Data Flow
+
+The custom data in the `body` parameter:
+
+1. **Gets encoded** as base64 JSON and added to the TeXML URL query parameters
+2. **Passes through** Telnyx's TeXML system to the WebSocket URL
+3. **Gets decoded** in the WebSocket endpoint and made available to your bot
+4. **Enables personalized** conversations based on user context, preferences, or business data
+
+> **Note**: The `body` parameter is optional. If not provided, the bot will engage in a standard conversation without custom context.
 
 ## Production Deployment
 
@@ -174,4 +206,19 @@ When `ENV=production`, the server automatically routes WebSocket connections to 
 
 ### Call your Bot
 
-As you did before, initiate a call via `curl` command to trigger your bot to dial a number.
+As you did before, initiate a call via `curl` command to trigger your bot to dial a number. You can include custom data in the `body` parameter for personalized conversations:
+
+```bash
+curl -X POST https://your-production-server.com/start \
+  -H "Content-Type: application/json" \
+  -d '{
+    "phone_number": "+1234567890",
+    "body": {
+      "customer_id": "cust_789",
+      "subscription_status": "active",
+      "support_tier": "premium"
+    }
+  }'
+```
+
+The custom data will be automatically routed through Pipecat Cloud to your deployed bot for personalized interactions.

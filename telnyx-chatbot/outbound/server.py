@@ -16,7 +16,7 @@ from contextlib import asynccontextmanager
 import aiohttp
 import uvicorn
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException, Request, WebSocket
+from fastapi import FastAPI, HTTPException, Query, Request, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse
 
@@ -72,13 +72,11 @@ async def make_telnyx_call(
 
 
 def get_websocket_url(host: str):
-    """Construct WebSocket URL based on environment variables."""
+    """Construct base WebSocket URL (without query parameters)."""
     env = os.getenv("ENV", "local").lower()
 
     if env == "production":
-        agent_name = os.getenv("AGENT_NAME")
-        org_name = os.getenv("ORGANIZATION_NAME")
-        return f"wss://api.pipecat.daily.co/ws/telnyx?serviceHost={agent_name}.{org_name}"
+        return "wss://api.pipecat.daily.co/ws/telnyx"
     else:
         return f"wss://{host}/ws"
 
@@ -115,19 +113,17 @@ async def initiate_outbound_call(request: Request) -> JSONResponse:
         data = await request.json()
 
         # Validate request data
-        if not data.get("dialout_settings"):
+        if not data.get("phone_number"):
             raise HTTPException(
-                status_code=400, detail="Missing 'dialout_settings' in the request body"
-            )
-
-        if not data["dialout_settings"].get("phone_number"):
-            raise HTTPException(
-                status_code=400, detail="Missing 'phone_number' in dialout_settings"
+                status_code=400, detail="Missing 'phone_number' in the request body"
             )
 
         # Extract the phone number to dial
-        phone_number = str(data["dialout_settings"]["phone_number"])
+        phone_number = str(data["phone_number"])
         print(f"Processing outbound call to {phone_number}")
+
+        # Extract custom data if provided
+        body = data.get("body", {})
 
         # Get server URL for TeXML webhook
         host = request.headers.get("host")
@@ -140,7 +136,23 @@ async def initiate_outbound_call(request: Request) -> JSONResponse:
             if not host.startswith("localhost") and not host.startswith("127.0.0.1")
             else "http"
         )
+
+        # Add body as base64-encoded parameter to TeXML URL
         texml_url = f"{protocol}://{host}/answer"
+        if body:
+            import base64
+            import json
+            import urllib.parse
+
+            # Encode body as base64 JSON
+            body_json = json.dumps(body)
+            body_b64 = base64.b64encode(body_json.encode("utf-8")).decode("utf-8")
+
+            # URL encode the base64 string to handle special characters like +, /, =
+            encoded_body = urllib.parse.quote(body_b64, safe="")
+            texml_url = f"{texml_url}?body={encoded_body}"
+            print(f"TeXML URL with body param: {texml_url}")
+            print(f"Encoded body length: {len(body_b64)}")
 
         # Initiate outbound call via Telnyx
         try:
@@ -191,6 +203,29 @@ async def get_answer_xml(request: Request) -> HTMLResponse:
         # Get dynamic WebSocket URL based on environment
         ws_url = get_websocket_url(host)
 
+        # Add query parameters to WebSocket URL
+        query_parts = []
+
+        # Add serviceHost for production environments
+        env = os.getenv("ENV", "local").lower()
+        if env == "production":
+            agent_name = os.getenv("AGENT_NAME")
+            org_name = os.getenv("ORGANIZATION_NAME")
+            if agent_name and org_name:
+                query_parts.append(f"serviceHost={agent_name}.{org_name}")
+
+        # Add body parameter if present
+        if request.query_params and "body" in request.query_params:
+            body_param = request.query_params["body"]
+            query_parts.append(f"body={body_param}")
+            print(f"Added body param: {body_param[:50]}...")
+
+        # Construct WebSocket URL with proper &amp; encoding for multiple params
+        if query_parts:
+            query_string = "&amp;".join(query_parts)
+            ws_url = f"{ws_url}?{query_string}"
+            print(f"WebSocket URL with query params: {ws_url}")
+
         # Generate TeXML response
         texml_content = f'''<?xml version="1.0" encoding="UTF-8"?>
 <Response>
@@ -208,10 +243,35 @@ async def get_answer_xml(request: Request) -> HTMLResponse:
 
 
 @app.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket):
+async def websocket_endpoint(
+    websocket: WebSocket,
+    body: str = Query(None),
+    serviceHost: str = Query(None),
+):
     """Handle WebSocket connection from Telnyx Media Streams."""
     await websocket.accept()
     print("WebSocket connection accepted for outbound call")
+
+    print(f"Received query params - body: {body}, serviceHost: {serviceHost}")
+
+    # Decode body parameter if provided
+    body_data = {}
+    if body:
+        try:
+            import base64
+            import json
+
+            # URL decode first, then base64 decode
+            import urllib.parse
+
+            url_decoded = urllib.parse.unquote(body)
+            decoded_json = base64.b64decode(url_decoded).decode("utf-8")
+            body_data = json.loads(decoded_json)
+            print(f"Decoded body data: {body_data}")
+        except Exception as e:
+            print(f"Error decoding body parameter: {e}")
+    else:
+        print("No body parameter received")
 
     try:
         # Import the bot function from the bot module
@@ -221,6 +281,9 @@ async def websocket_endpoint(websocket: WebSocket):
         # Create runner arguments and run the bot
         runner_args = WebSocketRunnerArguments(websocket=websocket)
         runner_args.handle_sigint = False
+
+        # TODO: When WebSocketRunnerArguments supports body, add it here:
+        # runner_args = WebSocketRunnerArguments(websocket=websocket, body=body_data)
 
         await bot(runner_args)
 
