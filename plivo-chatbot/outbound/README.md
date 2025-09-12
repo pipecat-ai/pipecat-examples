@@ -11,7 +11,7 @@ When you want to make an outbound call:
 3. **Call answered**: When answered, Plivo fetches XML from your server's `/answer` endpoint
 4. **Server returns XML**: Tells Plivo to start a WebSocket stream to your bot
 5. **WebSocket connection**: Audio streams between the called person and your bot
-6. **Call information**: Phone numbers are passed via Plivo's `extraHeaders` to your bot
+6. **Call information**: Phone numbers and custom data are passed via query parameters in the WebSocket URL to your bot
 
 ## Architecture
 
@@ -119,14 +119,14 @@ curl -X POST https://your-ngrok-url.ngrok.io/start \
 
 ### Call with Custom Data
 
-You can include custom data that will be available to your bot. **Note**: Plivo has character restrictions on extraHeaders - see their documentation for supported characters.
+You can include custom data that will be available to your bot:
 
 ```bash
 curl -X POST https://your-ngrok-url.ngrok.io/start \
   -H "Content-Type: application/json" \
   -d '{
     "phone_number": "+1234567890",
-    "custom_data": {
+    "body": {
       "user": {
         "id": "user123",
         "firstName": "John",
@@ -137,7 +137,7 @@ curl -X POST https://your-ngrok-url.ngrok.io/start \
   }'
 ```
 
-**Important**: Plivo has restrictions on which characters are supported in extraHeaders. If certain characters don't appear in your bot, check Plivo's extraHeaders documentation for the current character limitations.
+The body data can be any JSON structure - nested objects, arrays, etc. Your bot will receive this data automatically.
 
 Replace:
 
@@ -182,32 +182,4 @@ As you did before, initiate a call via `curl` command to trigger your bot to dia
 
 ## Accessing Call Information in Your Bot
 
-Your bot automatically receives call information and custom data through Plivo's `extraHeaders`:
-
-- **Phone Numbers**: `from` and `to` are always available
-- **Custom Data**: Any data you include in the `custom_data` field
-
-The Pipecat development runner extracts this data using the `parse_telephony_websocket` function:
-
-```python
-async def bot(runner_args: RunnerArguments):
-    transport_type, call_data = await parse_telephony_websocket(runner_args.websocket)
-
-    if transport_type == "plivo":
-        # Phone numbers
-        from_number = call_data["from"]
-        to_number = call_data["to"]
-
-        # Custom data
-        params = call_data["custom_parameters"]
-        user_id = params.get("user_id")           # "user123"
-        first_name = params.get("user_firstName") # "John"
-        last_name = params.get("user_lastName")   # "Doe"
-        account_type = params.get("user_accountType") # "premium"
-
-        # Use this data to personalize the conversation
-        print(f"Call from {from_number} to {to_number}")
-        print(f"User: {first_name} {last_name} (ID: {user_id}, Type: {account_type})")
-```
-
-This allows your bot to provide personalized responses based on the caller and context.
+Your bot automatically receives caller information through query parameters in the WebSocket URL. The server extracts the `From` and `To` phone numbers and passes them as `body` data to your bot via the WebsocketRunnerArguments (coming soon!).

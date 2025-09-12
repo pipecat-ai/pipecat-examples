@@ -18,7 +18,7 @@ When someone calls your Plivo number:
 1. **Plivo calls your webhook**: `GET https://your-server.com/` with call info (From, To, CallUUID)
 2. **Server returns XML**: Tells Plivo to start a WebSocket stream to your bot
 3. **WebSocket connection**: Audio streams between caller and your bot
-4. **Call information**: Phone numbers are passed via Plivo's `extraHeaders` to your bot
+4. **Call information**: Phone numbers are passed via query parameters in the WebSocket URL to your bot
 
 ## Prerequisites
 
@@ -100,7 +100,7 @@ The bot supports two deployment modes controlled by the `ENV` variable:
      - Plivo Application: Your application
      - Click "Update" to save
 
-The bot automatically receives the caller's and called phone numbers for personalized responses.
+The bot automatically receives the caller's and called phone numbers for personalized responses via the body parameter.
 
 ### Run the Local Server
 
@@ -161,15 +161,33 @@ Place a call to the number associated with your bot. The bot will answer and sta
 
 ## Accessing Call Information in Your Bot
 
-Your bot automatically receives caller information through Plivo's `extraHeaders`. The server extracts the `From` and `To` phone numbers and makes them available to your bot.
+Your bot automatically receives caller information through query parameters in the WebSocket URL. The server extracts the `From` and `To` phone numbers and passes them as `body` data to your bot via the WebsocketRunnerArguments (coming soon!).
 
-In your `bot.py`, you can access this information from the WebSocket headers:
+### Adding Custom Data
 
-```python
-# The server already extracts call info and logs it
-# You can access it in your bot logic if needed
-extra_headers = websocket.headers.get("X-Plivo-ExtraHeaders", "")
-# Format: "from=+1234567890,to=+0987654321"
+You can include custom data by adding query parameters to your webhook URL in the Plivo console:
+
+**Basic webhook URL:**
+
+```
+https://your-server.com/
 ```
 
-This allows your bot to provide personalized responses based on who's calling and which number they called.
+**Webhook URL with custom data:**
+
+```
+https://your-server.com/?user_type=premium&campaign=summer2024
+```
+
+Your bot will receive:
+
+```json
+{
+  "from": "+1234567890",
+  "to": "+0987654321",
+  "user_type": "premium",
+  "campaign": "summer2024"
+}
+```
+
+This allows your bot to provide personalized responses based on who's calling and any custom context you provide.

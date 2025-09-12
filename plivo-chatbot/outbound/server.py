@@ -10,7 +10,10 @@ Webhook server to handle outbound call requests, initiate calls via Plivo API,
 and handle subsequent WebSocket connections for Media Streams.
 """
 
+import base64
+import json
 import os
+import urllib.parse
 from contextlib import asynccontextmanager
 
 import aiohttp
@@ -69,9 +72,7 @@ def get_websocket_url(host: str):
     env = os.getenv("ENV", "local").lower()
 
     if env == "production":
-        agent_name = os.getenv("AGENT_NAME")
-        org_name = os.getenv("ORGANIZATION_NAME")
-        return f"wss://api.pipecat.daily.co/ws/plivo?serviceHost={agent_name}.{org_name}"
+        return "wss://api.pipecat.daily.co/ws/plivo"
     else:
         return f"wss://{host}/ws"
 
@@ -116,8 +117,8 @@ async def initiate_outbound_call(request: Request) -> JSONResponse:
         # Extract the phone number to dial
         phone_number = str(data["phone_number"])
 
-        # Extract custom data if provided
-        custom_data = data.get("custom_data", {})
+        # Extract body data if provided
+        body_data = data.get("body", {})
         print(f"Processing outbound call to {phone_number}")
 
         # Get server URL for answer URL
@@ -132,26 +133,12 @@ async def initiate_outbound_call(request: Request) -> JSONResponse:
             else "http"
         )
 
-        # Add custom data as query parameters to answer URL
+        # Add body data as query parameters to answer URL
         answer_url = f"{protocol}://{host}/answer"
-        if custom_data:
-            import urllib.parse
-
-            # Flatten the nested dict before URL encoding
-            def flatten_for_url(data, prefix=""):
-                """Flatten nested dict for URL parameters."""
-                params = {}
-                for key, value in data.items():
-                    param_name = f"{prefix}_{key}" if prefix else key
-                    if isinstance(value, dict):
-                        params.update(flatten_for_url(value, param_name))
-                    else:
-                        params[param_name] = str(value)
-                return params
-
-            flattened_params = flatten_for_url(custom_data)
-            query_params = urllib.parse.urlencode(flattened_params)
-            answer_url = f"{answer_url}?{query_params}"
+        if body_data:
+            body_json = json.dumps(body_data)
+            body_encoded = urllib.parse.quote(body_json)
+            answer_url = f"{answer_url}?body_data={body_encoded}"
 
         # Initiate outbound call via Plivo
         try:
@@ -190,15 +177,24 @@ async def initiate_outbound_call(request: Request) -> JSONResponse:
 async def get_answer_xml(
     request: Request,
     CallUUID: str = Query(None, description="Plivo call UUID"),
-    From: str = Query(None, description="Caller's phone number"),
-    To: str = Query(None, description="Called phone number"),
+    body_data: str = Query(None, description="JSON encoded body data"),
 ) -> HTMLResponse:
     """Return XML instructions for connecting call to WebSocket."""
     print("Serving answer XML for outbound call")
 
-    # Log call details (optional - useful for debugging)
+    # Parse body data from query parameter
+    parsed_body_data = {}
+    if body_data:
+        try:
+            parsed_body_data = json.loads(body_data)
+        except json.JSONDecodeError:
+            print(f"Failed to parse body data: {body_data}")
+
+    # Log call details
     if CallUUID:
-        print(f"Plivo outbound call: {From} → {To}, UUID: {CallUUID}")
+        print(f"Plivo outbound call UUID: {CallUUID}")
+        if parsed_body_data:
+            print(f"Body data: {parsed_body_data}")
 
     try:
         # Get the server host to construct WebSocket URL
@@ -206,35 +202,34 @@ async def get_answer_xml(
         if not host:
             raise HTTPException(status_code=400, detail="Unable to determine server host")
 
-        # Get dynamic WebSocket URL based on environment
-        ws_url = get_websocket_url(host)
+        # Get base WebSocket URL
+        base_ws_url = get_websocket_url(host)
 
-        # Build extraHeaders for Plivo (comma-separated key=value pairs)
-        extra_headers = []
+        # Add query parameters to WebSocket URL
+        query_params = []
 
-        # Always add from and to parameters
-        if From:
-            extra_headers.append(f"from={From}")
-        if To:
-            extra_headers.append(f"to={To}")
+        # Add serviceHost for production
+        env = os.getenv("ENV", "local").lower()
+        if env == "production":
+            agent_name = os.getenv("AGENT_NAME")
+            org_name = os.getenv("ORGANIZATION_NAME")
+            service_host = f"{agent_name}.{org_name}"
+            query_params.append(f"serviceHost={service_host}")
 
-        # Add custom data from query parameters
-        for key, value in request.query_params.items():
-            if key not in ["CallUUID", "From", "To"]:  # Skip Plivo's built-in params
-                extra_headers.append(f"{key}={value}")
+        # Add body data if available
+        if parsed_body_data:
+            body_json = json.dumps(parsed_body_data)
+            body_encoded = base64.b64encode(body_json.encode("utf-8")).decode("utf-8")
+            query_params.append(f"body={body_encoded}")
 
-        extra_headers_str = ",".join(extra_headers) if extra_headers else ""
-
-        # Generate XML response for Plivo with extraHeaders if we have call information
-        if extra_headers_str:
-            xml_content = f"""<?xml version="1.0" encoding="UTF-8"?>
-<Response>
-    <Stream bidirectional="true" keepCallAlive="true" contentType="audio/x-mulaw;rate=8000" extraHeaders="{extra_headers_str}">
-        {ws_url}
-    </Stream>
-</Response>"""
+        # Construct final WebSocket URL
+        if query_params:
+            ws_url = f"{base_ws_url}?{'&'.join(query_params)}"
         else:
-            xml_content = f"""<?xml version="1.0" encoding="UTF-8"?>
+            ws_url = base_ws_url
+
+        # Generate XML response for Plivo
+        xml_content = f"""<?xml version="1.0" encoding="UTF-8"?>
 <Response>
     <Stream bidirectional="true" keepCallAlive="true" contentType="audio/x-mulaw;rate=8000">
         {ws_url}
@@ -249,10 +244,29 @@ async def get_answer_xml(
 
 
 @app.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket):
+async def websocket_endpoint(
+    websocket: WebSocket,
+    body: str = Query(None),
+    serviceHost: str = Query(None),
+):
     """Handle WebSocket connection from Plivo Media Streams."""
     await websocket.accept()
     print("WebSocket connection accepted for outbound call")
+
+    print(f"Received query params - body: {body}, serviceHost: {serviceHost}")
+
+    # Decode body parameter if provided
+    body_data = {}
+    if body:
+        try:
+            # Base64 decode the JSON (it was base64-encoded in the answer endpoint)
+            decoded_json = base64.b64decode(body).decode("utf-8")
+            body_data = json.loads(decoded_json)
+            print(f"Decoded body data: {body_data}")
+        except Exception as e:
+            print(f"Error decoding body parameter: {e}")
+    else:
+        print("No body parameter received")
 
     try:
         # Import the bot function from the bot module
@@ -262,6 +276,9 @@ async def websocket_endpoint(websocket: WebSocket):
         # Create runner arguments and run the bot
         runner_args = WebSocketRunnerArguments(websocket=websocket)
         runner_args.handle_sigint = False
+
+        # TODO: When WebSocketRunnerArguments supports body, add it here:
+        # runner_args = WebSocketRunnerArguments(websocket=websocket, body=body_data)
 
         await bot(runner_args)
 
