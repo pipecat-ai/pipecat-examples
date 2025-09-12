@@ -98,7 +98,6 @@ async def bot(runner_args: RunnerArguments):
 
     transport_type, call_data = await parse_telephony_websocket(runner_args.websocket)
     logger.info(f"Auto-detected transport: {transport_type}")
-    logger.info(f"Call data: {call_data}")
 
     serializer = TwilioFrameSerializer(
         stream_sid=call_data["stream_id"],

@@ -10,17 +10,14 @@ Webhook server to handle outbound call requests, initiate calls via Twilio API,
 and handle subsequent WebSocket connections for Media Streams.
 """
 
-import argparse
-import base64
 import os
-from contextlib import asynccontextmanager
 
-import aiohttp
 import uvicorn
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Request, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse
+from twilio.rest import Client as TwilioClient
 from twilio.twiml.voice_response import Connect, Stream, VoiceResponse
 
 load_dotenv(override=True)
@@ -72,9 +69,7 @@ def generate_twiml(host: str, body_data: dict = None) -> str:
     return str(response)
 
 
-async def make_twilio_call(
-    session: aiohttp.ClientSession, to_number: str, from_number: str, twiml_url: str
-):
+def make_twilio_call(to_number: str, from_number: str, twiml_url: str):
     """Make an outbound call using Twilio's REST API."""
     account_sid = os.getenv("TWILIO_ACCOUNT_SID")
     auth_token = os.getenv("TWILIO_AUTH_TOKEN")
@@ -82,42 +77,17 @@ async def make_twilio_call(
     if not account_sid or not auth_token:
         raise ValueError("Missing Twilio credentials")
 
-    # Create basic auth header
-    auth_string = f"{account_sid}:{auth_token}"
-    auth_bytes = auth_string.encode("ascii")
-    auth_b64 = base64.b64encode(auth_bytes).decode("ascii")
+    # Create Twilio client and make the call
+    client = TwilioClient(account_sid, auth_token)
+    call = client.calls.create(to=to_number, from_=from_number, url=twiml_url, method="POST")
 
-    headers = {
-        "Authorization": f"Basic {auth_b64}",
-        "Content-Type": "application/x-www-form-urlencoded",
-    }
-
-    data = {"To": to_number, "From": from_number, "Url": twiml_url, "Method": "POST"}
-
-    url = f"https://api.twilio.com/2010-04-01/Accounts/{account_sid}/Calls.json"
-
-    async with session.post(url, headers=headers, data=data) as response:
-        if response.status != 201:
-            error_text = await response.text()
-            raise Exception(f"Twilio API error ({response.status}): {error_text}")
-
-        result = await response.json()
-        return result
+    return {"sid": call.sid}
 
 
 # ----------------- API ----------------- #
 
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    # Create aiohttp session for Twilio API calls
-    app.state.session = aiohttp.ClientSession()
-    yield
-    # Close session when shutting down
-    await app.state.session.close()
-
-
-app = FastAPI(lifespan=lifespan)
+app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
@@ -166,8 +136,7 @@ async def initiate_outbound_call(request: Request) -> JSONResponse:
 
         # Initiate outbound call via Twilio
         try:
-            call_result = await make_twilio_call(
-                session=request.app.state.session,
+            call_result = make_twilio_call(
                 to_number=phone_number,
                 from_number=os.getenv("TWILIO_PHONE_NUMBER"),
                 twiml_url=twiml_url,
@@ -263,14 +232,6 @@ async def websocket_endpoint(websocket: WebSocket):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Pipecat Twilio Outbound Chatbot Server")
-    parser.add_argument(
-        "-t", "--test", action="store_true", default=False, help="set the server in testing mode"
-    )
-    args, _ = parser.parse_known_args()
-
-    app.state.testing = args.test
-
     # Run the server
     port = int(os.getenv("PORT", "7860"))
     print(f"Starting Twilio outbound chatbot server on port {port}")
