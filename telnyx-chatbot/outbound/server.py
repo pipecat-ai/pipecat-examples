@@ -10,7 +10,10 @@ Webhook server to handle outbound call requests, initiate calls via Telnyx API,
 and handle subsequent WebSocket connections for Media Streams.
 """
 
+import base64
+import json
 import os
+import urllib.parse
 from contextlib import asynccontextmanager
 
 import aiohttp
@@ -122,7 +125,7 @@ async def initiate_outbound_call(request: Request) -> JSONResponse:
         phone_number = str(data["phone_number"])
         print(f"Processing outbound call to {phone_number}")
 
-        # Extract custom data if provided
+        # Extract body data if provided (for custom data injection)
         body = data.get("body", {})
 
         # Get server URL for TeXML webhook
@@ -140,10 +143,6 @@ async def initiate_outbound_call(request: Request) -> JSONResponse:
         # Add body as base64-encoded parameter to TeXML URL
         texml_url = f"{protocol}://{host}/answer"
         if body:
-            import base64
-            import json
-            import urllib.parse
-
             # Encode body as base64 JSON
             body_json = json.dumps(body)
             body_b64 = base64.b64encode(body_json.encode("utf-8")).decode("utf-8")
@@ -162,13 +161,17 @@ async def initiate_outbound_call(request: Request) -> JSONResponse:
                 from_number=os.getenv("TELNYX_PHONE_NUMBER"),
                 texml_url=texml_url,
             )
-            # Handle different response formats
+
+            # Extract call ID from response
             if "data" in call_result:
                 call_sid = call_result["data"].get("call_control_id") or call_result["data"].get(
                     "sid"
                 )
             else:
-                call_sid = call_result.get("sid") or call_result.get("call_control_id") or "unknown"
+                call_sid = call_result.get("sid") or call_result.get("call_control_id")
+
+            if not call_sid:
+                call_sid = "unknown"
 
         except Exception as e:
             print(f"Error initiating Telnyx call: {e}")
@@ -218,7 +221,7 @@ async def get_answer_xml(request: Request) -> HTMLResponse:
         if request.query_params and "body" in request.query_params:
             body_param = request.query_params["body"]
             query_parts.append(f"body={body_param}")
-            print(f"Added body param: {body_param[:50]}...")
+            print(f"Added body param to WebSocket URL")
 
         # Construct WebSocket URL with proper &amp; encoding for multiple params
         if query_parts:
@@ -258,12 +261,7 @@ async def websocket_endpoint(
     body_data = {}
     if body:
         try:
-            import base64
-            import json
-
             # URL decode first, then base64 decode
-            import urllib.parse
-
             url_decoded = urllib.parse.unquote(body)
             decoded_json = base64.b64decode(url_decoded).decode("utf-8")
             body_data = json.loads(decoded_json)
