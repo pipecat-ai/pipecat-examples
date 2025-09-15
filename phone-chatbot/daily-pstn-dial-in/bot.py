@@ -9,11 +9,8 @@
 Daily PSTN Dial-in Bot.
 """
 
-import argparse
-import asyncio
 import json
 import os
-import sys
 
 from dotenv import load_dotenv
 from loguru import logger
@@ -23,93 +20,27 @@ from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineParams, PipelineTask
 from pipecat.processors.aggregators.openai_llm_context import OpenAILLMContext
+from pipecat.runner.types import RunnerArguments
 from pipecat.services.cartesia.tts import CartesiaTTSService
+from pipecat.services.deepgram.stt import DeepgramSTTService
 from pipecat.services.openai.llm import OpenAILLMService
+from pipecat.transports.base_transport import BaseTransport
 from pipecat.transports.daily.transport import DailyDialinSettings, DailyParams, DailyTransport
 
-# Setup logging
 load_dotenv()
-logger.remove(0)
-logger.add(sys.stderr, level="DEBUG")
 
 
-daily_api_key = os.getenv("DAILY_API_KEY", "")
-daily_api_url = os.getenv("DAILY_API_URL", "https://api.daily.co/v1")
+async def run_bot(transport: BaseTransport, handle_sigint: bool) -> None:
+    """Run the voice bot with the given parameters."""
 
+    stt = DeepgramSTTService(api_key=os.getenv("DEEPGRAM_API_KEY"))
 
-async def run_bot(
-    room_url: str,
-    token: str,
-    body: dict,
-) -> None:
-    """Run the voice bot with the given parameters.
-
-    Args:
-        room_url: The Daily room URL
-        token: The Daily room token
-        body: Body passed to the bot from the webhook
-
-    """
-    # ------------ CONFIGURATION AND SETUP ------------
-    logger.info(f"Starting bot with room: {room_url}")
-    logger.info(f"Token: {token}")
-    logger.info(f"Body: {body}")
-    # Parse the body to get the dial-in settings
-    body_data = json.loads(body)
-
-    # Check if the body contains dial-in settings
-    logger.debug(f"Body data: {body_data}")
-
-    if not all([body_data.get("callId"), body_data.get("callDomain")]):
-        logger.error("Call ID and Call Domain are required in the body.")
-        return None
-
-    call_id = body_data.get("callId")
-    call_domain = body_data.get("callDomain")
-    logger.debug(f"Call ID: {call_id}")
-    logger.debug(f"Call Domain: {call_domain}")
-
-    if not call_id or not call_domain:
-        logger.error("Call ID and Call Domain are required for dial-in.")
-        sys.exit(1)
-
-    daily_dialin_settings = DailyDialinSettings(call_id=call_id, call_domain=call_domain)
-    logger.debug(f"Dial-in settings: {daily_dialin_settings}")
-    transport_params = DailyParams(
-        api_url=daily_api_url,
-        api_key=daily_api_key,
-        dialin_settings=daily_dialin_settings,
-        audio_in_enabled=True,
-        audio_out_enabled=True,
-        video_out_enabled=False,
-        vad_analyzer=SileroVADAnalyzer(),
-        transcription_enabled=True,
-    )
-    logger.debug("setup transport params")
-
-    # Initialize transport with Daily
-    transport = DailyTransport(
-        room_url,
-        token,
-        "Simple Dial-in Bot",
-        transport_params,
-    )
-    logger.debug("setup transport")
-
-    # Initialize TTS
     tts = CartesiaTTSService(
         api_key=os.getenv("CARTESIA_API_KEY", ""),
         voice_id="b7d50908-b17c-442d-ad8d-810c63997ed9",  # Use Helpful Woman voice by default
     )
-    logger.debug("setup tts")
 
-    # ------------ LLM AND CONTEXT SETUP ------------
-
-    # Set up the system instruction for the LLM
-
-    # Initialize LLM
     llm = OpenAILLMService(api_key=os.getenv("OPENAI_API_KEY"))
-    logger.debug("setup llm")
 
     # Initialize LLM context with system prompt
     messages = [
@@ -125,26 +56,20 @@ async def run_bot(
 
     # Setup the conversational context
     context = OpenAILLMContext(messages)
-    logger.debug("setup context")
     context_aggregator = llm.create_context_aggregator(context)
-    logger.debug("setup context aggregator")
 
-    # ------------ PIPELINE SETUP ------------
-
-    # Build the pipeline
     pipeline = Pipeline(
         [
-            transport.input(),  # Transport user input
-            context_aggregator.user(),  # User responses
-            llm,  # LLM
-            tts,  # TTS
-            transport.output(),  # Transport bot output
-            context_aggregator.assistant(),  # Assistant spoken responses
+            transport.input(),
+            stt,
+            context_aggregator.user(),
+            llm,
+            tts,
+            transport.output(),
+            context_aggregator.assistant(),
         ]
     )
-    logger.debug("setup pipeline")
 
-    # Create pipeline task
     task = PipelineTask(
         pipeline,
         params=PipelineParams(
@@ -152,14 +77,10 @@ async def run_bot(
             enable_usage_metrics=True,
         ),
     )
-    logger.debug("setup task")
-
-    # ------------ EVENT HANDLERS ------------
 
     @transport.event_handler("on_first_participant_joined")
     async def on_first_participant_joined(transport, participant):
         logger.debug(f"First participant joined: {participant['id']}")
-        await transport.capture_participant_transcription(participant["id"])
         await task.queue_frames([LLMRunFrame()])
 
     @transport.event_handler("on_participant_left")
@@ -190,30 +111,41 @@ async def run_bot(
     async def on_dialin_warning(transport, data):
         logger.warning(f"Dial-in warning: {data}")
 
-    # Run the pipeline
-    runner = PipelineRunner()
+    runner = PipelineRunner(handle_sigint=handle_sigint)
     await runner.run(task)
 
 
-async def main():
-    """Parse command line arguments and run the bot."""
-    parser = argparse.ArgumentParser(description="Simple Dial-in Bot")
-    parser.add_argument("-u", "--url", type=str, help="Daily room URL")
-    parser.add_argument("-t", "--token", type=str, help="Daily room token")
-    parser.add_argument("-b", "--body", type=str, help="JSON configuration string")
+async def bot(runner_args: RunnerArguments):
+    """Main bot entry point compatible with Pipecat Cloud."""
+    # Body is always a dict (compatible with both local and Pipecat Cloud)
+    body_data = runner_args.body
+    room_url = body_data.get("room_url")
+    token = body_data.get("token")
+    call_id = body_data.get("callId")
+    call_domain = body_data.get("callDomain")
 
-    args = parser.parse_args()
+    if not all([call_id, call_domain]):
+        logger.error("Call ID and Call Domain are required in the body.")
+        return None
 
-    logger.debug(f"url: {args.url}")
-    logger.debug(f"token: {args.token}")
-    logger.debug(f"body: {args.body}")
-    if not all([args.url, args.token, args.body]):
-        logger.error("All arguments (-u, -t, -b) are required")
-        parser.print_help()
-        sys.exit(1)
+    daily_dialin_settings = DailyDialinSettings(call_id=call_id, call_domain=call_domain)
 
-    await run_bot(args.url, args.token, args.body)
+    transport_params = DailyParams(
+        api_url=os.getenv("DAILY_API_URL", "https://api.daily.co/v1"),
+        api_key=os.getenv("DAILY_API_KEY", ""),
+        dialin_settings=daily_dialin_settings,
+        audio_in_enabled=True,
+        audio_out_enabled=True,
+        video_out_enabled=False,
+        vad_analyzer=SileroVADAnalyzer(),
+        transcription_enabled=True,
+    )
 
+    transport = DailyTransport(
+        room_url,
+        token,
+        "Simple Dial-in Bot",
+        transport_params,
+    )
 
-if __name__ == "__main__":
-    asyncio.run(main())
+    await run_bot(transport, runner_args.handle_sigint)
