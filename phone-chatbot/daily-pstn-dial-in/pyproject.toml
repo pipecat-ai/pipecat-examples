@@ -1,0 +1,24 @@
+[project]
+name = "daily-pstn-dial-in"
+version = "0.1.0"
+description = "Daily PSTN Dial-in example"
+requires-python = ">=3.10"
+dependencies = [
+    "pipecat-ai[daily,deepgram,cartesia,openai,silero,runner]>=0.0.83",
+    "pipecatcloud>=0.2.4",
+]
+
+[dependency-groups]
+dev = [
+    "pre-commit~=4.2.0",
+    "ruff~=0.12.1",
+    "python-dotenv>=1.0.1,<2.0.0",
+]
+
+[tool.ruff]
+exclude = [".git", "*_pb2.py"]
+line-length = 100
+
+[tool.ruff.lint]
+select = ["I"]
+ignore = []
