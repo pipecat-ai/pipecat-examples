@@ -204,7 +204,26 @@ async def main():
 
         @transport.event_handler("on_participant_left")
         async def on_participant_left(transport, participant, reason):
+            logger.info(f"Participant left: {participant.get('id', 'unknown')} (reason: {reason})")
             await task.cancel()
+
+        @transport.event_handler("on_left")
+        async def on_left(transport):
+            logger.info("Bot left the room")
+            await task.cancel()
+
+        @transport.event_handler("on_client_disconnected")
+        async def on_client_disconnected(transport, client):
+            logger.info(f"Client disconnected: {client}")
+            # Note: This is fired when a client (participant) disconnects
+            # You might want to check if this was the last client before canceling
+            # For now, we'll let on_participant_left handle the cancellation
+
+        @transport.event_handler("on_error")
+        async def on_transport_error(transport, error):
+            logger.error(f"Transport error occurred: {error}")
+            # Optionally, you can add more detailed error handling here
+            # For example, checking error type and taking specific actions
 
         runner = PipelineRunner()
 
