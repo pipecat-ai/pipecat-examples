@@ -28,7 +28,7 @@ from pipecat.processors.filters.stt_mute_filter import STTMuteConfig, STTMuteFil
 from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
 from pipecat.processors.frameworks.rtvi import RTVIObserver, RTVIProcessor
 from pipecat.processors.transcript_processor import TranscriptProcessor
-from pipecat.services.cartesia.tts import CartesiaTTSService
+from pipecat.services.asyncai.tts import AsyncAITTSService
 from pipecat.services.deepgram.stt import DeepgramSTTService
 from pipecat.services.openai.llm import OpenAILLMService
 from pipecat.transports.daily.transport import DailyParams, DailyTransport
@@ -148,10 +148,16 @@ async def main():
             ),
         )
 
-        tts = CartesiaTTSService(
-            api_key=os.getenv("CARTESIA_API_KEY"),
-            voice_id="34dbb662-8e98-413c-a1ef-1a3407675fe7",  # Spanish Narrator Man
-            model="sonic-2",
+        # tts = CartesiaTTSService(
+        #     api_key=os.getenv("CARTESIA_API_KEY"),
+        #     voice_id="34dbb662-8e98-413c-a1ef-1a3407675fe7",  # Spanish Narrator Man
+        #     model="sonic-2",
+        # )
+
+        tts = AsyncAITTSService(
+            api_key=os.getenv("ASYNCAI_API_KEY") or "",
+            voice_id=os.getenv("ASYNCAI_VOICE_ID", "e0f39dc4-f691-4e78-bba5-5c636692cc04"),
+            model="asyncflow_v2.0",
         )
 
         in_language = "English"

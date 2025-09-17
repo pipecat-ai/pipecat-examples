@@ -3,7 +3,11 @@ name = "pipecat-examples"
 version = "0.0.0"
 description = "Examples for Pipecat AI framework"
 requires-python = ">=3.10"
-dependencies = []
+dependencies = [
+    "aiohttp>=3.12.15",
+    "loguru>=0.7.3",
+    "pipecat-ai[silero,webrtc,websockets]>=0.0.85",
+]
 
 [dependency-groups]
 dev = [
