@@ -1,6 +1,6 @@
-# Daily PSTN call transfer
+# Daily PSTN Cold Call Transfer
 
-A basic example of how to create a bot that handles the initial customer interaction and then transfers to a human operator when needed.
+A basic example of how to create a bot that handles the initial customer interaction and then performs a cold transfer to a human operator when requested.
 
 ## How It Works
 
@@ -12,7 +12,7 @@ A basic example of how to create a bot that handles the initial customer interac
 6. The bot joins the Daily room and signals readiness
 7. Daily forwards the call to the Daily room
 8. The caller and the bot are connected, and the bot handles the conversation
-9. When requested, the bot can dial out to an operator for call transfer
+9. When requested, the bot dials out to an operator and performs a cold transfer (bot leaves the call)
 
 ## Architecture Overview
 
@@ -109,7 +109,7 @@ The bot supports two deployment modes controlled by the `ENV` variable:
 
 3. Call your bot!
 
-   Call the number you configured to talk to your bot. Ask to speak to a manager and the OPERATOR_NUMBER will be dialed.
+   Call the number you configured to talk to your bot. Ask to speak to a manager and the bot will transfer you to the OPERATOR_NUMBER (cold transfer - the bot will leave the call).
 
 ## Production Deployment
 
@@ -139,6 +139,18 @@ PIPECAT_AGENT_NAME=your-agent-name
 ```
 
 The server automatically detects the environment and routes bot starting requests accordingly.
+
+## What is a Cold Transfer?
+
+A cold transfer is when the bot transfers the call directly to another party (the operator) and then leaves the call entirely. This means:
+
+1. **Customer** calls and speaks with the **bot**
+2. Customer requests to speak with a supervisor
+3. **Bot** dials the **operator** and says "I'm transferring you to a supervisor now"
+4. When the **operator** answers, the **bot immediately leaves the call**
+5. **Customer** and **operator** are now connected directly
+
+This is different from a "warm transfer" where the bot would stay on the call, introduce the customer to the operator, provide a summary, and then leave.
 
 ## Daily SIP Configuration
 
