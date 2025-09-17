@@ -1,23 +1,45 @@
-# Daily PSTN dial-out simple chatbot
+# IVR Navigation Bot
 
-This project demonstrates how to create a voice bot that uses Daily's PSTN capabilities to make calls to phone numbers.
+This project demonstrates how to create a voice bot that can automatically navigate Interactive Voice Response (IVR) phone systems using AI-powered decision making.
 
 ## How It Works
 
 1. The server receives a request with the phone number to dial out to
-2. The server creates a Daily room with SIP capabilities
-3. The server starts the bot process (locally or via Pipecat Cloud based on ENV)
-4. When the bot has joined, it starts the dial-out process and rings the number provided
-5. The user answers the phone and is brought into the call
-6. The end user and bot are connected, and the bot handles the conversation
+2. The server creates a Daily room with SIP capabilities and starts the bot
+3. The bot dials the specified number and connects to an IVR system
+4. The IVR Navigator automatically detects menu options and navigates toward the specified goal
+5. The bot uses DTMF tones and natural language responses to traverse the phone menu
+6. Once the goal is reached, the bot ends the call
+
+## Expected Navigation Path
+
+When calling the test number (+1-412-314-6113), the bot will navigate through Daily Pharmacy's IVR system:
+
+1. **Main Menu**: "Press 1 for prescription services, Press 2 for pharmacy hours..."
+
+   - Bot selects option 1 (prescription services)
+
+2. **Date of Birth Verification**: "Please enter your date of birth..."
+
+   - Bot enters: 01011970 (configured for Mark Backman)
+
+3. **Prescription Number**: "Please enter your 7 digit prescription number..."
+
+   - Bot enters: 1234567 (configured prescription)
+
+4. **Prescription Found**: "I found your prescription for Ibuprofen 800mg..."
+   - Bot receives status information and completes the call
+
+The IVR Navigator handles this navigation automatically using the goal and patient information configured in the bot.
 
 ## Prerequisites
 
 ### Daily
 
 - A Daily account with an API key (or Daily API key from Pipecat Cloud account)
-- A phone number purchased through Daily
-- Dial-out must be enabled on your domain. Find out more by reading this [document and filling in the form](https://docs.daily.co/guides/products/dial-in-dial-out#main)
+- A phone number purchased through Daily with dial-out enabled
+
+For detailed setup instructions on purchasing phone numbers and enabling dial-out, see the [Daily PSTN dial-out example](https://github.com/pipecat-ai/pipecat-examples/tree/main/phone-chatbot/daily-pstn-dial-out).
 
 ### AI Services
 
@@ -49,14 +71,6 @@ This project demonstrates how to create a voice bot that uses Daily's PSTN capab
    # Edit .env with your API keys
    ```
 
-3. Buy a phone number
-
-   Instructions on how to do that can be found at this [docs link](https://docs.daily.co/reference/rest-api/phone-numbers/buy-phone-number)
-
-4. Request dial-out enablement
-
-   For compliance reasons, to enable dial-out for your Daily account, you must request enablement via the form. You can find out more about dial-out, and the form at the [link here](https://docs.daily.co/guides/products/dial-in-dial-out#main)
-
 ## Environment Configuration
 
 The bot supports two deployment modes controlled by the `ENV` variable:
@@ -80,7 +94,7 @@ The bot supports two deployment modes controlled by the `ENV` variable:
    uv run server.py
    ```
 
-2. Test the dial-out functionality
+2. Test the IVR navigation functionality
 
    With server.py running, send the following curl command from your terminal:
 
@@ -89,12 +103,22 @@ The bot supports two deployment modes controlled by the `ENV` variable:
      -H "Content-Type: application/json" \
      -d '{
        "dialout_settings": {
-         "phone_number": "+1234567890"
+         "phone_number": "+14123146113"
        }
      }'
    ```
 
-   The server should create a room, the bot will join and then ring the number provided. Answer the call to speak with the bot.
+   The server will create a room, the bot will join and dial the test IVR system. The bot will automatically navigate through the Daily Pharmacy IVR menu to obtain prescription status information for the user.
+
+3. **Observe the call (optional)**
+
+   You can join the Daily room to listen in on the IVR navigation. When the bot starts, you'll see a message in the console like:
+
+   ```
+   Joining https://YOUR-ACCOUNT.daily.co/AUTO-GENERATED-ROOM
+   ```
+
+   Open this URL in your browser to observe the bot navigating through the IVR system in real-time.
 
 ## Production Deployment
 
@@ -125,19 +149,22 @@ PIPECAT_AGENT_NAME=your-agent-name
 
 The server automatically detects the environment and routes bot starting requests accordingly.
 
+## Learn More About IVR Navigation
+
+For comprehensive information about IVR navigation capabilities, configuration options, and advanced usage patterns, see the [IVR Navigation Guide](https://docs.pipecat.ai/guides/fundamentals/ivr).
+
 ## Troubleshooting
 
-### I get an error about dial-out not being enabled
+### IVR navigation gets stuck
 
-- Check that your room has `enable_dialout=True` set
-- Check that your meeting token is an owner token (The bot does this for you automatically)
-- Check that you have purchased a phone number to ring from
-- Check that the phone number you are trying to ring is correct, and is a US or Canadian number.
+- Check that the bot's goal and patient information match the IVR system's expected inputs
+- Review the bot logs for navigation decision details
 
 ### Call connects but no bot is heard
 
 - Ensure your Daily API key is correct and has SIP capabilities
 - Verify that the Cartesia API key and voice ID are correct
+- Check that dial-out is enabled on your Daily domain
 
 ### Bot starts but disconnects immediately
 

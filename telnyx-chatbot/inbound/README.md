@@ -25,7 +25,7 @@ This project is a Pipecat-based chatbot that integrates with Telnyx to handle We
 
 ### AI Services
 
-- OpenAI API key for the bot's intelligence
+- OpenAI API key for the LLM inference
 - Deepgram API key for speech-to-text
 - Cartesia API key for text-to-speech
 
