@@ -17,7 +17,7 @@ This project demonstrates how to create a voice bot that can receive phone calls
 
 - A Daily account with an API key for room creation
 - A Twilio account with a phone number that supports voice
-- OpenAI API key for the bot's intelligence
+- OpenAI API key for the LLM inference
 - Cartesia API key for text-to-speech
 - [uv](https://docs.astral.sh/uv/getting-started/installation/) package manager installed
 

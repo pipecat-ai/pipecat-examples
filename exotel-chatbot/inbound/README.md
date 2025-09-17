@@ -33,7 +33,7 @@ The bot automatically receives the caller's and called phone numbers for persona
 
 ### AI Services
 
-- OpenAI API key for the bot's intelligence
+- OpenAI API key for the LLM inference
 - Deepgram API key for speech-to-text
 - Cartesia API key for text-to-speech
 

@@ -33,7 +33,7 @@ The bot can receive custom data for personalized responses by including query pa
 
 ### AI Services
 
-- OpenAI API key for the bot's intelligence
+- OpenAI API key for the LLM inference
 - Deepgram API key for speech-to-text
 - Cartesia API key for text-to-speech
 

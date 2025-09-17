@@ -14,7 +14,7 @@ These examples use the following components:
 ## Prerequisites
 
 - A Daily account with an API key
-- An OpenAI API key for the bot's intelligence
+- An OpenAI API key for the LLM inference
 - A Cartesia API key for text-to-speech
 - One phone to dial-in from and another phone to receive calls when escalating to a manager
 

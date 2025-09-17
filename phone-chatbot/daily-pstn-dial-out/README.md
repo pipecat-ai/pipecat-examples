@@ -21,7 +21,8 @@ This project demonstrates how to create a voice bot that uses Daily's PSTN capab
 
 ### AI Services
 
-- OpenAI API key for the bot's intelligence
+- Deepgram API key for speech-to-text
+- OpenAI API key for the LLM inference
 - Cartesia API key for text-to-speech
 
 ### System

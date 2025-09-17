@@ -23,7 +23,7 @@ This project demonstrates how to create a voice bot that can receive phone calls
 
 ### AI Services
 
-- OpenAI API key for the bot's intelligence
+- OpenAI API key for the LLM inference
 - Deepgram API key for speech-to-text
 - Cartesia API key for text-to-speech
 
