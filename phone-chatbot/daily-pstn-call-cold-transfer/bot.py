@@ -13,6 +13,7 @@ from pipecat.adapters.schemas.function_schema import FunctionSchema
 from pipecat.adapters.schemas.tools_schema import ToolsSchema
 from pipecat.audio.vad.silero import SileroVADAnalyzer
 from pipecat.frames.frames import (
+    EndFrame,
     EndTaskFrame,
     LLMMessagesAppendFrame,
     LLMRunFrame,
@@ -59,9 +60,9 @@ async def dial_operator(transport: BaseTransport, params: FunctionCallParams):
         await params.llm.push_frame(LLMMessagesAppendFrame([message], run_llm=True))
 
         # Start the dialout to transfer the call
-        dialout_params = {"phoneNumber": operator_number}
-        logger.debug(f"Dialout parameters: {dialout_params}")
-        await transport.start_dialout(dialout_params)
+        transfer_params = {"toEndPoint": operator_number}
+        logger.debug(f"SIP call transfer parameters: {transfer_params}")
+        await transport.sip_call_transfer(transfer_params)
 
     else:
         # No operator number configured
@@ -178,7 +179,8 @@ Available functions:
     async def on_dialout_answered(transport, data):
         logger.info(f"Operator answered, transferring call: {data}")
         # Cold transfer: bot leaves the call, customer and operator continue
-        await task.cancel()
+        # await task.cancel()
+        await task.queue_frames([EndFrame()])
 
     @transport.event_handler("on_dialout_error")
     async def on_dialout_error(transport, data):

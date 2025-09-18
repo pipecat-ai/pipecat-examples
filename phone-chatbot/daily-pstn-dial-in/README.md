@@ -1,5 +1,3 @@
-<!-- @format -->
-
 # Daily PSTN dial-in simple chatbot
 
 This project demonstrates how to create a voice bot that can receive phone calls via Dailys PSTN capabilities to enable voice conversations.
