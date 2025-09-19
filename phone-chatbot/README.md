@@ -1,64 +1,34 @@
-<!-- @format -->
+# Pipecat Phone Chatbot Examples
 
-<div align="center">
- <img alt="pipecat" width="300px" height="auto" src="image.png">
-</div>
+This directory contains examples for building phone chatbots using Pipecat. All examples can be run locally for development or deployed to [Pipecat Cloud](https://pipecat.daily.co) for production.
 
-# Pipecat Phone Chatbot
+## Examples
 
-This repository contains examples for building intelligent phone chatbots using AI for various use cases including:
+- **[daily-pstn-dial-in](./daily-pstn-dial-in/)** - Basic incoming call handling with Daily PSTN
+- **[daily-pstn-dial-out](./daily-pstn-dial-out/)** - Basic outgoing call handling with Daily PSTN
+- **[daily-pstn-cold-transfer](./daily-pstn-cold-transfer/)** - Customer support bot with cold transfer to human operators
+- **[daily-twilio-sip-dial-in](./daily-twilio-sip-dial-in/)** - Incoming calls using Daily + Twilio SIP
+- **[daily-twilio-sip-dial-out](./daily-twilio-sip-dial-out/)** - Outgoing calls using Daily + Twilio SIP
 
-- **daily-pstn-dial-in**: Basic incoming call handling
-- **daily-pstn-dial-out**: Basic outgoing call handling
-- **daily-twilio-sip-dial-in**: Basic incoming call handling using Daily SIP + Twilio
-- **daily-twilio-sip-dial-out**: Basic outgoing call handling using Daily SIP + Twilio
-- **daily-pstn-simple-call-transfer**: Bot handles initial customer interaction and transfers to a human operator when needed
+Each example includes its own README with detailed setup instructions, architecture details, and deployment guidance.
 
-## Architecture Overview
+## Getting Started
 
-These examples use the following components:
+1. Choose an example that matches your use case
+2. Follow the setup instructions in that example's README
+3. Test locally using ngrok for webhook endpoints
+4. Deploy to [Pipecat Cloud](https://pipecat.daily.co) for production
 
-- 🔁 **Transport**: Daily WebRTC
-- 💬 **Speech-to-Text**: Deepgram via Daily transport, or via separate Deepgram service
-- 🤖 **LLMs**: Each example uses a specific LLM (OpenAI GPT-4o or Google Gemini)
-- 📞 **SIP/PSTN**: Examples either use Daily PSTN or SIP with a SIP provider such as Twilio
-- 🔉 **Text-to-Speech**: Cartesia
+## Architecture
 
-### Phone Number Provider: Daily vs Twilio
+All examples use:
 
-If you're starting from scratch, we recommend using Daily to provision phone numbers alongside Daily as a transport for simplicity (this provides automatic call forwarding).
+- **Transport**: Daily WebRTC
+- **Speech-to-Text**: Deepgram
+- **LLM**: OpenAI GPT-4o
+- **Text-to-Speech**: Cartesia
+- **Phone Numbers**: Daily PSTN or Twilio SIP
 
-If you already have Twilio numbers and workflows, you can connect them to your Pipecat bots with some additional configuration (`on_dialin_ready` and using the Twilio client to trigger forwarding).
+## Support
 
-The Twilio dial-out example shows you how to configure the SIP URI domain and TwiML bins.
-
-## Deployment
-
-See Pipecat Cloud deployment docs for how to deploy this example: https://docs.pipecat.daily.co/agents/deploy
-
-We also have a great, easy to use quickstart guide here: https://docs.pipecat.daily.co/quickstart
-
-## Using Different LLM Providers
-
-Each example in this repository is implemented with a specific LLM provider:
-
-- **daily-pstn-dial-in**: Uses OpenAI
-- **daily-pstn-dial-out**: Uses OpenAI
-- **daily-twilio-sip-dial-in**: Uses OpenAI
-- **daily-twilio-sip-dial-out**: Uses OpenAI
-- **daily-pstn-simple-call-transfer**: Uses OpenAI
-
-If you want to implement one of these examples with a different LLM provider than what's provided:
-
-- To implement **call_transfer** with **Gemini**, reference the `bot.py` file inside the voicemail detection example for how to structure LLM context, function calling, and other Gemini-specific implementations.
-- To implement **voicemail_detection** with **OpenAI**, reference the `bot.py` file inside the call_transfer example for OpenAI-specific implementation details.
-
-The key differences between implementations involve how context is managed, function calling syntax, and message formatting. Looking at both implementations side-by-side provides a good template for adapting any example to your preferred LLM provider.
-
-## Customizing Bot Prompts
-
-All examples include default prompts that work well for standard use cases.
-
-## Advanced Usage
-
-For more advanced phone integration scenarios using PSTN/SIP, please reach out on [Discord](https://discord.gg/pipecat).
+For questions or advanced use cases, join our [Discord community](https://discord.gg/pipecat).
