@@ -1,0 +1,7 @@
+agent_name = "smallwebrtc-poc"
+image = "your_username/pipecat-smallwebrtc:latest"
+image_credentials = "smallwebrtc-pull-secret"
+secret_set = "smallwebrtc-secrets"
+
+[scaling]
+	min_agents = 1
