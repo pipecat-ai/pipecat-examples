@@ -1,6 +1,6 @@
-# Daily PSTN dial-in simple chatbot
+# Daily PSTN Cold Call Transfer
 
-This project demonstrates how to create a voice bot that can receive phone calls via Dailys PSTN capabilities to enable voice conversations.
+A basic example of how to create a bot that handles the initial customer interaction and then performs a cold transfer to a human operator when requested.
 
 ## How It Works
 
@@ -12,6 +12,16 @@ This project demonstrates how to create a voice bot that can receive phone calls
 6. The bot joins the Daily room and signals readiness
 7. Daily forwards the call to the Daily room
 8. The caller and the bot are connected, and the bot handles the conversation
+9. When requested, the bot dials out to an operator and performs a cold transfer (bot leaves the call)
+
+## Architecture Overview
+
+This example uses the following components:
+
+- 🔁 **Transport**: Daily WebRTC
+- 💬 **Speech-to-Text**: Deepgram
+- 🤖 **LLM**: OpenAI GPT-4o
+- 🔉 **Text-to-Speech**: Cartesia
 
 ## Prerequisites
 
@@ -21,7 +31,7 @@ This project demonstrates how to create a voice bot that can receive phone calls
 
 ### AI Services
 
-- OpenAI API key for the LLM inference
+- OpenAI API key for the bot's intelligence
 - Deepgram API key for speech-to-text
 - Cartesia API key for text-to-speech
 
@@ -31,6 +41,7 @@ This project demonstrates how to create a voice bot that can receive phone calls
 - `uv` package manager
 - ngrok (for local development)
 - Docker (for production deployment)
+- One phone to dial-in from and another phone to receive calls when escalating to a manager
 
 ## Setup
 
@@ -42,12 +53,14 @@ This project demonstrates how to create a voice bot that can receive phone calls
 
 2. Set up environment variables
 
-Copy the example file and fill in your API keys:
+   Copy the example file and fill in your API keys:
 
-    ```bash
-    cp .env.example .env
-    # Edit .env with your API keys
-    ```
+   ```bash
+   cp .env.example .env
+   # Edit .env with your API keys
+   ```
+
+   - Note: Please specify an OPERATOR_NUMBER so that the bot can ring a number when escalating to a manager
 
 3. Buy a phone number
 
@@ -96,7 +109,7 @@ The bot supports two deployment modes controlled by the `ENV` variable:
 
 3. Call your bot!
 
-   Call the number you configured to talk to your bot.
+   Call the number you configured to talk to your bot. Ask to speak to a manager and the bot will transfer you to the OPERATOR_NUMBER (cold transfer - the bot will leave the call).
 
 ## Production Deployment
 
@@ -127,23 +140,17 @@ PIPECAT_AGENT_NAME=your-agent-name
 
 The server automatically detects the environment and routes bot starting requests accordingly.
 
-## Troubleshooting
+## What is a Cold Transfer?
 
-### Call is not being answered
+A cold transfer is when the bot transfers the call directly to another party (the operator) and then leaves the call entirely. This means:
 
-- Check that your dial-in config is correctly configured to point towards your ngrok server and correct endpoint
-- Make sure the server.py file is running
-- Make sure ngrok is correctly setup and pointing to the correct port
+1. **Customer** calls and speaks with the **bot**
+2. Customer requests to speak with a supervisor
+3. **Bot** dials the **operator** and says "I'm transferring you to a supervisor now"
+4. When the **operator** answers, the **bot immediately leaves the call**
+5. **Customer** and **operator** are now connected directly
 
-### Call connects but no bot is heard
-
-- Ensure your Daily API key is correct and has SIP capabilities
-- Verify that the Cartesia API key and voice ID are correct
-
-### Bot starts but disconnects immediately
-
-- Check the Daily logs for any error messages
-- Ensure your server has stable internet connectivity
+This is different from a "warm transfer" where the bot would stay on the call, introduce the customer to the operator, provide a summary, and then leave.
 
 ## Daily SIP Configuration
 
@@ -156,6 +163,38 @@ sip_params = DailyRoomSipParams(
     sip_mode="dial-in",         # For receiving calls (vs. dial-out)
     num_endpoints=1,            # Number of SIP endpoints to create
 )
+
+properties = DailyRoomProperties(
+        sip=sip_params,
+        enable_dialout=True,  # Needed for outbound calls if you expand the bot
+        enable_chat=False,  # No need for chat in a voice bot
+        start_video_off=True,  # Voice only
+)
 ```
 
 If you're using the Pipecat development runner's Daily util, these args are handled for you when calling `configure()`.
+
+## Troubleshooting
+
+### Call is not being answered
+
+- Check that your dial-in config is correctly configured to point towards your ngrok server and correct endpoint
+- Make sure the server.py file is running
+- Make sure ngrok is correctly setup and pointing to the correct port
+
+### The bot does not escalate to the manager
+
+- Check that your room has `enable_dialout=True` set
+- Check that your meeting token is an owner token (The bot does this for you automatically)
+- Check that the phone number you are trying to ring is correct, and is a US or Canadian number.
+
+### Call connects but no bot is heard
+
+- Ensure your Daily API key is correct and has SIP capabilities
+- Verify that the Deepgram API key is correct
+- Verify that the Cartesia API key and voice ID are correct
+
+### Bot starts but disconnects immediately
+
+- Check the Daily logs for any error messages
+- Ensure your server has stable internet connectivity
