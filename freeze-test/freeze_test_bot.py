@@ -27,7 +27,7 @@ from pipecat.frames.frames import (
     LLMFullResponseEndFrame,
     LLMMessagesAppendFrame,
     StartFrame,
-    StartInterruptionFrame,
+    InterruptionFrame,
     StopFrame,
     TranscriptionFrame,
     TTSSpeakFrame,
@@ -127,7 +127,7 @@ class SimulateFreezeInput(FrameProcessor):
     async def _send_user_text(self, text: str):
         # Emulation as if the user has spoken and the stt transcribed
         await self.push_frame(UserStartedSpeakingFrame())
-        await self.push_frame(StartInterruptionFrame())
+        await self.push_frame(InterruptionFrame())
         await self.push_frame(
             TranscriptionFrame(
                 text,
@@ -284,7 +284,7 @@ async def run_example(websocket_client):
                     LLMFullResponseEndFrame: None,
                     UserStartedSpeakingFrame: None,
                     UserStoppedSpeakingFrame: None,
-                    StartInterruptionFrame: None,
+                    InterruptionFrame: None,
                     CancelFrame: None,
                 },
                 exclude_fields={
