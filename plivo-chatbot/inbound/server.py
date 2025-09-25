@@ -51,7 +51,7 @@ def get_websocket_url(host: str, body_data: dict = None):
 
     # Construct final URL
     if query_params:
-        return f"{base_url}?{'&'.join(query_params)}"
+        return f"{base_url}?{'&amp;'.join(query_params)}"
     else:
         return base_url
 
