@@ -141,12 +141,11 @@ curl -X POST https://your-ngrok-url.ngrok.io/start \
   -d '{
     "phone_number": "+1234567890",
     "body": {
-      "user_id": "user123",
-      "name": "John Doe",
-      "account_type": "premium",
-      "context": {
-        "last_order": "2024-01-15",
-        "total_spent": 1250.00
+      "user": {
+        "id": "user123",
+        "firstName": "John",
+        "lastName": "Doe",
+        "accountType": "premium"
       }
     }
   }'
