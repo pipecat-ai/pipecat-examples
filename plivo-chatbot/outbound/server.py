@@ -224,7 +224,7 @@ async def get_answer_xml(
 
         # Construct final WebSocket URL
         if query_params:
-            ws_url = f"{base_ws_url}?{'&'.join(query_params)}"
+            ws_url = f"{base_ws_url}?{'&amp;'.join(query_params)}"
         else:
             ws_url = base_ws_url
 
