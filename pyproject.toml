@@ -3,7 +3,15 @@ name = "pipecat-examples"
 version = "0.0.0"
 description = "Examples for Pipecat AI framework"
 requires-python = ">=3.10"
-dependencies = []
+dependencies = [
+    "aiortc>=1.13.0",
+    "deepgram-sdk>=4.8.1",
+    "fastapi[all]>=0.116.2",
+    "loguru>=0.7.3",
+    "pipecat-ai[elevenlabs,google,openai,runner,silero,webrtc,websocket-transport]>=0.0.82",
+    "python-dotenv>=1.1.1",
+    "uvicorn>=0.37.0",
+]
 
 [dependency-groups]
 dev = [

@@ -33,6 +33,7 @@ Respond to what the user said in a creative and helpful way. Keep your responses
 
 
 async def run_bot_websocket_server():
+    print("Starting bot...ester")
     ws_transport = WebsocketServerTransport(
         params=WebsocketServerParams(
             serializer=ProtobufFrameSerializer(),
@@ -108,3 +109,8 @@ async def run_bot_websocket_server():
     runner = PipelineRunner()
 
     await runner.run(task)
+
+if __name__ == "__main__":
+    from pipecat.runner.run import main
+
+    main()

@@ -19,7 +19,24 @@
     </div>
   </div>
 
-  <audio id="bot-audio" autoplay></audio>
+  <div class="main-content">
+        <div class="bot-container">
+          <audio id="bot-audio" autoplay></audio>
+        </div>
+      </div>
+  <div class="device-bar">
+        <div class="device-controls">
+          <select id="device-selector"></select>
+          <button id="mic-toggle-btn">Unmute Mic</button>
+        </div>
+        <div class="text-input-container">
+          <input
+            type="text"
+            id="text-input"
+            placeholder="Type your message..." />
+          <button id="send-text-btn" disabled>Send</button>
+        </div>
+      </div>
 
   <div class="debug-panel">
     <h3>Debug Info</h3>

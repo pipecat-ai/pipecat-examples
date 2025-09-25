@@ -9,20 +9,56 @@ import sys
 from dotenv import load_dotenv
 from loguru import logger
 from pipecat.audio.vad.silero import SileroVADAnalyzer
-from pipecat.frames.frames import LLMRunFrame
+from pipecat.frames.frames import LLMMessagesAppendFrame, LLMRunFrame
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineParams, PipelineTask
 from pipecat.processors.aggregators.openai_llm_context import OpenAILLMContext
-from pipecat.processors.frameworks.rtvi import RTVIConfig, RTVIObserver, RTVIProcessor
+from pipecat.processors.frameworks.rtvi import ActionResult, RTVIAction, RTVIActionArgument, RTVIConfig, RTVIObserver, RTVIProcessor
 from pipecat.serializers.protobuf import ProtobufFrameSerializer
 from pipecat.services.gemini_multimodal_live import GeminiMultimodalLiveLLMService
+from pipecat.services.openai.llm import OpenAIContextAggregatorPair
 from pipecat.transports.websocket.fastapi import (
     FastAPIWebsocketParams,
     FastAPIWebsocketTransport,
 )
 
 load_dotenv(override=True)
+
+def create_action_llm_append_to_messages(context_aggregator: OpenAIContextAggregatorPair):
+    async def action_llm_append_to_messages_handler(
+        rtvi: RTVIProcessor, service: str, arguments: dict[str, any]
+    ) -> ActionResult:
+        run_immediately = arguments["run_immediately"] if "run_immediately" in arguments else True
+
+        if run_immediately:
+            await rtvi.interrupt_bot()
+
+            # We just interrupted the bot so it should be fine to use the
+            # context directly instead of through frame.
+            if "messages" in arguments and arguments["messages"]:
+                mess = arguments["messages"]
+                frame = LLMMessagesAppendFrame(messages=arguments["messages"])
+                await rtvi.push_frame(frame)
+
+        if run_immediately:
+            frame = LLMRunFrame()
+            await rtvi.push_frame(frame)
+
+        return True
+
+    action_llm_append_to_messages = RTVIAction(
+        service="llm",
+        action="append_to_messages",
+        result="bool",
+        arguments=[
+            RTVIActionArgument(name="messages", type="array"),
+            RTVIActionArgument(name="run_immediately", type="bool"),
+        ],
+        handler=action_llm_append_to_messages_handler,
+    )
+    return action_llm_append_to_messages
+
 
 logger.remove(0)
 logger.add(sys.stderr, level="DEBUG")
@@ -67,9 +103,11 @@ async def run_bot(websocket_client):
         ],
     )
     context_aggregator = llm.create_context_aggregator(context)
+    action_llm_append_to_messages = create_action_llm_append_to_messages(context_aggregator)
 
     # RTVI events for Pipecat client UI
     rtvi = RTVIProcessor(config=RTVIConfig(config=[]))
+    rtvi.register_action(action_llm_append_to_messages)
 
     pipeline = Pipeline(
         [
@@ -110,3 +148,8 @@ async def run_bot(websocket_client):
     runner = PipelineRunner(handle_sigint=False)
 
     await runner.run(task)
+
+if __name__ == "__main__":
+    from pipecat.runner.run import main
+
+    main()
