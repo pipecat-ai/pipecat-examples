@@ -142,7 +142,7 @@ async def run_bot(transport: BaseTransport):
         ),
         enable_tracing=IS_TRACING_ENABLED,
         # Optionally, add a conversation ID to track the conversation
-        # conversation_id="8df26cc1-6db0-4a7a-9930-1e037c8f1fa2",
+        # additional_span_attributes={"langfuse.session.id": "8df26cc1-6db0-4a7a-9930-1e037c8f1fa2"},
     )
 
     @transport.event_handler("on_client_connected")
