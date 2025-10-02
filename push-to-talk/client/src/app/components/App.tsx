@@ -14,11 +14,11 @@ import {
   Card,
   CardContent,
   ConnectButton,
-  LoaderIcon,
+  SpinLoader,
   PipecatLogo,
   TranscriptOverlay,
-  XIcon,
 } from '@pipecat-ai/voice-ui-kit';
+import { XIcon } from 'lucide-react';
 import { PlasmaVisualizer } from '@pipecat-ai/voice-ui-kit/webgl';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
@@ -124,7 +124,7 @@ export const App = ({ connectParams, transportType }: AppProps) => {
   if (!client) {
     return (
       <div className="w-full h-screen flex items-center justify-center">
-        <LoaderIcon className="animate-spin opacity-50" size={32} />
+        <SpinLoader />
       </div>
     );
   }

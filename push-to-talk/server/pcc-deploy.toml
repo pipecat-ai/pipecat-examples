@@ -1,0 +1,6 @@
+agent_name = "push-to-talk"
+image = "your_username/push-to-talk:0.1"
+secret_set = "push-to-talk-secrets"
+
+[scaling]
+	min_agents = 1
