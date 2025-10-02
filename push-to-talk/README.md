@@ -85,3 +85,7 @@ The push-to-talk functionality uses client-server message passing:
 - Server opens audio input gate, allowing frames to flow to STT
 - Client sends `{type: "push_to_talk", data: {state: "stop"}}` when button is released
 - Server closes audio input gate, triggering transcript processing
+
+## Deploy your Bot to Pipecat Cloud
+
+Follow the [quickstart instructions](https://docs.pipecat.ai/getting-started/quickstart#step-2%3A-deploy-to-production) to deploy your bot to Pipecat Cloud.
