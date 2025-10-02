@@ -3,12 +3,12 @@ import {
   PipecatClient,
   TransportConnectionParams,
   TransportState,
-} from '@pipecat-ai/client-js';
+} from "@pipecat-ai/client-js";
 import {
   PipecatClientAudio,
   PipecatClientProvider,
-} from '@pipecat-ai/client-react';
-import { DailyTransport } from '@pipecat-ai/daily-transport';
+} from "@pipecat-ai/client-react";
+import { DailyTransport } from "@pipecat-ai/daily-transport";
 import {
   Button,
   Card,
@@ -18,24 +18,24 @@ import {
   PipecatLogo,
   TranscriptOverlay,
   XIcon,
-} from '@pipecat-ai/voice-ui-kit';
-import { PlasmaVisualizer } from '@pipecat-ai/voice-ui-kit/webgl';
-import { useCallback, useEffect, useRef, useState } from 'react';
+} from "@pipecat-ai/voice-ui-kit";
+import { PlasmaVisualizer } from "@pipecat-ai/voice-ui-kit/webgl";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 export interface AppProps {
   connectParams: TransportConnectionParams | ConnectionEndpoint;
-  transportType: 'daily';
+  transportType: "daily";
 }
 
-export type AppState = 'idle' | 'connecting' | 'connected' | 'disconnected';
-export type PushToTalkState = 'idle' | 'talking';
+export type AppState = "idle" | "connecting" | "connected" | "disconnected";
+export type PushToTalkState = "idle" | "talking";
 
 export const App = ({ connectParams, transportType }: AppProps) => {
   const [client, setClient] = useState<PipecatClient | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [state, setState] = useState<AppState>('idle');
+  const [state, setState] = useState<AppState>("idle");
   const [pushToTalkState, setPushToTalkState] =
-    useState<PushToTalkState>('idle');
+    useState<PushToTalkState>("idle");
   const isMounted = useRef(false);
 
   useEffect(() => {
@@ -44,7 +44,7 @@ export const App = ({ connectParams, transportType }: AppProps) => {
     isMounted.current = true;
     async function initClient() {
       // Only run on client side
-      if (typeof window === 'undefined') return;
+      if (typeof window === "undefined") return;
 
       const transport = new DailyTransport();
 
@@ -55,24 +55,24 @@ export const App = ({ connectParams, transportType }: AppProps) => {
         callbacks: {
           onTransportStateChanged: (state: TransportState) => {
             switch (state) {
-              case 'connecting':
-              case 'authenticating':
-              case 'connected':
-                setState('connecting');
+              case "connecting":
+              case "authenticating":
+              case "connected":
+                setState("connecting");
                 break;
-              case 'ready':
-                setState('connected');
+              case "ready":
+                setState("connected");
                 break;
-              case 'disconnected':
-              case 'disconnecting':
+              case "disconnected":
+              case "disconnecting":
               default:
-                setState('idle');
+                setState("idle");
                 break;
             }
           },
           onError: () => {
             setError(
-              'An error occured connecting to agent. It may be that the agent is at capacity. Please try again later.'
+              "An error occured connecting to agent. It may be that the agent is at capacity. Please try again later."
             );
           },
         },
@@ -87,7 +87,7 @@ export const App = ({ connectParams, transportType }: AppProps) => {
   const handleStartSession = async () => {
     if (
       !client ||
-      !['initialized', 'disconnected', 'error'].includes(client.state)
+      !["initialized", "disconnected", "error"].includes(client.state)
     ) {
       return;
     }
@@ -96,7 +96,7 @@ export const App = ({ connectParams, transportType }: AppProps) => {
     try {
       await client.connect(connectParams);
     } catch (err) {
-      console.error('Connection error:', err);
+      console.error("Connection error:", err);
       setError(
         `Failed to start session: ${
           err instanceof Error ? err.message : String(err)
@@ -106,18 +106,20 @@ export const App = ({ connectParams, transportType }: AppProps) => {
   };
 
   const handlePushToTalk = useCallback(() => {
-    if (!client || state !== 'connected') {
+    if (!client || state !== "connected") {
       return;
     }
 
-    if (pushToTalkState === 'idle') {
+    if (pushToTalkState === "idle") {
       // Start talking
-      setPushToTalkState('talking');
-      client.sendClientMessage('push_to_talk', { state: 'start' });
+      console.log("Start talking");
+      setPushToTalkState("talking");
+      client.sendClientMessage("push_to_talk", { state: "start" });
     } else {
       // Stop talking
-      setPushToTalkState('idle');
-      client.sendClientMessage('push_to_talk', { state: 'stop' });
+      console.log("Stop talking");
+      setPushToTalkState("idle");
+      client.sendClientMessage("push_to_talk", { state: "stop" });
     }
   }, [client, state, pushToTalkState]);
 
@@ -153,12 +155,12 @@ export const App = ({ connectParams, transportType }: AppProps) => {
           <div className="relative bg-background overflow-hidden flex-1 shadow-long/[0.02]">
             <main className="flex flex-col gap-0 h-full relative justify-end items-center">
               <PlasmaVisualizer />
-              {['idle', 'connecting'].includes(state) && (
+              {["idle", "connecting"].includes(state) && (
                 <div className="absolute w-full h-full flex items-center justify-center">
                   <ConnectButton size="xl" onConnect={handleStartSession} />
                 </div>
               )}
-              {state === 'connected' && (
+              {state === "connected" && (
                 <>
                   <div className="absolute w-full h-full flex items-center justify-center">
                     <TranscriptOverlay
@@ -171,25 +173,27 @@ export const App = ({ connectParams, transportType }: AppProps) => {
                       onMouseDown={handlePushToTalk}
                       onMouseUp={handlePushToTalk}
                       className={`px-8 py-4 rounded-full font-semibold transition-all duration-200 select-none ${
-                        pushToTalkState === 'talking'
-                          ? 'bg-red-500 text-white shadow-lg scale-105'
-                          : 'bg-blue-500 hover:bg-blue-600 text-white shadow-md'
-                      }`}>
-                      {pushToTalkState === 'talking'
-                        ? 'Release to Send'
-                        : 'Hold to Talk'}
+                        pushToTalkState === "talking"
+                          ? "bg-red-500 text-white shadow-lg scale-105"
+                          : "bg-blue-500 hover:bg-blue-600 text-white shadow-md"
+                      }`}
+                    >
+                      {pushToTalkState === "talking"
+                        ? "Release to Send"
+                        : "Hold to Talk"}
                     </button>
                   </div>
                 </>
               )}
-              {state === 'connected' && (
+              {state === "connected" && (
                 <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 z-50">
                   <Card className="animate-in fade-in slide-in-from-bottom-10 duration-500">
                     <CardContent className="flex flex-row gap-4 p-4">
                       <Button
                         onClick={() => client?.disconnect()}
                         variant="destructive"
-                        size="sm">
+                        size="sm"
+                      >
                         Disconnect
                       </Button>
                     </CardContent>

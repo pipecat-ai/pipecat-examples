@@ -9,7 +9,8 @@
     "lint": "next lint"
   },
   "dependencies": {
-    "@pipecat-ai/daily-transport": "^1.2.0",
+    "@pipecat-ai/client-js": "^1.4.0",
+    "@pipecat-ai/daily-transport": "^1.4.0",
     "@pipecat-ai/voice-ui-kit": "^0.1.1",
     "next": "15.3.4",
     "react": "^19.0.0",

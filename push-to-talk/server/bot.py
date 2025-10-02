@@ -15,8 +15,8 @@ from pipecat.frames.frames import (
     LLMRunFrame,
     StartFrame,
     StartInterruptionFrame,
-    StopInterruptionFrame,
     UserStartedSpeakingFrame,
+    UserStoppedSpeakingFrame,
 )
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
@@ -62,6 +62,32 @@ transport_params = {
 }
 
 
+class DebugLogger(FrameProcessor):
+    """Logs all frames passing through for debugging"""
+
+    async def process_frame(self, frame: Frame, direction: FrameDirection):
+        await super().process_frame(frame, direction)
+        # Log all frame types to see what's coming through
+        frame_type = type(frame).__name__
+        if "RTVI" in frame_type or "Message" in frame_type:
+            logger.info(f"DebugLogger: {frame_type} - direction: {direction}")
+            if isinstance(frame, RTVIClientMessageFrame):
+                logger.info(f"  RTVI Frame details: type={frame.type}, data={frame.data}")
+            # Log Daily message frame content
+            elif "Daily" in frame_type and "Message" in frame_type:
+                # Try to access the message content using getattr with fallback
+                message_attr = getattr(frame, "message", None)
+                if message_attr:
+                    logger.info(f"  Daily Message content: {message_attr}")
+                data_attr = getattr(frame, "data", None)
+                if data_attr:
+                    logger.info(f"  Daily Message data: {data_attr}")
+                # Log all public attributes to understand the structure
+                public_attrs = [attr for attr in dir(frame) if not attr.startswith("_")]
+                logger.info(f"  Daily Message attributes: {public_attrs}")
+        await self.push_frame(frame, direction)
+
+
 class PushToTalkGate(FrameProcessor):
     def __init__(self):
         super().__init__()
@@ -70,12 +96,11 @@ class PushToTalkGate(FrameProcessor):
     async def process_frame(self, frame: Frame, direction: FrameDirection):
         await super().process_frame(frame, direction)
 
-        if isinstance(frame, StartFrame):
-            await self.push_frame(frame, direction)
-
-        elif isinstance(frame, RTVIClientMessageFrame):
-            self._handle_rtvi_frame(frame)
-            await self.push_frame(frame, direction)
+        # Debug: Log all frames to see if RTVIClientMessageFrame is coming through
+        if isinstance(frame, RTVIClientMessageFrame):
+            logger.info(
+                f"PushToTalkGate received RTVIClientMessageFrame: type={frame.type}, data={frame.data}"
+            )
 
         # If the gate is closed, suppress all audio frames until the user releases the button
         # We don't include the UserStoppedSpeakingFrame because it's an important signal to tell
@@ -86,39 +111,49 @@ class PushToTalkGate(FrameProcessor):
                 InputAudioRawFrame,
                 UserStartedSpeakingFrame,
                 StartInterruptionFrame,
-                StopInterruptionFrame,
+                UserStoppedSpeakingFrame,
             ),
         ):
             logger.trace(f"{frame.__class__.__name__} suppressed - Button not pressed")
         else:
             await self.push_frame(frame, direction)
 
-    def _handle_rtvi_frame(self, frame: RTVIClientMessageFrame):
-        if frame.type == "push_to_talk" and frame.data:
-            data = frame.data
-            if data.get("state") == "start":
-                self._gate_opened = True
-                logger.info("Input gate opened - user started talking")
-            elif data.get("state") == "stop":
-                self._gate_opened = False
-                logger.info("Input gate closed - user stopped talking")
-
 
 async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     logger.info(f"Starting bot")
 
-    stt = DeepgramSTTService(api_key=os.getenv("DEEPGRAM_API_KEY"))
+    stt = DeepgramSTTService(api_key=os.getenv("DEEPGRAM_API_KEY", ""))
 
     tts = CartesiaTTSService(
-        api_key=os.getenv("CARTESIA_API_KEY"),
+        api_key=os.getenv("CARTESIA_API_KEY", ""),
         voice_id="71a7ad14-091c-4e8e-a314-022ece01c121",  # British Reading Lady
     )
 
-    llm = OpenAILLMService(api_key=os.getenv("OPENAI_API_KEY"))
+    llm = OpenAILLMService(api_key=os.getenv("OPENAI_API_KEY", ""))
 
     push_to_talk_gate = PushToTalkGate()
 
-    rtvi = RTVIProcessor(config=RTVIConfig(config=[]))
+    debug_logger = DebugLogger()
+
+    rtvi = RTVIProcessor(config=RTVIConfig(config=[]), transport=transport)
+
+    logger.info("Setting up RTVI event handler for push-to-talk")
+
+    # Handle push-to-talk messages via RTVI event handler
+    @rtvi.event_handler("on_client_message")
+    async def on_client_message(processor, message_type, data):
+        logger.info(
+            f"!!! RTVI EVENT HANDLER CALLED !!! Received client message: type={message_type}, data={data}"
+        )
+        if message_type == "push_to_talk":
+            if data and data.get("state") == "start":
+                push_to_talk_gate._gate_opened = True
+                logger.info("Input gate opened - user started talking")
+            elif data and data.get("state") == "stop":
+                push_to_talk_gate._gate_opened = False
+                logger.info("Input gate closed - user stopped talking")
+        else:
+            logger.info(f"Received other client message type: {message_type}")
 
     messages = [
         {
@@ -133,6 +168,7 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     pipeline = Pipeline(
         [
             transport.input(),  # Transport user input
+            debug_logger,  # Debug logging
             rtvi,
             push_to_talk_gate,
             stt,
