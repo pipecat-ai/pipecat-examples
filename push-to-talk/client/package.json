@@ -9,11 +9,13 @@
     "lint": "next lint"
   },
   "dependencies": {
-    "@pipecat-ai/daily-transport": "^1.2.0",
-    "@pipecat-ai/voice-ui-kit": "^0.1.1",
+    "@pipecat-ai/daily-transport": "^1.4.0",
+    "@pipecat-ai/voice-ui-kit": "^0.4.0",
+    "lucide-react": "^0.511.0",
     "next": "15.3.4",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "three": "^0.180.0",
     "tw-animate-css": "^1.3.5"
   },
   "devDependencies": {
