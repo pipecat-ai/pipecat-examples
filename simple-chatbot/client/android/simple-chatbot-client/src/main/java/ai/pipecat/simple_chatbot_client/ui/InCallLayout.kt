@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -20,7 +21,7 @@ fun InCallLayout(voiceClientManager: VoiceClientManager) {
 
     val localCam by remember { derivedStateOf { voiceClientManager.tracks.value?.local?.video } }
 
-    Column(Modifier.fillMaxSize()) {
+    Column(Modifier.fillMaxSize().imePadding()) {
 
         InCallHeader(expiryTime = null)
 
@@ -65,7 +66,9 @@ fun InCallLayout(voiceClientManager: VoiceClientManager) {
         }
 
         InCallFooter(
-            onClickEnd = voiceClientManager::stop
+            onClickEnd = voiceClientManager::stop,
+            onSubmitChatText = voiceClientManager::sendText,
+            chatHistory = voiceClientManager.chatHistory,
         )
     }
 }

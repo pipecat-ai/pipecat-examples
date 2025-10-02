@@ -232,3 +232,6 @@ twilio-chatbot/server*.wav
 **/*.mobileprovision
 **/*.orig.*
 **/web-build/
+
+# Intellij IDEA/Android Studio
+.idea
