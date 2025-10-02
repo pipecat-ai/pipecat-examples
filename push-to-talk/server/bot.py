@@ -12,10 +12,9 @@ from pipecat.audio.vad.silero import SileroVADAnalyzer
 from pipecat.frames.frames import (
     Frame,
     InputAudioRawFrame,
+    InterruptionFrame,
     LLMRunFrame,
     StartFrame,
-    StartInterruptionFrame,
-    StopInterruptionFrame,
     UserStartedSpeakingFrame,
 )
 from pipecat.pipeline.pipeline import Pipeline
@@ -85,8 +84,7 @@ class PushToTalkGate(FrameProcessor):
             (
                 InputAudioRawFrame,
                 UserStartedSpeakingFrame,
-                StartInterruptionFrame,
-                StopInterruptionFrame,
+                InterruptionFrame,
             ),
         ):
             logger.trace(f"{frame.__class__.__name__} suppressed - Button not pressed")
