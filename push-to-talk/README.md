@@ -14,20 +14,13 @@ To run this demo, you'll need two terminal windows.
 
 ### Terminal 1: Server Setup
 
-1. Create and activate a virtual environment:
+1. Create virtual environment and install dependencies:
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+uv sync
 ```
 
-2. Install dependencies:
-
-```bash
-pip install -r requirements.txt
-```
-
-3. Configure environment:
+2. Configure environment:
 
 ```bash
 cp env.example .env
@@ -40,10 +33,10 @@ Edit `.env` and add your API keys:
 - `DEEPGRAM_API_KEY`: For speech-to-text
 - `DAILY_API_KEY`: For WebRTC transport
 
-4. Run the server:
+3. Run the server:
 
 ```bash
-python bot.py -t daily
+uv run bot.py -t daily
 ```
 
 ### Terminal 2: Client Setup
@@ -52,7 +45,6 @@ python bot.py -t daily
 
 ```bash
 npm i
-npm i @pipecat-ai/daily-transport
 ```
 
 2. Configure environment:
