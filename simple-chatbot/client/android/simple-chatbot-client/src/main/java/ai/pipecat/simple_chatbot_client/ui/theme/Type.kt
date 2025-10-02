@@ -10,6 +10,7 @@ import androidx.compose.ui.unit.sp
 
 object TextStyles {
     val base = TextStyle(fontFamily = FontFamily(Font(R.font.inter)))
+    val mono = TextStyle(fontFamily = FontFamily(Font(R.font.robotomono)))
 }
 
 // Set of Material typography styles to start with

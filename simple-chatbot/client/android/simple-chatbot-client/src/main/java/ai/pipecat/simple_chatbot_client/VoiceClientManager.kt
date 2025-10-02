@@ -12,6 +12,7 @@ import ai.pipecat.client.types.APIRequest
 import ai.pipecat.client.types.BotReadyData
 import ai.pipecat.client.types.Participant
 import ai.pipecat.client.types.PipecatMetrics
+import ai.pipecat.client.types.SendTextOptions
 import ai.pipecat.client.types.Tracks
 import ai.pipecat.client.types.Transcript
 import ai.pipecat.client.types.TransportState
@@ -23,6 +24,7 @@ import androidx.compose.runtime.Stable
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.snapshots.SnapshotStateList
 
 @Immutable
 data class Error(val message: String)
@@ -50,6 +52,8 @@ class VoiceClientManager(private val context: Context) {
     val camera = mutableStateOf(false)
     val tracks = mutableStateOf<Tracks?>(null)
 
+    val chatHistory = SnapshotStateList<ChatHistoryElement>()
+
     private fun <E> Future<E, RTVIError>.displayErrors() = withErrorCallback {
         Log.e(TAG, "Future resolved with error: ${it.description}", it.exception)
         errors.add(Error(it.description))
@@ -60,6 +64,8 @@ class VoiceClientManager(private val context: Context) {
         if (client.value != null) {
             return
         }
+
+        chatHistory.clear()
 
         val url = if (baseUrl.endsWith("/")) {
             baseUrl
@@ -78,6 +84,7 @@ class VoiceClientManager(private val context: Context) {
                 "Error from backend: $message".let {
                     Log.e(TAG, it)
                     errors.add(Error(it))
+                    chatHistory.appendLog(it)
                 }
             }
 
@@ -90,6 +97,7 @@ class VoiceClientManager(private val context: Context) {
                 Log.i(TAG, "Bot ready. Version ${data.version}")
 
                 botReady.value = true
+                chatHistory.appendLog("Bot is ready")
             }
 
             override fun onMetrics(data: PipecatMetrics) {
@@ -98,10 +106,14 @@ class VoiceClientManager(private val context: Context) {
 
             override fun onUserTranscript(data: Transcript) {
                 Log.i(TAG, "User transcript: $data")
+                if (data.final) {
+                    chatHistory.appendOrUpdateUser(data.text)
+                }
             }
 
             override fun onBotTranscript(text: String) {
                 Log.i(TAG, "Bot transcript: $text")
+                chatHistory.appendOrUpdateBot(text)
             }
 
             override fun onBotStartedSpeaking() {
@@ -134,6 +146,8 @@ class VoiceClientManager(private val context: Context) {
             }
 
             override fun onDisconnected() {
+                chatHistory.appendLog("Disconnected")
+
                 botIsTalking.value = false
                 userIsTalking.value = false
                 state.value = null
@@ -194,5 +208,10 @@ class VoiceClientManager(private val context: Context) {
 
     fun stop() {
         client.value?.disconnect()?.displayErrors()
+    }
+
+    fun sendText(text: String, options: SendTextOptions = SendTextOptions()) {
+        chatHistory.appendOrUpdateUser(text)
+        client.value?.sendText(text, options)
     }
 }

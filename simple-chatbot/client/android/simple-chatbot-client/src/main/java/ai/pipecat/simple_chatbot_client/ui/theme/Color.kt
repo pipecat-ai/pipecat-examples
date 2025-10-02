@@ -19,4 +19,6 @@ object Colors {
     val botIndicatorBackground = Color(0xFF374151)
     val mutedMicBackground = Color(0xFFF04A4A)
     val unmutedMicBackground = Color(0xFF616978)
+
+    val logTextColor = Color(0x98b3d9FF)
 }
