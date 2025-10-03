@@ -9,7 +9,11 @@ Demo app which connects to the `simple-chatbot` backend over RTVI.
 ## How to run
 
 ```bash
-./gradlew runDebug
+# Build and install the app
+./gradlew installDebug
+
+# Launch the app
+adb shell am start -n ai.pipecat.simple_chatbot_client/.MainActivity
 ```
 
 Ensure that the `simple-chatbot` server is running as described in the parent README.
