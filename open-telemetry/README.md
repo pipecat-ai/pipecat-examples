@@ -35,6 +35,7 @@ This organization helps you track conversation-to-conversation and turn-to-turn 
 | ------------------------------- | ------------------------------------------------------------------------- |
 | [Jaeger Tracing](./jaeger/)     | Tracing with Jaeger, an open-source end-to-end distributed tracing system |
 | [Langfuse Tracing](./langfuse/) | Tracing with Langfuse, a specialized platform for LLM observability       |
+| [Opik Tracing](./opik/)         | Tracing with Opik, an open-source tracing and evaluation platform         |
 
 ## Common Requirements
 
