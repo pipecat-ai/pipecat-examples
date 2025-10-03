@@ -1,0 +1,19 @@
+[project]
+name = "smallwebrtc-example"
+version = "0.1.0"
+description = "Example for building voice AI bots with Pipecat built using SmallWebRTC"
+requires-python = ">=3.10"
+dependencies = [
+    "pipecat-ai[cartesia,daily,deepgram,openai,runner,silero,webrtc]>=0.0.87",
+    "pipecatcloud>=0.2.5",
+]
+
+[dependency-groups]
+dev = [
+    "ruff~=0.12.1",
+]
+
+[tool.ruff]
+line-length = 100
+[tool.ruff.lint]
+select = ["I"]
