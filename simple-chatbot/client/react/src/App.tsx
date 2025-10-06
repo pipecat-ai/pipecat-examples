@@ -7,6 +7,7 @@ import { PipecatProvider } from "./providers/PipecatProvider";
 import { ConnectButton } from "./components/ConnectButton";
 import { StatusDisplay } from "./components/StatusDisplay";
 import { DebugDisplay } from "./components/DebugDisplay";
+import { MicrophoneSelector } from "./components/MicrophoneSelector";
 import "./App.css";
 
 function BotVideo() {
@@ -27,6 +28,7 @@ function AppContent() {
     <div className="app">
       <div className="status-bar">
         <StatusDisplay />
+        <MicrophoneSelector />
         <ConnectButton />
       </div>
 

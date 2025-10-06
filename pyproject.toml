@@ -3,7 +3,10 @@ name = "pipecat-examples"
 version = "0.0.0"
 description = "Examples for Pipecat AI framework"
 requires-python = ">=3.10"
-dependencies = []
+dependencies = [
+    "loguru>=0.7.3",
+    "pillow>=11.3.0",
+]
 
 [dependency-groups]
 dev = [
