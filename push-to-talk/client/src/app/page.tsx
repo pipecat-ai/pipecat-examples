@@ -15,6 +15,10 @@ export default function Home() {
       <FullScreenContainer>
         <PipecatAppBase
           transportType="daily"
+          clientOptions={{
+            enableMic: true,
+            enableCam: false,
+          }}
           connectParams={{
             endpoint: '/api/connect',
           }}>

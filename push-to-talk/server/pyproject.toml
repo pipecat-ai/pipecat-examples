@@ -4,7 +4,8 @@ version = "0.1.0"
 description = "Push to talk example"
 requires-python = ">=3.10"
 dependencies = [
-    "pipecat-ai[daily,deepgram,openai,silero,cartesia,runner]>=0.0.82",
+    "pipecat-ai[daily,deepgram,openai,silero,cartesia,runner]>=0.0.87",
+    "pipecat-ai-whisker",
     "pipecatcloud>=0.2.4"
 ]
 

@@ -7,11 +7,11 @@ import {
   TranscriptOverlay,
   UserAudioControl,
   usePipecatConnectionState,
-} from '@pipecat-ai/voice-ui-kit';
-import { PlasmaVisualizer } from '@pipecat-ai/voice-ui-kit/webgl';
-import { LogOutIcon, XIcon, MicIcon } from 'lucide-react';
-import { usePipecatClient } from '@pipecat-ai/client-react';
-import { useCallback, useState } from 'react';
+} from "@pipecat-ai/voice-ui-kit";
+import { PlasmaVisualizer } from "@pipecat-ai/voice-ui-kit/webgl";
+import { LogOutIcon, XIcon, MicIcon } from "lucide-react";
+import { usePipecatClient } from "@pipecat-ai/client-react";
+import { useCallback, useState } from "react";
 
 export interface AppProps {
   handleConnect?: () => void | Promise<void>;
@@ -19,45 +19,48 @@ export interface AppProps {
   error?: string | null;
 }
 
-export type PushToTalkState = 'idle' | 'talking';
+export type PushToTalkState = "idle" | "talking";
 
 const PushToTalkButton = () => {
   const client = usePipecatClient();
   const [pushToTalkState, setPushToTalkState] =
-    useState<PushToTalkState>('idle');
+    useState<PushToTalkState>("idle");
 
   const handlePushToTalk = useCallback(() => {
-    if (!client || client.state !== 'ready') {
+    if (!client || client.state !== "ready") {
       return;
     }
 
-    if (pushToTalkState === 'idle') {
+    if (pushToTalkState === "idle") {
       // Start talking
-      setPushToTalkState('talking');
-      client.sendClientMessage('push_to_talk', { state: 'start' });
+      setPushToTalkState("talking");
+      client.sendClientMessage("push_to_talk", { state: "start" });
+      console.log("Push to talk started");
     } else {
       // Stop talking
-      setPushToTalkState('idle');
-      client.sendClientMessage('push_to_talk', { state: 'stop' });
+      setPushToTalkState("idle");
+      client.sendClientMessage("push_to_talk", { state: "stop" });
+      console.log("Push to talk stopped");
     }
   }, [client, pushToTalkState]);
 
-  const isReady = client && client.state === 'ready';
+  const isReady = client && client.state === "ready";
 
   return (
     <Button
       size="xl"
-      variant={pushToTalkState === 'talking' ? 'destructive' : 'primary'}
+      variant={pushToTalkState === "talking" ? "destructive" : "primary"}
       disabled={!isReady}
       onMouseDown={handlePushToTalk}
       onMouseUp={handlePushToTalk}
       onTouchStart={handlePushToTalk}
       onTouchEnd={handlePushToTalk}
       className={`transition-all duration-200 select-none ${
-        pushToTalkState === 'talking' ? 'scale-105' : ''
-      } flex items-center gap-2`}>
+        pushToTalkState === "talking" ? "scale-105" : ""
+      } flex items-center gap-2`}
+    >
       <MicIcon size={20} />
-      {pushToTalkState === 'talking' ? 'Release to Send' : 'Hold to Talk'}
+      {pushToTalkState === "talking" ? "Release to Send" : "Hold to Talk"}
     </Button>
   );
 };
@@ -98,7 +101,8 @@ export const App = ({ handleConnect, handleDisconnect, error }: AppProps) => {
                     size="xl"
                     isIcon={true}
                     variant="outline"
-                    onClick={handleDisconnect}>
+                    onClick={handleDisconnect}
+                  >
                     <LogOutIcon />
                   </Button>
                 </ControlBar>

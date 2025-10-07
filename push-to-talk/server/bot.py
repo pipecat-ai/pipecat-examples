@@ -34,8 +34,9 @@ from pipecat.services.cartesia.tts import CartesiaTTSService
 from pipecat.services.deepgram.stt import DeepgramSTTService
 from pipecat.services.openai.llm import OpenAILLMService
 from pipecat.transports.base_transport import BaseTransport, TransportParams
-from pipecat.transports.daily.transport import DailyParams
+from pipecat.transports.daily.transport import DailyParams, DailyInputTransportMessageFrame
 from pipecat.transports.websocket.fastapi import FastAPIWebsocketParams
+from pipecat_whisker import WhiskerObserver
 
 load_dotenv(override=True)
 
@@ -46,7 +47,7 @@ transport_params = {
     "daily": lambda: DailyParams(
         audio_in_enabled=True,
         audio_out_enabled=True,
-        vad_analyzer=SileroVADAnalyzer(),
+        # No VAD for push-to-talk - the button controls when to listen
     ),
     "twilio": lambda: FastAPIWebsocketParams(
         audio_in_enabled=True,
@@ -69,15 +70,43 @@ class PushToTalkGate(FrameProcessor):
     async def process_frame(self, frame: Frame, direction: FrameDirection):
         await super().process_frame(frame, direction)
 
+        # Log all frame types for debugging
+        logger.debug(f"PushToTalkGate received frame: {frame.__class__.__name__}, gate_opened={self._gate_opened}")
+
+        # Always pass through StartFrame
         if isinstance(frame, StartFrame):
             await self.push_frame(frame, direction)
+            return
 
-        elif isinstance(frame, RTVIClientMessageFrame):
+        # Handle RTVI client messages (if RTVI processor is working)
+        if isinstance(frame, RTVIClientMessageFrame):
+            logger.info(f"RTVI Frame received: {frame.type} - {frame.data}")
             self._handle_rtvi_frame(frame)
             await self.push_frame(frame, direction)
+            return
+        
+        # Handle Daily transport messages directly (since RTVI processor isn't converting them)
+        if isinstance(frame, DailyInputTransportMessageFrame):
+            message = frame.message
+            logger.debug(f"Transport message frame: {message}")
+            # Check if it's an RTVI message
+            if message.get('label') == 'rtvi-ai' and 'data' in message:
+                data = message['data']
+                msg_type = data.get('t')
+                msg_data = data.get('d')
+                logger.info(f"RTVI message from transport: {msg_type} - {msg_data}")
+                if msg_type == "push_to_talk" and msg_data:
+                    if msg_data.get("state") == "start":
+                        self._gate_opened = True
+                        logger.info("Input gate opened - user started talking")
+                    elif msg_data.get("state") == "stop":
+                        self._gate_opened = False
+                        logger.info("Input gate closed - user stopped talking")
+            # Don't pass through transport message frames to the pipeline
+            return
 
-        # If the gate is closed, suppress all audio frames until the user releases the button
-        # We don't include the UserStoppedSpeakingFrame because it's an important signal to tell
+        # For all other frames: suppress audio-related frames when gate is closed
+        # We don't include UserStoppedSpeakingFrame because it's an important signal to tell
         # the UserContextAggregator that the user is done speaking and to push the aggregation.
         if not self._gate_opened and isinstance(
             frame,
@@ -88,8 +117,14 @@ class PushToTalkGate(FrameProcessor):
             ),
         ):
             logger.trace(f"{frame.__class__.__name__} suppressed - Button not pressed")
-        else:
-            await self.push_frame(frame, direction)
+            return
+        
+        # Log when audio frames pass through
+        if isinstance(frame, (InputAudioRawFrame, UserStartedSpeakingFrame)):
+            logger.info(f"Audio frame passing through - gate is open: {frame.__class__.__name__}")
+        
+        # If we get here, push the frame through
+        await self.push_frame(frame, direction)
 
     def _handle_rtvi_frame(self, frame: RTVIClientMessageFrame):
         if frame.type == "push_to_talk" and frame.data:
@@ -116,7 +151,12 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
 
     push_to_talk_gate = PushToTalkGate()
 
-    rtvi = RTVIProcessor(config=RTVIConfig(config=[]))
+    rtvi = RTVIProcessor(config=RTVIConfig(config=[]), transport=transport)
+    
+    # Add event handler to see raw app messages from Daily
+    @transport.event_handler("on_app_message")
+    async def on_app_message(transport, message, sender):
+        logger.info(f"Raw app message received: {message} from {sender}")
 
     messages = [
         {
@@ -131,8 +171,8 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     pipeline = Pipeline(
         [
             transport.input(),  # Transport user input
+            push_to_talk_gate,  # Gate BEFORE RTVI so it sees all frames
             rtvi,
-            push_to_talk_gate,
             stt,
             context_aggregator.user(),  # User responses
             llm,  # LLM
@@ -142,13 +182,15 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
         ]
     )
 
+    whisker = WhiskerObserver(pipeline, file_name="push-to-talk.bin")
+
     task = PipelineTask(
         pipeline,
         params=PipelineParams(
             enable_metrics=True,
             enable_usage_metrics=True,
         ),
-        observers=[RTVIObserver(rtvi)],
+        observers=[RTVIObserver(rtvi), whisker],
     )
 
     @transport.event_handler("on_client_connected")
