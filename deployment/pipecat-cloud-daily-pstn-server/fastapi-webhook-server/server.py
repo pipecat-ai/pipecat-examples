@@ -166,11 +166,12 @@ async def dial(request: RoomRequest, raw_request: Request):
         "createDailyRoom": True,
         "dailyRoomProperties": daily_room_properties,
         "body": {
-            "dialin_settings": dialin_settings,
             "dialout_settings": request.dialout_settings,
             "voicemail_detection": request.voicemail_detection,
             "call_transfer": request.call_transfer,
             "sip_headers": request.sipHeaders,  # passing the SIP headers to the bot
+            "callId": request.callId,
+            "callDomain": request.callDomain,
         },
     }
 

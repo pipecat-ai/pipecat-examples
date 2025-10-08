@@ -119,8 +119,8 @@ async def bot(runner_args: RunnerArguments):
     """Main bot entry point compatible with Pipecat Cloud."""
     # Body is always a dict (compatible with both local and Pipecat Cloud)
     body_data = runner_args.body
-    room_url = body_data.get("room_url")
-    token = body_data.get("token")
+    room_url = runner_args.room_url
+    token = runner_args.token
     call_id = body_data.get("callId")
     call_domain = body_data.get("callDomain")
 
