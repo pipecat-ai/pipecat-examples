@@ -1,0 +1,6 @@
+agent_name = "jaeger-tracing"
+image = "your_username/jaeger-tracing:0.1"
+secret_set = "jaeger-tracing-secrets"
+
+[scaling]
+	min_agents = 1

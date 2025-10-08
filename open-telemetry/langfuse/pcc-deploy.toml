@@ -1,0 +1,6 @@
+agent_name = "langfuse-tracing"
+image = "your_username/langfuse-tracing:0.1"
+secret_set = "langfuse-tracing-secrets"
+
+[scaling]
+	min_agents = 1

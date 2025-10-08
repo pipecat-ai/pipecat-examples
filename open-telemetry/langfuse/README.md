@@ -37,10 +37,10 @@ CARTESIA_API_KEY=your_key_here
 OPENAI_API_KEY=your_key_here
 ```
 
-### 3. Install Dependencies
+### 3. Set up a venv and install Dependencies
 
 ```bash
-pip install -r requirements.txt
+uv sync
 ```
 
 > Install only the http exporter. If you have a conflict, uninstall the grpc exporter.
@@ -48,7 +48,7 @@ pip install -r requirements.txt
 ### 4. Run the Demo
 
 ```bash
-python bot.py
+uv run bot.py
 ```
 
 ### 5. View Traces in Langfuse
