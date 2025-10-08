@@ -1,0 +1,20 @@
+[project]
+name = "pipecat-langfuse-tracing"
+version = "0.1.0"
+description = "A Pipecat example using Langfuse tracing"
+requires-python = ">=3.10"
+dependencies = [
+    "pipecat-ai[daily,webrtc,websocket,silero,cartesia,deepgram,openai,tracing,runner]>=0.0.82",
+    "pipecatcloud>=0.2.5",
+    "opentelemetry-exporter-otlp-proto-http",
+]
+
+[dependency-groups]
+dev = [
+    "ruff~=0.12.1",
+]
+
+[tool.ruff]
+line-length = 100
+[tool.ruff.lint]
+select = ["I"]
