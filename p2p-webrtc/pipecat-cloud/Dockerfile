@@ -18,7 +18,5 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
     uv sync --locked --no-install-project --no-dev
 
-# Only for local development
-# COPY ./.env .env
 
 COPY ./bot.py bot.py
