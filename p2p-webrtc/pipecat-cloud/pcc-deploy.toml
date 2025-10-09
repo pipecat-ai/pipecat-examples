@@ -1,5 +1,7 @@
 agent_name = "smallwebrtc-poc"
 image = "your_username/pipecat-smallwebrtc:latest"
+#For private image pulls.
+#More details: https://docs.pipecat.ai/deployment/pipecat-cloud/fundamentals/secrets#image-pull-secrets
 image_credentials = "smallwebrtc-pull-secret"
 secret_set = "smallwebrtc-secrets"
 enable_krisp = true

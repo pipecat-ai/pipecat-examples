@@ -1,9 +1,4 @@
-# For using a different local image
-# docker build -t dailyco/pipecat-base:pcc .
-# production
-# FROM dailyco/pipecat-base:latest
-# local testing
-FROM dailyco/pipecat-base:pcc
+FROM dailyco/pipecat-base:latest
 
 # Install system dependencies required for OpenCV
 RUN apt-get update && apt-get install -y \
@@ -23,7 +18,5 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
     uv sync --locked --no-install-project --no-dev
 
-# Only for local development
-COPY ./.env .env
 
 COPY ./bot.py bot.py
