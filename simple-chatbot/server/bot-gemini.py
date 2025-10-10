@@ -6,7 +6,7 @@
 
 """Gemini Bot Implementation.
 
-This module implements a chatbot using Google's Gemini Multimodal Live model.
+This module implements a chatbot using Google's Gemini Live model.
 It includes:
 - Real-time audio/video interaction through Daily
 - Animated robot avatar
@@ -37,7 +37,7 @@ from pipecat.processors.aggregators.openai_llm_context import OpenAILLMContext
 from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
 from pipecat.processors.frameworks.rtvi import RTVIConfig, RTVIObserver, RTVIProcessor
 from pipecat.runner.types import RunnerArguments
-from pipecat.services.gemini_multimodal_live.gemini import GeminiMultimodalLiveLLMService
+from pipecat.services.google.gemini_live.llm import GeminiLiveLLMService
 from pipecat.transports.base_transport import BaseTransport
 from pipecat.transports.daily.transport import DailyParams, DailyTransport
 
@@ -101,14 +101,14 @@ async def run_bot(transport: BaseTransport):
     """Main bot execution function.
 
     Sets up and runs the bot pipeline including:
-    - Gemini Live multimodal model integration
+    - Gemini Live model integration
     - Voice activity detection
     - Animation processing
     - RTVI event handling
     """
 
-    # Initialize the Gemini Multimodal Live model
-    llm = GeminiMultimodalLiveLLMService(
+    # Initialize the Gemini Live model
+    llm = GeminiLiveLLMService(
         api_key=os.getenv("GOOGLE_API_KEY"),
         voice_id="Puck",  # Aoede, Charon, Fenrir, Kore, Puck
     )
