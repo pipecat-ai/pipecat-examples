@@ -50,9 +50,9 @@ from pipecat.processors.filters.stt_mute_filter import STTMuteConfig, STTMuteFil
 from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
 from pipecat.processors.producer_processor import ProducerProcessor
 from pipecat.serializers.twilio import TwilioFrameSerializer
-from pipecat.services.gemini_multimodal_live.gemini import (
-    GeminiMultimodalLiveLLMService,
-    GeminiMultimodalModalities,
+from pipecat.services.google.gemini_live.llm import (
+    GeminiLiveLLMService,
+    GeminiModalities,
     InputParams,
 )
 from pipecat.services.google.tts import GoogleTTSService
@@ -412,7 +412,7 @@ class GameTimer:
             logger.exception(f"Error in game timer: {e}")
 
 
-class ResettablePlayerLLM(GeminiMultimodalLiveLLMService):
+class ResettablePlayerLLM(GeminiLiveLLMService):
     """A specialized LLM service that can reset its context when notified about a new word.
 
     This LLM intelligently waits for the host to finish speaking before reconnecting.
@@ -614,10 +614,10 @@ Important guidelines:
         config=STTMuteConfig(strategies={STTMuteStrategy.MUTE_UNTIL_FIRST_BOT_COMPLETE})
     )
 
-    host_llm = GeminiMultimodalLiveLLMService(
+    host_llm = GeminiLiveLLMService(
         api_key=os.getenv("GOOGLE_API_KEY"),
         system_instruction=host_instruction,
-        params=InputParams(modalities=GeminiMultimodalModalities.TEXT),
+        params=InputParams(modalities=GeminiModalities.TEXT),
     )
 
     host_tts = GoogleTTSService(
