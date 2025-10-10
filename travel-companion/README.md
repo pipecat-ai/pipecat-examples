@@ -1,6 +1,6 @@
 # Pipecat Travel Companion
 
-Pipecat Travel Companion is a smart travel assistant powered by the `GeminiMultimodalLiveLLMService`. 
+Pipecat Travel Companion is a smart travel assistant powered by the `GeminiLiveLLMService`.
 It offers personalized recommendations and services like checking the weather, suggesting nearby restaurants,
 and providing recent news based on your current location. 
 

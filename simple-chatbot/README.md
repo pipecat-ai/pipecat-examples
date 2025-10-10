@@ -12,7 +12,7 @@ This repository demonstrates a simple AI chatbot with real-time audio/video inte
    - Requires OpenAI API key
 
 2. **Gemini Bot**
-   - Uses Google's Gemini Multimodal Live model
+   - Uses Google's Gemini Live model
    - Requires Gemini API key
 
 ## Six Client Options
