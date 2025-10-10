@@ -35,10 +35,7 @@ export async function POST() {
       throw new Error(data.error);
     }
 
-    return NextResponse.json({
-      room_url: data.dailyRoom,
-      token: data.dailyToken,
-    });
+    return NextResponse.json(data);
   } catch (error) {
     return NextResponse.json(
       { error: `Failed to process connection request: ${error}` },
