@@ -4,16 +4,15 @@
 # SPDX-License-Identifier: BSD 2-Clause License
 #
 
-import argparse
-import asyncio
-import os
-import sys
-from typing import Any, Dict
 
-import aiohttp
+import os
+
 from dotenv import load_dotenv
 from loguru import logger
+from pipecat.audio.turn.smart_turn.base_smart_turn import SmartTurnParams
+from pipecat.audio.turn.smart_turn.local_smart_turn_v3 import LocalSmartTurnAnalyzerV3
 from pipecat.audio.vad.silero import SileroVADAnalyzer
+from pipecat.audio.vad.vad_analyzer import VADParams
 from pipecat.frames.frames import LLMRunFrame
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
@@ -25,16 +24,13 @@ from pipecat.processors.frameworks.rtvi import (
     RTVIObserver,
     RTVIProcessor,
 )
-from pipecat.services.gemini_multimodal_live.gemini import GeminiMultimodalLiveLLMService
+from pipecat.runner.types import RunnerArguments
+from pipecat.runner.utils import create_transport
+from pipecat.services.google.gemini_live.llm import GeminiLiveLLMService
 from pipecat.transports.daily.transport import DailyParams, DailyTransport
-from pipecatcloud.agent import DailySessionArguments
 
 load_dotenv(override=True)
 
-# Check if we're in local development mode
-LOCAL_RUN = os.getenv("LOCAL_RUN")
-
-logger.add(sys.stderr, level="DEBUG")
 
 # Define conversation modes with their respective prompt templates
 game_prompt = """You are the AI host and player for a game of Word Wrangler.
@@ -75,8 +71,9 @@ PERSONALITY_PRESETS = {
 }
 
 
-async def main(transport: DailyTransport, config: Dict[str, Any]):
+async def run_bot(transport: DailyTransport, runner_args: RunnerArguments):
     # Use the provided session logger if available, otherwise use the default logger
+    config = runner_args.body
     logger.debug("Configuration: {}", config)
 
     # Extract configuration parameters with defaults
@@ -100,9 +97,8 @@ Important guidelines:
         config=STTMuteConfig(strategies={STTMuteStrategy.MUTE_UNTIL_FIRST_BOT_COMPLETE})
     )
 
-    llm = GeminiMultimodalLiveLLMService(
+    llm = GeminiLiveLLMService(
         api_key=os.getenv("GOOGLE_API_KEY"),
-        transcribe_user_audio=True,
         system_instruction=system_instruction,
     )
 
@@ -149,102 +145,48 @@ Important guidelines:
         # Kick off the conversation
         await task.queue_frames([LLMRunFrame()])
 
-    @transport.event_handler("on_first_participant_joined")
-    async def on_first_participant_joined(transport, participant):
-        logger.info("First participant joined: {}", participant["id"])
-        # Capture the participant's transcription
-        await transport.capture_participant_transcription(participant["id"])
+    @transport.event_handler("on_client_connected")
+    async def on_client_connected(transport, client):
+        logger.info(f"Client connected")
 
-    @transport.event_handler("on_participant_left")
-    async def on_participant_left(transport, participant, reason):
-        logger.info("Participant left: {}", participant)
+    @transport.event_handler("on_client_disconnected")
+    async def on_client_disconnected(transport, client):
+        logger.info(f"Client disconnected")
         await task.cancel()
 
-    runner = PipelineRunner(handle_sigint=False, force_gc=True)
+    runner = PipelineRunner(handle_sigint=runner_args.handle_sigint)
 
     await runner.run(task)
 
 
-async def bot(args: DailySessionArguments):
-    """Main bot entry point compatible with the FastAPI route handler.
+async def bot(runner_args: RunnerArguments):
+    """Main bot entry point compatible with the FastAPI route handler."""
+    if os.environ.get("ENV") != "local":
+        from pipecat.audio.filters.krisp_filter import KrispFilter
 
-    Args:
-        room_url: The Daily room URL
-        token: The Daily room token
-        body: The configuration object from the request body
-        session_id: The session ID for logging
-    """
-    from pipecat.audio.filters.krisp_filter import KrispFilter
+        krisp_filter = KrispFilter()
+    else:
+        krisp_filter = None
 
-    logger.info(f"Bot process initialized {args.room_url} {args.token}")
-
-    transport = DailyTransport(
-        args.room_url,
-        args.token,
-        "Word Wrangler Bot",
-        DailyParams(
+    # We store functions so objects (e.g. SileroVADAnalyzer) don't get
+    # instantiated. The function will be called when the desired transport gets
+    # selected.
+    transport_params = {
+        "daily": lambda: DailyParams(
             audio_in_enabled=True,
-            audio_in_filter=None if LOCAL_RUN else KrispFilter(),
+            audio_in_filter=krisp_filter,
             audio_out_enabled=True,
-            vad_analyzer=SileroVADAnalyzer(),
-        ),
-    )
+            vad_analyzer=SileroVADAnalyzer(params=VADParams(stop_secs=0.2)),
+            turn_analyzer=LocalSmartTurnAnalyzerV3(params=SmartTurnParams()),
+        )
+    }
 
-    try:
-        await main(transport, args.body)
-        logger.info("Bot process completed")
-    except Exception as e:
-        logger.exception(f"Error in bot process: {str(e)}")
-        raise
+    transport = await create_transport(runner_args, transport_params)
+
+    await run_bot(transport, runner_args)
 
 
-# Local development
-async def local_daily(args: DailySessionArguments):
-    """Daily transport for local development."""
-    # from runner import configure
+if __name__ == "__main__":
+    from pipecat.runner.run import main
 
-    try:
-        async with aiohttp.ClientSession() as session:
-            transport = DailyTransport(
-                room_url=args.room_url,
-                token=args.token,
-                bot_name="Bot",
-                params=DailyParams(
-                    audio_in_enabled=True,
-                    audio_out_enabled=True,
-                    vad_analyzer=SileroVADAnalyzer(),
-                ),
-            )
-
-            test_config = {
-                "personality": args.personality,
-            }
-
-            await main(transport, test_config)
-    except Exception as e:
-        logger.exception(f"Error in local development mode: {e}")
-
-
-# Local development entry point
-if LOCAL_RUN and __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        description="Run the Word Wrangler bot in local development mode"
-    )
-    parser.add_argument(
-        "-u", "--room-url", type=str, default=os.getenv("DAILY_SAMPLE_ROOM_URL", "")
-    )
-    parser.add_argument(
-        "-t", "--token", type=str, default=os.getenv("DAILY_SAMPLE_ROOM_TOKEN", None)
-    )
-    parser.add_argument(
-        "-p",
-        "--personality",
-        default="witty",
-        choices=["friendly", "professional", "enthusiastic", "thoughtful", "witty"],
-        help="Personality preset for the bot (friendly, professional, enthusiastic, thoughtful, witty)",
-    )
-    args = parser.parse_args()
-    try:
-        asyncio.run(local_daily(args))
-    except Exception as e:
-        logger.exception(f"Failed to run in local mode: {e}")
+    main()

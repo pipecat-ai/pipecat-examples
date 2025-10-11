@@ -37,13 +37,8 @@ export default async function handler(
 
     const data = await response.json();
 
-    console.log('Response from API:', JSON.stringify(data, null, 2));
-
     // Transform the response to match what Pipecat client expects
-    return res.status(200).json({
-      room_url: data.dailyRoom,
-      token: data.dailyToken,
-    });
+    return res.status(200).json(data);
   } catch (error) {
     console.error('Error starting agent:', error);
     return res.status(500).json({ error: 'Failed to start agent' });

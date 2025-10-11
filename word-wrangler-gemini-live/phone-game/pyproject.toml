@@ -1,0 +1,19 @@
+[project]
+name = "word-wrangler-twilio"
+version = "0.1.0"
+description = "Word Wrangler guessing game powered by Gemini and Twilio"
+requires-python = ">=3.10"
+dependencies = [
+    "pipecat-ai[webrtc,websocket,silero,google,local-smart-turn-v3,runner]>=0.0.90",
+    "pipecatcloud>=0.2.6"
+]
+
+[dependency-groups]
+dev = [
+    "ruff~=0.12.1",
+]
+
+[tool.ruff]
+line-length = 100
+[tool.ruff.lint]
+select = ["I"]

@@ -235,3 +235,6 @@ twilio-chatbot/server*.wav
 
 # Intellij IDEA/Android Studio
 .idea
+
+# Examples
+credentials.json
