@@ -133,7 +133,7 @@ This architecture enables complex interaction patterns that would be difficult t
 1. Switch to the server directory:
 
    ```bash
-   cd server
+   cd web-game/server
    ```
 
 2. Set up your virtual environment and install dependencies:
@@ -167,7 +167,7 @@ This architecture enables complex interaction patterns that would be difficult t
 1. In a new terminal window, navigate to client:
 
    ```bash
-   cd client
+   cd web-game/client
    ```
 
 2. Install dependencies:
@@ -200,19 +200,25 @@ This architecture enables complex interaction patterns that would be difficult t
 
 #### Running Locally
 
-1. Set up your virtual environment and install dependencies:
+1. Navigate to phone-game directory:
+
+   ```bash
+   cd phone-game
+   ```
+
+2. Set up your virtual environment and install dependencies:
 
    ```bash
    uv sync
    ```
 
-2. Create an .env file and add your API keys:
+3. Create an .env file and add your API keys:
 
    ```bash
    cp env.example .env
    ```
 
-3. Add environment variables for:
+4. Add environment variables for:
 
    ```
    GOOGLE_API_KEY=
@@ -221,7 +227,7 @@ This architecture enables complex interaction patterns that would be difficult t
    TWILIO_AUTH_TOKEN=
    ```
 
-4. Run the local bot:
+5. Run the local bot:
 
    ```bash
    uv run bot.py
