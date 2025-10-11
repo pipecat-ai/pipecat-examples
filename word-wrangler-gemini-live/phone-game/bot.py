@@ -31,7 +31,6 @@ from pipecat.frames.frames import (
     Frame,
     InputAudioRawFrame,
     LLMFullResponseEndFrame,
-    LLMRunFrame,
     LLMTextFrame,
     StartFrame,
     TTSAudioRawFrame,
@@ -41,9 +40,13 @@ from pipecat.pipeline.parallel_pipeline import ParallelPipeline
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineParams, PipelineTask
+from pipecat.processors.aggregators.openai_llm_context import (
+    OpenAILLMContext,
+    OpenAILLMContextFrame,
+)
 from pipecat.processors.consumer_processor import ConsumerProcessor
 from pipecat.processors.filters.stt_mute_filter import STTMuteConfig, STTMuteFilter, STTMuteStrategy
-from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
+from pipecat.processors.frame_processor import FrameDirection, FrameProcessor, FrameProcessorSetup
 from pipecat.processors.producer_processor import ProducerProcessor
 from pipecat.runner.types import RunnerArguments
 from pipecat.runner.utils import create_transport
@@ -209,18 +212,36 @@ class BotStoppedSpeakingNotifier(FrameProcessor):
         await self.push_frame(frame, direction)
 
 
-class StartFrameGate(FrameProcessor):
-    """A gate that blocks only StartFrame until notified by a notifier.
+class StartGate(FrameProcessor):
+    """A gate that blocks the inital context message to prevent the player from responding first.
 
-    Once opened, all frames pass through normally.
+    Blocks OpenAILLMContextFrame until the gate opens. This frame is dropped
+    (not stored) to ignore the initial message. Once opened, all frames pass through normally.
+    Note that we don't need to block User input frames or speaking frames because the STTMuteFilter
+    will handle that.
     """
 
     def __init__(self, notifier: BaseNotifier):
         super().__init__()
         self._notifier = notifier
-        self._blocked_start_frame: Optional[Frame] = None
         self._gate_opened = False
         self._gate_task: Optional[asyncio.Task] = None
+
+    async def setup(self, setup: FrameProcessorSetup):
+        """Set up the processor with required components.
+
+        Args:
+            setup: Configuration object containing setup parameters.
+        """
+        await super().setup(setup)
+        self._gate_task = self.create_task(self._wait_for_notification())
+
+    async def cleanup(self):
+        """Clean up the processor resources."""
+        await super().cleanup()
+        if self._gate_task:
+            await self.cancel_task(self._gate_task)
+            self._gate_task = None
 
     async def process_frame(self, frame: Frame, direction: FrameDirection):
         await super().process_frame(frame, direction)
@@ -228,14 +249,15 @@ class StartFrameGate(FrameProcessor):
         if self._gate_opened:
             # Once the gate is open, let everything through
             await self.push_frame(frame, direction)
-        elif isinstance(frame, StartFrame):
-            # Store the StartFrame and wait for notification
-            logger.debug(f"{self}: Blocking StartFrame until host bot stops speaking")
-            self._blocked_start_frame = frame
+        elif isinstance(frame, OpenAILLMContextFrame):
+            # Drop these frames until the gate opens - we want to ignore this audio
+            logger.trace(f"{self}: Dropping {type(frame).__name__} until host bot stops speaking")
 
             # Start the gate task if not already running
-            if not self._gate_task:
-                self._gate_task = self.create_task(self._wait_for_notification())
+
+        else:
+            # Let all other frames through
+            await self.push_frame(frame, direction)
 
     async def _wait_for_notification(self):
         try:
@@ -245,12 +267,8 @@ class StartFrameGate(FrameProcessor):
             # Gate is now open - only run this code once
             if not self._gate_opened:
                 self._gate_opened = True
-                logger.debug(f"{self}: Gate opened, passing through blocked StartFrame")
+                logger.debug(f"{self}: Gate opened, all frames will now pass through")
 
-                # Push the blocked StartFrame if we have one
-                if self._blocked_start_frame:
-                    await self.push_frame(self._blocked_start_frame)
-                    self._blocked_start_frame = None
         except asyncio.CancelledError:
             logger.debug(f"{self}: Gate task was cancelled")
             raise
@@ -602,8 +620,8 @@ Important guidelines:
     # Create BotStoppedSpeakingNotifier to detect when host bot stops speaking
     bot_stopped_speaking_detector = BotStoppedSpeakingNotifier(bot_speaking_notifier)
 
-    # Create StartFrameGate to block Player LLM until host has stopped speaking
-    start_frame_gate = StartFrameGate(bot_speaking_notifier)
+    # Create StartGate to block Player LLM until host has stopped speaking
+    start_gate = StartGate(bot_speaking_notifier)
 
     # Create GameStateTracker to handle new words and score tracking
     game_state_tracker = GameStateTracker(new_word_notifier)
@@ -625,6 +643,12 @@ Important guidelines:
         },
     ]
 
+    # While there are no context aggregators in the Pipeline, we need to create
+    # one here to be able to push the context frame to the PipelineTask. This is
+    # what initiates the conversation.
+    context = OpenAILLMContext(messages)
+    context_aggregator = host_llm.create_context_aggregator(context)
+
     pipeline = Pipeline(
         [
             transport.input(),  # Receive audio/video from Daily call
@@ -640,7 +664,7 @@ Important guidelines:
                 ],
                 # Player branch: guesses words based on human descriptions
                 [
-                    start_frame_gate,  # Gates the player until host finishes intro
+                    start_gate,  # Gates the player until host finishes intro
                     player_llm,  # AI player that makes guesses
                     producer,  # Collects audio frames to be passed to the consumer
                 ],
@@ -664,8 +688,10 @@ Important guidelines:
     @transport.event_handler("on_client_connected")
     async def on_client_connected(transport, client):
         logger.info(f"Client connected: {client}")
-        # Kick off the conversation
-        await task.queue_frames([LLMRunFrame()])
+        # Kick off the conversation by getting the context frame and pushing it.
+        # There is no aggegrator in the Pipeline, so we need to rely on the
+        # PipelineTask to push the frame.
+        await task.queue_frames([context_aggregator.user().get_context_frame()])
         # Start the game timer
         game_timer.start()
 
