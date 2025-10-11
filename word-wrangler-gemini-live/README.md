@@ -136,26 +136,19 @@ This architecture enables complex interaction patterns that would be difficult t
    cd server
    ```
 
-2. Set up and activate your virtual environment:
+2. Set up your virtual environment and install dependencies:
 
    ```bash
-   python3 -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   uv sync
    ```
 
-3. Install dependencies:
-
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-4. Create an .env file and add your API keys:
+3. Create an .env file and add your API keys:
 
    ```bash
    cp env.example .env
    ```
 
-5. Add environment variables for:
+4. Add environment variables for:
 
    ```
    DAILY_API_KEY=
@@ -163,10 +156,10 @@ This architecture enables complex interaction patterns that would be difficult t
    GOOGLE_API_KEY=
    ```
 
-6. Run the server:
+5. Run the server:
 
    ```bash
-   LOCAL_RUN=1 python server.py
+   uv run bot -t daily
    ```
 
 #### Run the Client
@@ -205,50 +198,33 @@ This architecture enables complex interaction patterns that would be difficult t
 
 ### Phone Game
 
-There are two versions of the phone game:
-
-1. **Local Development** (`bot_phone_local.py`):
-
-   - For testing locally before deployment
-
-2. **Deployment** (`bot_phone_twilio.py`):
-   - Ready for deployment to Pipecat Cloud
-
 #### Running Locally
 
-1. Set up and activate your virtual environment:
+1. Set up your virtual environment and install dependencies:
 
    ```bash
-   python3 -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   uv sync
    ```
 
-2. Install dependencies:
+2. Create an .env file and add your API keys:
 
    ```bash
-   pip install -r requirements.txt
-   ```
-
-3. Create an .env file in the server directory with your API keys:
-
-   ```bash
-   cd server
    cp env.example .env
    ```
 
-4. Configure Daily information in your .env:
+3. Add environment variables for:
 
    ```
-   DAILY_API_KEY=your_daily_api_key
-   DAILY_SAMPLE_ROOM_URL=your_daily_room_url
-   GOOGLE_API_KEY=your_google_api_key
-   GOOGLE_TEST_CREDENTIALS_FILE=path_to_credentials_file
+   GOOGLE_API_KEY=
+   GOOGLE_TEST_CREDENTIALS_FILE=
+   TWILIO_ACCOUNT_SID=
+   TWILIO_AUTH_TOKEN=
    ```
 
-5. Run the local bot:
+4. Run the local bot:
 
    ```bash
-   LOCAL_RUN=1 python bot_phone_local.py
+   uv run bot.py
    ```
 
 ## Deployment
@@ -261,7 +237,7 @@ You can deploy your server code using Pipecat Cloud. For a full walkthrough, sta
 
 Here are the steps you'll need to complete:
 
-- Build, tag, and push your Docker image to a registry.
+- Build, tag, and push your Docker image to a registry (e.g. `uv run pcc docker build-push`)
 - Create Pipecat Cloud secrets using the CLI or dashboard. For this agent, you only need a `GOOGLE_API_KEY`. Your `DAILY_API_KEY` is automatically applied.
 - Deploy your agent image. You can use a pcc-deploy.toml file to make deploying easier. For example:
 
@@ -272,11 +248,11 @@ secret_set = "word-wrangler-secrets"
 enable_krisp = true
 
 [scaling]
-  min_instances = 1
-  max_instances = 5
+  min_agents = 1
+  max_agents = 5
 ```
 
-Then, you can deploy with the CLI using `pcc deploy`.
+Then, you can deploy with the CLI using `uv run pcc deploy`.
 
 - Finally, confirm that your agent is deployed. You'll get feedback in the terminal.
 
@@ -300,20 +276,28 @@ You'll need to modify the Dockerfile so that the credentials.json and word_list.
 ```Dockerfile
 FROM dailyco/pipecat-base:latest
 
-COPY ./requirements.txt requirements.txt
+# Enable bytecode compilation
+ENV UV_COMPILE_BYTECODE=1
 
-RUN pip install --no-cache-dir --upgrade -r requirements.txt
+# Copy from the cache instead of linking since it's a mounted volume
+ENV UV_LINK_MODE=copy
+
+# Install the project's dependencies using the lockfile and settings
+RUN --mount=type=cache,target=/root/.cache/uv \
+    --mount=type=bind,source=uv.lock,target=uv.lock \
+    --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
+    uv sync --locked --no-install-project --no-dev
 
 COPY ./word_list.py word_list.py
 COPY ./credentials.json credentials.json
-COPY ./bot_phone_twilio.py bot.py
+COPY ./bot.py bot.py
 ```
 
 Note: Your `credentials.json` file should have your Google service account credentials.
 
 #### Buy and Configure a Twilio Number
 
-Check out the [Twilio Websocket Telephony guide](https://docs.pipecat.daily.co/pipecat-in-production/telephony/twilio-mediastreams) for a step-by-step walkthrough on how to purchase a phone number, configure your TwiML, and make or receive calls.
+Check out the [Twilio Websocket Telephony guide](https://docs.pipecat.ai/deployment/pipecat-cloud/guides/telephony/twilio-websocket) for a step-by-step walkthrough on how to purchase a phone number, configure your TwiML, and make or receive calls.
 
 ## Tech stack
 

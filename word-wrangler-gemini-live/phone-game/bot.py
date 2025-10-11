@@ -6,29 +6,24 @@
 
 """Word Wrangler: A voice-based word guessing game.
 
-To run this demo:
-1. Set up environment variables:
-   - GOOGLE_API_KEY: API key for Google services
-   - GOOGLE_TEST_CREDENTIALS_FILE: Path to Google credentials JSON file
-
-2. Install requirements:
-   pip install -r requirements.txt
-
-3. Run in local development mode:
-   LOCAL_RUN=1 python word_wrangler.py
+This demo version is intended to be deployed to
+Pipecat Cloud. For more information, visit:
+- Deployment Quickstart: https://docs.pipecat.daily.co/quickstart
+- Build for Twilio: https://docs.pipecat.daily.co/pipecat-in-production/telephony/twilio-mediastreams
 """
 
 import asyncio
 import os
 import re
-import sys
 from typing import Any, Mapping, Optional
 
-import aiohttp
 from dotenv import load_dotenv
 from loguru import logger
-from pipecat.audio.utils import create_default_resampler
+from pipecat.audio.resamplers.soxr_resampler import SOXRAudioResampler
+from pipecat.audio.turn.smart_turn.base_smart_turn import SmartTurnParams
+from pipecat.audio.turn.smart_turn.local_smart_turn_v3 import LocalSmartTurnAnalyzerV3
 from pipecat.audio.vad.silero import SileroVADAnalyzer
+from pipecat.audio.vad.vad_analyzer import VADParams
 from pipecat.frames.frames import (
     BotStoppedSpeakingFrame,
     CancelFrame,
@@ -46,40 +41,30 @@ from pipecat.pipeline.parallel_pipeline import ParallelPipeline
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineParams, PipelineTask
-from pipecat.processors.aggregators.openai_llm_context import (
-    OpenAILLMContext,
-)
 from pipecat.processors.consumer_processor import ConsumerProcessor
 from pipecat.processors.filters.stt_mute_filter import STTMuteConfig, STTMuteFilter, STTMuteStrategy
 from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
 from pipecat.processors.producer_processor import ProducerProcessor
-from pipecat.services.gemini_multimodal_live.gemini import (
-    GeminiMultimodalLiveLLMService,
-    GeminiMultimodalModalities,
+from pipecat.runner.types import RunnerArguments
+from pipecat.runner.utils import create_transport
+from pipecat.services.google.gemini_live.llm import (
+    GeminiLiveLLMService,
+    GeminiModalities,
     InputParams,
 )
 from pipecat.services.google.tts import GoogleTTSService
 from pipecat.sync.base_notifier import BaseNotifier
 from pipecat.sync.event_notifier import EventNotifier
-from pipecat.transports.daily.transport import DailyParams, DailyTransport
+from pipecat.transports.base_transport import BaseTransport, TransportParams
+from pipecat.transports.websocket.fastapi import (
+    FastAPIWebsocketParams,
+)
 from pipecat.utils.text.base_text_filter import BaseTextFilter
-from pipecatcloud.agent import DailySessionArguments
+
 from word_list import generate_game_words
 
 load_dotenv(override=True)
 
-# Check if we're in local development mode
-LOCAL_RUN = os.getenv("LOCAL_RUN")
-if LOCAL_RUN:
-    import webbrowser
-
-    try:
-        from runner import configure
-    except ImportError:
-        logger.error("Could not import local_runner module. Local development mode may not work.")
-
-
-logger.add(sys.stderr, level="DEBUG")
 
 GAME_DURATION_SECONDS = 120
 NUM_WORDS_PER_GAME = 20
@@ -275,7 +260,12 @@ class StartFrameGate(FrameProcessor):
 
 
 class GameStateTracker(FrameProcessor):
-    """Tracks game state including new words and score by monitoring host responses."""
+    """Tracks game state including new words and score by monitoring host responses.
+
+    This processor aggregates streamed text from the host LLM to detect:
+    1. New word announcements (triggering player LLM resets)
+    2. Score updates (to track the current score)
+    """
 
     def __init__(self, new_word_notifier: BaseNotifier):
         super().__init__()
@@ -417,7 +407,7 @@ class GameTimer:
             logger.exception(f"Error in game timer: {e}")
 
 
-class ResettablePlayerLLM(GeminiMultimodalLiveLLMService):
+class ResettablePlayerLLM(GeminiLiveLLMService):
     """A specialized LLM service that can reset its context when notified about a new word.
 
     This LLM intelligently waits for the host to finish speaking before reconnecting.
@@ -524,7 +514,7 @@ async def tts_audio_raw_frame_filter(frame: Frame):
 
 
 # Create a resampler instance once
-resampler = create_default_resampler()
+resampler = SOXRAudioResampler()
 
 
 async def tts_to_input_audio_transformer(frame: Frame):
@@ -555,24 +545,12 @@ async def tts_to_input_audio_transformer(frame: Frame):
         return input_frame
 
 
-async def main(room_url: str, token: str):
-    # Use the provided session logger if available, otherwise use the default logger
-    logger.debug("Starting bot in room: {}", room_url)
+async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
+    logger.debug("Starting WebSocket bot")
 
     game_words = generate_game_words(NUM_WORDS_PER_GAME)
     words_string = ", ".join(f'"{word}"' for word in game_words)
     logger.debug(f"Game words: {words_string}")
-
-    transport = DailyTransport(
-        room_url,
-        token,
-        "Word Wrangler Bot",
-        DailyParams(
-            audio_in_enabled=True,
-            audio_out_enabled=True,
-            vad_analyzer=SileroVADAnalyzer(),
-        ),
-    )
 
     player_instruction = f"""{game_player_prompt}
 
@@ -598,10 +576,10 @@ Important guidelines:
         config=STTMuteConfig(strategies={STTMuteStrategy.MUTE_UNTIL_FIRST_BOT_COMPLETE})
     )
 
-    host_llm = GeminiMultimodalLiveLLMService(
+    host_llm = GeminiLiveLLMService(
         api_key=os.getenv("GOOGLE_API_KEY"),
         system_instruction=host_instruction,
-        params=InputParams(modalities=GeminiMultimodalModalities.TEXT),
+        params=InputParams(modalities=GeminiModalities.TEXT),
     )
 
     host_tts = GoogleTTSService(
@@ -647,10 +625,6 @@ Important guidelines:
         },
     ]
 
-    # This sets up the LLM context by providing messages and tools
-    context = OpenAILLMContext(messages)
-    context_aggregator = host_llm.create_context_aggregator(context)
-
     pipeline = Pipeline(
         [
             transport.input(),  # Receive audio/video from Daily call
@@ -678,6 +652,7 @@ Important guidelines:
     task = PipelineTask(
         pipeline,
         params=PipelineParams(
+            audio_out_sample_rate=8000,
             enable_metrics=True,
             enable_usage_metrics=True,
         ),
@@ -686,66 +661,61 @@ Important guidelines:
     # Create the game timer
     game_timer = GameTimer(task, game_state_tracker, game_duration_seconds=GAME_DURATION_SECONDS)
 
-    @transport.event_handler("on_first_participant_joined")
-    async def on_first_participant_joined(transport, participant):
-        logger.info("First participant joined: {}", participant["id"])
+    @transport.event_handler("on_client_connected")
+    async def on_client_connected(transport, client):
+        logger.info(f"Client connected: {client}")
         # Kick off the conversation
         await task.queue_frames([LLMRunFrame()])
         # Start the game timer
         game_timer.start()
 
-    @transport.event_handler("on_participant_left")
-    async def on_participant_left(transport, participant, reason):
-        logger.info("Participant left: {}", participant)
+    @transport.event_handler("on_client_disconnected")
+    async def on_client_disconnected(transport, client):
+        logger.info(f"Client disconnected: {client}")
         # Stop the timer
         game_timer.stop()
         # Cancel the pipeline task
         await task.cancel()
 
-    runner = PipelineRunner(handle_sigint=False, force_gc=True)
+    runner = PipelineRunner(handle_sigint=runner_args.handle_sigint)
 
     await runner.run(task)
 
 
-async def bot(args: DailySessionArguments):
-    """Main bot entry point compatible with the FastAPI route handler.
+async def bot(runner_args: RunnerArguments):
+    """Main bot entry point compatible with Pipecat Cloud."""
+    if os.environ.get("ENV") != "local":
+        from pipecat.audio.filters.krisp_filter import KrispFilter
 
-    Args:
-        room_url: The Daily room URL
-        token: The Daily room token
-        body: The configuration object from the request body
-        session_id: The session ID for logging
-    """
-    logger.info(f"Bot process initialized {args.room_url} {args.token}")
+        krisp_filter = KrispFilter()
+    else:
+        krisp_filter = None
 
-    try:
-        await main(args.room_url, args.token)
-        logger.info("Bot process completed")
-    except Exception as e:
-        logger.exception(f"Error in bot process: {str(e)}")
-        raise
+    # We store functions so objects (e.g. SileroVADAnalyzer) don't get
+    # instantiated. The function will be called when the desired transport gets
+    # selected.
+    transport_params = {
+        "webrtc": lambda: TransportParams(
+            audio_in_enabled=True,
+            audio_in_filter=krisp_filter,
+            audio_out_enabled=True,
+            vad_analyzer=SileroVADAnalyzer(params=VADParams(stop_secs=0.2)),
+            turn_analyzer=LocalSmartTurnAnalyzerV3(params=SmartTurnParams()),
+        ),
+        "twilio": lambda: FastAPIWebsocketParams(
+            audio_in_enabled=True,
+            audio_in_filter=krisp_filter,
+            audio_out_enabled=True,
+            vad_analyzer=SileroVADAnalyzer(params=VADParams(stop_secs=0.2)),
+            turn_analyzer=LocalSmartTurnAnalyzerV3(params=SmartTurnParams()),
+        ),
+    }
 
-
-# Local development functions
-async def local_main():
-    """Function for local development testing."""
-    try:
-        async with aiohttp.ClientSession() as session:
-            (room_url, token) = await configure(session)
-            logger.warning("_")
-            logger.warning("_")
-            logger.warning(f"Talk to your voice agent here: {room_url}")
-            logger.warning("_")
-            logger.warning("_")
-            webbrowser.open(room_url)
-            await main(room_url, token)
-    except Exception as e:
-        logger.exception(f"Error in local development mode: {e}")
+    transport = await create_transport(runner_args, transport_params)
+    await run_bot(transport, runner_args)
 
 
-# Local development entry point
-if LOCAL_RUN and __name__ == "__main__":
-    try:
-        asyncio.run(local_main())
-    except Exception as e:
-        logger.exception(f"Failed to run in local mode: {e}")
+if __name__ == "__main__":
+    from pipecat.runner.run import main
+
+    main()

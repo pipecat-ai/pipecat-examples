@@ -1,5 +1,0 @@
-pipecatcloud
-pipecat-ai[daily,google,silero]>=0.0.82
-fastapi
-uvicorn
-python-dotenv
