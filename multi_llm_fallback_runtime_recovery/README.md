@@ -6,7 +6,7 @@
 🔗 **GitHub:** [matinict](https://github.com/matinict)
 
 ---
-  
+
 ## 📘 Overview
 
 This example demonstrates a **robust multi-LLM fallback mechanism** built using **[Pipecat](https://github.com/pipecat-ai/pipecat)**.  
@@ -53,10 +53,10 @@ OLLAMA_MODEL=qwen2.5:latest
 GEMINI_API_KEY=your_gemini_key
 OPENAI_API_KEY=your_openai_key
 
-
+```` 
 
 ## 🌐 Connect with Us
 
-[![Facebook](https://img.shields.io/badge/Follow-Facebook-1877F2?logo=facebook&logoColor=white)](https://web.facebook.com/Playownai/)  
-[![LinkedIn](https://img.shields.io/badge/Follow-LinkedIn-0A66C2?logo=linkedin&logoColor=white)](https://www.linkedin.com/company/playownai)  
-[![YouTube](https://img.shields.io/badge/Subscribe-@PlayOwnAi-FF0000?logo=youtube&logoColor=white)](https://www.youtube.com/@PlayOwnAi/)
+[![Facebook](https://img.shields.io/badge/Follow-Facebook-1877F2?logo=facebook&logoColor=white)](https://web.facebook.com/Playownai/)|
+[![LinkedIn](https://img.shields.io/badge/Follow-LinkedIn-0A66C2?logo=linkedin&logoColor=white)](https://www.linkedin.com/company/playownai)|
+[![YouTube](https://img.shields.io/badge/Subscribe-@PlayOwnAi-FF0000?logo=youtube&logoColor=white)](https://www.youtube.com/@PlayOwnAi/)|
