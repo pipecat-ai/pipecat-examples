@@ -27,6 +27,7 @@ share/python-wheels/
 MANIFEST
 .DS_Store
 .env
+.env.local
 fly.toml
 
 # PyInstaller
