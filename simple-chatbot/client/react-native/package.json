@@ -9,13 +9,13 @@
     "update": "(cd ../rtvi-client-react-native-daily; yarn build); cp -R ../rtvi-client-react-native-daily/lib/* ./node_modules/react-native-realtime-ai-daily/lib/;"
   },
   "dependencies": {
-    "@daily-co/config-plugin-rn-daily-js": "0.0.9",
-    "@daily-co/react-native-daily-js": "^0.79.0",
-    "@daily-co/react-native-webrtc": "^118.0.3-daily.4",
+    "@daily-co/config-plugin-rn-daily-js": "0.0.10",
+    "@daily-co/react-native-daily-js": "^0.82.0",
+    "@daily-co/react-native-webrtc": "^124.0.6-daily.1",
     "@react-native-async-storage/async-storage": "1.24.0",
     "@react-navigation/native": "^7.0.14",
     "@react-navigation/stack": "^7.1.1",
-    "expo": "^53.0.7",
+    "expo": "^53.0.23",
     "expo-build-properties": "~0.14.6",
     "expo-dev-client": "~5.1.8",
     "expo-splash-screen": "~0.30.8",
@@ -25,7 +25,7 @@
     "react-native-background-timer": "^2.4.1",
     "react-native-gesture-handler": "^2.25.0",
     "react-native-get-random-values": "^1.11.0",
-    "@pipecat-ai/react-native-daily-transport": "^1.2.0",
+    "@pipecat-ai/react-native-daily-transport": "^1.4.0",
     "react-native-safe-area-context": "^5.4.0",
     "react-native-screens": "^4.10.0",
     "react-native-toast-message": "^2.3.0"
