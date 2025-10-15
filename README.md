@@ -60,7 +60,6 @@ Ready to explore more? These are two of the most useful examples for common use 
 
 ### **Multimodal & Creative**
 
-- **[moondream-chatbot](moondream-chatbot/)** - Vision + voice multimodal AI bot
 - **[storytelling-chatbot](storytelling-chatbot/)** - Interactive storytelling experiences
 - **[news-chatbot](news-chatbot/)** - AI news reader and discussion bot
 
