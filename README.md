@@ -87,7 +87,6 @@ Ready to explore more? These are two of the most useful examples for common use 
 
 ### **Monitoring & Analytics**
 
-- **[sentry-metrics](sentry-metrics/)** - Use Sentry to collect Time-to-First-Byte and processing metrics
 - **[open-telemetry](open-telemetry/)** - Observability and tracing examples using Langfuse and Jaeger
 
 ### **Testing & Development**
