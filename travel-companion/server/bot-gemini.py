@@ -6,7 +6,7 @@
 
 """Gemini Travel Companion
 
-This module implements a chatbot using Google's Gemini Multimodal Live model.
+This module implements a chatbot using Google's Gemini Live model.
 It includes:
 - Real-time audio interaction through Daily
 - Function calling
@@ -32,7 +32,7 @@ from pipecat.processors.aggregators.openai_llm_context import OpenAILLMContext
 from pipecat.processors.frameworks.rtvi import RTVIConfig, RTVIObserver, RTVIProcessor
 from pipecat.runner.types import RunnerArguments
 from pipecat.runner.utils import create_transport
-from pipecat.services.gemini_multimodal_live.gemini import GeminiMultimodalLiveLLMService
+from pipecat.services.google.gemini_live.llm import GeminiLiveLLMService
 from pipecat.transports.base_transport import BaseTransport, TransportParams
 from pipecat.transports.daily.transport import DailyParams
 
@@ -47,14 +47,14 @@ transport_params = {
         audio_out_enabled=True,
         video_in_enabled=True,
         # set stop_secs to something roughly similar to the internal setting
-        # of the Multimodal Live api, just to align events. This doesn't really
-        # matter because we can only use the Multimodal Live API's phrase
+        # of the Gemini Live api, just to align events. This doesn't really
+        # matter because we can only use the Gemini Live API's phrase
         # endpointing, for now.
         vad_analyzer=SileroVADAnalyzer(params=VADParams(stop_secs=0.5)),
     ),
 }
 
-# Search tool can only be used together with other tools when using the Multimodal Live API
+# Search tool can only be used together with other tools when using the Gemini Live API
 # Otherwise it should be used alone.
 # We are registering the tools here, but who are handling them is the RTVI client
 get_location_function = FunctionSchema(
@@ -113,14 +113,14 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     """Main bot execution function.
 
     Sets up and runs the bot pipeline including:
-    - Gemini Live multimodal model integration
+    - Gemini Live model integration
     - Voice activity detection
     - Animation processing
     - RTVI event handling
     """
 
-    # Initialize the Gemini Multimodal Live model
-    llm = GeminiMultimodalLiveLLMService(
+    # Initialize the Gemini Live model
+    llm = GeminiLiveLLMService(
         api_key=os.getenv("GOOGLE_API_KEY"),
         voice_id="Puck",  # Aoede, Charon, Fenrir, Kore, Puck
         system_instruction=system_instruction,
