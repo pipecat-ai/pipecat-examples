@@ -165,35 +165,14 @@ class WebRTCApp {
       this.updateStatus('Starting the bot');
       const headers = new Headers();
       headers.append("Authorization", `Bearer ${this.apiKey}`);
-
-      const startBotResult = await this.pcClient.startBot({
+      await this.pcClient.startBotAndConnect({
           endpoint: this.startUrl,
           headers: headers,
           requestData: {
             createDailyRoom: false,
             enableDefaultIceServers: true
           }
-      }) as any;
-
-      console.log("startBotResult", startBotResult)
-      const sessionId = startBotResult?.sessionId;
-      if (!sessionId) {
-        throw new Error("session_id not found in startBotResult")
-      }
-
-      const iceServers = startBotResult?.iceConfig?.iceServers
-      if (iceServers) {
-        (this.pcClient.transport as SmallWebRTCTransport).iceServers = iceServers
-      }
-
-      this.updateStatus('Connecting');
-      const offerUrl = `${this.baseUrl}/sessions/${sessionId}/api/offer`
-      const webrtcRequestParams: APIRequest = {
-        endpoint: offerUrl,
-        headers: headers
-      }
-      console.log("webrtcRequestParams", webrtcRequestParams)
-      await this.pcClient.connect({webrtcRequestParams});
+      });
     } catch (e) {
       console.log(`Failed to connect ${e}`);
       this.stop();
