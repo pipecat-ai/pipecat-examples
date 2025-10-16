@@ -1,0 +1,49 @@
+# Pipecat AI Multi-LLM Fallback Bot
+# Requirements for running voice AI bot with Ollama → Google Gemini → OpenAI fallback
+
+# ===== CORE DEPENDENCIES =====
+pipecat-ai==0.0.87
+pipecat-ai[daily]==0.0.87
+pipecat-ai[cartesia]==0.0.87
+pipecat-ai[openai]==0.0.87
+pipecat-ai[google]==0.0.87
+pipecat-ai[ollama]==0.0.87
+
+# ===== SPEECH-TO-TEXT =====
+deepgram-sdk>=3.5.0
+
+# ===== TEXT-TO-SPEECH =====
+cartesia>=1.0.0
+
+# ===== LLM SERVICES =====
+openai>=1.3.0
+google-generativeai>=0.3.0
+
+# ===== WEB FRAMEWORK =====
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+starlette>=0.27.0
+
+# ===== HTTP CLIENT =====
+httpx>=0.25.0
+
+# ===== CONFIGURATION =====
+python-dotenv>=1.0.0
+pydantic>=2.0.0
+
+# ===== LOGGING =====
+loguru>=0.7.0
+
+# ===== AUDIO PROCESSING =====
+torch>=2.0.0
+torchaudio>=2.0.0
+numpy>=1.24.0
+
+# ===== ASYNC & UTILITIES =====
+aiohttp>=3.8.0
+asyncio-contextmanager>=1.0.0
+
+# ===== DEVELOPMENT (Optional) =====
+# pytest>=7.4.0
+# black>=23.0.0
+# flake8>=6.0.0
