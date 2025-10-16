@@ -24,47 +24,41 @@
         let connected = false
         let peerConnection = null
 
-        const waitForIceGatheringComplete = async (pc, timeoutMs = 2000) => {
-            if (pc.iceGatheringState === 'complete') return;
-            console.log("Waiting for ICE gathering to complete. Current state:", pc.iceGatheringState);
-            return new Promise((resolve) => {
-                let timeoutId;
-                const checkState = () => {
-                    console.log("icegatheringstatechange:", pc.iceGatheringState);
-                    if (pc.iceGatheringState === 'complete') {
-                        cleanup();
-                        resolve();
-                    }
-                };
-                const onTimeout = () => {
-                    console.warn(`ICE gathering timed out after ${timeoutMs} ms.`);
-                    cleanup();
-                    resolve();
-                };
-                const cleanup = () => {
-                    pc.removeEventListener('icegatheringstatechange', checkState);
-                    clearTimeout(timeoutId);
-                };
-                pc.addEventListener('icegatheringstatechange', checkState);
-                timeoutId = setTimeout(onTimeout, timeoutMs);
-                // Checking the state again to avoid any eventual race condition
-                checkState();
+        const sendIceCandidate = async (pc, candidate) => {
+            await fetch('/api/offer', {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                pc_id: pc.pc_id,
+                candidates:[{
+                    candidate: candidate.candidate,
+                    sdp_mid: candidate.sdpMid,
+                    sdp_mline_index: candidate.sdpMLineIndex
+                }]
+              })
             });
         };
 
-
         const createSmallWebRTCConnection = async (audioTrack) => {
             const config = {
-              iceServers: [],
+              iceServers:[
+                {
+                  urls:"stun:stun.l.google.com:19302",
+                }
+              ]
             };
             const pc = new RTCPeerConnection(config)
+            
+            // Queue to store ICE candidates until we have received the answer and have a session in progress
+            pc.pendingIceCandidates = []
+            pc.canSendIceCandidates = false
+            
             addPeerConnectionEventListeners(pc)
             pc.ontrack = e => audioEl.srcObject = e.streams[0]
             // SmallWebRTCTransport expects to receive both transceivers
             pc.addTransceiver(audioTrack, { direction: 'sendrecv' })
             pc.addTransceiver('video', { direction: 'sendrecv' })
             await pc.setLocalDescription(await pc.createOffer())
-            await waitForIceGatheringComplete(pc)
             const offer = pc.localDescription
             const response = await fetch('/api/offer', {
                 body: JSON.stringify({ sdp: offer.sdp, type: offer.type}),
@@ -72,7 +66,18 @@
                 method: 'POST',
             });
             const answer = await response.json()
+            pc.pc_id = answer.pc_id
             await pc.setRemoteDescription(answer)
+            
+            // Now we can send ICE candidates
+            pc.canSendIceCandidates = true
+            
+            // Send any queued ICE candidates
+            for (const candidate of pc.pendingIceCandidates) {
+                await sendIceCandidate(pc, candidate)
+            }
+            pc.pendingIceCandidates = []
+            
             return pc
         }
 
@@ -95,9 +100,17 @@
                     _onDisconnected()
                 }
             }
-            pc.onicecandidate = (event) => {
+            pc.onicecandidate = async (event) => {
                 if (event.candidate) {
                     console.log("New ICE candidate:", event.candidate);
+                    // Check if we can send ICE candidates (we have received the answer with pc_id)
+                    if (pc.canSendIceCandidates && pc.pc_id) {
+                        // Send immediately
+                        await sendIceCandidate(pc, event.candidate)
+                    } else {
+                        // Queue the candidate until we have pc_id
+                        pc.pendingIceCandidates.push(event.candidate)
+                    }
                 } else {
                     console.log("All ICE candidates have been sent.");
                 }
