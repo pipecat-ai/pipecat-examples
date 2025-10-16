@@ -21,7 +21,6 @@ class WebRTCApp {
   private declare pcClient: PipecatClient;
 
   private declare baseUrl: string;
-  private declare agentName: string;
   private declare startUrl: string;
   private declare apiKey: string;
 
@@ -33,9 +32,8 @@ class WebRTCApp {
   }
 
   private setupEnvironmentVariables() {
-    this.baseUrl = import.meta.env.VITE_PIPECAT_BASE_URL;
-    this.agentName = import.meta.env.VITE_PIPECAT_AGENT_NAME;
-    this.startUrl = `${this.baseUrl}/v1/public/${this.agentName}/start`
+    this.baseUrl = import.meta.env.VITE_PIPECAT_BASE_URL
+    this.startUrl = `${this.baseUrl}/start`
     this.apiKey = import.meta.env.VITE_PIPECAT_PUBLIC_API;
   }
 
@@ -189,7 +187,7 @@ class WebRTCApp {
       }
 
       this.updateStatus('Connecting');
-      const offerUrl = `${this.baseUrl}/v1/public/${this.agentName}/sessions/${sessionId}/api/offer`
+      const offerUrl = `${this.baseUrl}/sessions/${sessionId}/api/offer`
       const webrtcRequestParams: APIRequest = {
         endpoint: offerUrl,
         headers: headers
