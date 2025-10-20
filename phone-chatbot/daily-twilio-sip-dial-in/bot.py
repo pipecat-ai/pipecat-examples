@@ -30,9 +30,6 @@ load_dotenv()
 logger.remove(0)
 logger.add(sys.stderr, level="DEBUG")
 
-# Initialize Twilio client
-twilio_client = Client(os.getenv("TWILIO_ACCOUNT_SID"), os.getenv("TWILIO_AUTH_TOKEN"))
-
 
 async def run_bot(
     transport: BaseTransport, call_id: str, sip_uri: str, handle_sigint: bool
@@ -44,7 +41,6 @@ async def run_bot(
         call_id: The Twilio call ID
         sip_uri: The Daily SIP URI for forwarding the call
     """
-    call_already_forwarded = False
 
     stt = DeepgramSTTService(api_key=os.getenv("DEEPGRAM_API_KEY"))
     llm = OpenAILLMService(api_key=os.getenv("OPENAI_API_KEY"))
@@ -106,45 +102,24 @@ async def run_bot(
     # Handle call ready to forward
     @transport.event_handler("on_dialin_ready")
     async def on_dialin_ready(transport, sip_endpoint):
-        nonlocal call_already_forwarded
-
-        # We only want to forward the call once
-        # The on_dialin_ready event will be triggered for each sip endpoint provisioned
-        if call_already_forwarded:
-            logger.warning("Call already forwarded, ignoring this event.")
-            return
-
         logger.info(f"Forwarding call {call_id} to {sip_uri}")
 
         try:
+            # Initialize Twilio client
+            twilio_client = Client(os.getenv("TWILIO_ACCOUNT_SID"), os.getenv("TWILIO_AUTH_TOKEN"))
             # Update the Twilio call with TwiML to forward to the Daily SIP endpoint
             twilio_client.calls(call_id).update(
                 twiml=f"<Response><Dial><Sip>{sip_uri}</Sip></Dial></Response>"
             )
             logger.info("Call forwarded successfully")
-            call_already_forwarded = True
         except Exception as e:
             logger.error(f"Failed to forward call: {str(e)}")
-            raise
-
-    @transport.event_handler("on_dialin_connected")
-    async def on_dialin_connected(transport, data):
-        logger.debug(f"Dial-in connected: {data}")
-
-    @transport.event_handler("on_dialin_stopped")
-    async def on_dialin_stopped(transport, data):
-        logger.debug(f"Dial-in stopped: {data}")
+            await task.cancel()
 
     @transport.event_handler("on_dialin_error")
     async def on_dialin_error(transport, data):
         logger.error(f"Dial-in error: {data}")
-        # If there is an error, the bot should leave the call
-        # This may be also handled in on_participant_left with
-        # await task.cancel()
-
-    @transport.event_handler("on_dialin_warning")
-    async def on_dialin_warning(transport, data):
-        logger.warning(f"Dial-in warning: {data}")
+        await task.cancel()
 
     # Run the pipeline
     runner = PipelineRunner(handle_sigint=handle_sigint)
