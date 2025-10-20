@@ -53,7 +53,7 @@ class CallContainerModel: ObservableObject {
         let pipecatClientOptions = PipecatClientOptions.init(
             transport: SmallWebRTCTransport.init(),
             enableMic: currentSettings.enableMic,
-            enableCam: false,
+            enableCam: currentSettings.enableCam,
         )
         self.pipecatClientIOS = PipecatClient.init(
             options: pipecatClientOptions
@@ -114,6 +114,7 @@ class CallContainerModel: ObservableObject {
     
     @MainActor
     func toggleCamInput() {
+        print("Is cam enabled: \(self.isCamEnabled)")
         self.pipecatClientIOS?.enableCam(enable: !self.isCamEnabled) { result in
             switch result {
             case .success():
@@ -228,24 +229,33 @@ extension CallContainerModel:PipecatClientDelegate {
         }
     }
     
-    //TODO: need to refactor this
-    /*func onTracksUpdated(tracks: Tracks) {
-        self.handleEvent(eventName: "onTracksUpdated", eventValue: tracks)
-        Task { @MainActor in
-            self.localCamId = tracks.local.video
-            self.botCamId = tracks.bot?.video ?? nil
-        }
-    }*/
-    
     func onTrackStarted(track: MediaStreamTrack, participant: Participant?) {
         Task { @MainActor in
             self.handleEvent(eventName: "onTrackStarted", eventValue: track)
+            
+            guard track.kind == .video else { return }
+            
+            // Use optional binding to simplify the check for local participant
+            if participant?.local ?? true {
+                self.localCamId = track.id
+            } else {
+                self.botCamId = track.id
+            }
         }
     }
 
     func onTrackStopped(track: MediaStreamTrack, participant: Participant?) {
         Task { @MainActor in
             self.handleEvent(eventName: "onTrackStopped", eventValue: track)
+            
+            guard track.kind == .video else { return }
+            
+            // Use optional binding to simplify the check for local participant
+            if participant?.local ?? true {
+                self.localCamId = nil
+            } else {
+                self.botCamId = nil
+            }
         }
     }
     
