@@ -21,7 +21,7 @@ class CallContainerModel: ObservableObject {
     @Published var liveBotMessage: LiveMessage?
     @Published var liveUserMessage: LiveMessage?
     
-    var rtviClientIOS: RTVIClient?
+    var pipecatClientIOS: PipecatClient?
     
     @Published var selectedMic: MediaDeviceId? = nil {
         didSet {
@@ -50,42 +50,34 @@ class CallContainerModel: ObservableObject {
         }
         
         let currentSettings = SettingsManager.getSettings()
-        let rtviClientOptions = RTVIClientOptions.init(
+        let pipecatClientOptions = PipecatClientOptions.init(
+            transport: SmallWebRTCTransport.init(),
             enableMic: currentSettings.enableMic,
-            enableCam: currentSettings.enableCam,
-            params: RTVIClientParams(
-                config: [
-                    .init(
-                        service: SmallWebRTCTransport.SERVICE_NAME,
-                        options: [
-                            .init(name: "server_url", value: .string(baseUrl))
-                        ]
-                    )
-                ]
+            enableCam: false,
+        )
+        self.pipecatClientIOS = PipecatClient.init(
+            options: pipecatClientOptions
+        )
+        self.pipecatClientIOS?.delegate = self
+        
+        let transportParams = SmallWebRTCTransportConnectionParams.init(
+            webrtcRequestParams: APIRequest.init(
+                endpoint: URL(string: baseUrl + "/api/offer")!
             )
         )
-        self.rtviClientIOS = RTVIClient.init(
-            transport: SmallWebRTCTransport.init(options: rtviClientOptions),
-            options: rtviClientOptions
-        )
-        self.rtviClientIOS?.delegate = self
-        
-        // Registering the llm helper, we will need this to handle the function calling
-        let llmHelper = try? self.rtviClientIOS?.registerHelper(service: "llm", helper: LLMHelper.self)
-        llmHelper?.delegate = self
-        
-        self.rtviClientIOS?.start() { result in
+        //TODO: replace for startBotAndConnect once we implement support for it on iOS as we did on web
+        self.pipecatClientIOS?.connect(transportParams: transportParams, ) { result in
             switch result {
             case .failure(let error):
                 self.showError(message: error.localizedDescription)
-                self.rtviClientIOS = nil
+                self.pipecatClientIOS = nil
             case .success():
                 // Apply initial mic preference
                 if let selectedMic = SettingsManager.getSettings().selectedMic {
                     self.selectMic(MediaDeviceId(id: selectedMic))
                 }
                 // Populate available devices list
-                self.availableMics = self.rtviClientIOS?.getAllMics() ?? []
+                self.availableMics = self.pipecatClientIOS?.getAllMics() ?? []
             }
         }
         self.saveCredentials(backendURL: backendURL)
@@ -93,9 +85,9 @@ class CallContainerModel: ObservableObject {
     
     @MainActor
     func disconnect() {
-        self.rtviClientIOS?.disconnect(completion: nil)
-        self.rtviClientIOS?.release()
-        self.rtviClientIOS = nil
+        self.pipecatClientIOS?.disconnect(completion: nil)
+        self.pipecatClientIOS?.release()
+        self.pipecatClientIOS = nil
     }
     
     func showError(message: String) {
@@ -110,10 +102,10 @@ class CallContainerModel: ObservableObject {
     
     @MainActor
     func toggleMicInput() {
-        self.rtviClientIOS?.enableMic(enable: !self.isMicEnabled) { result in
+        self.pipecatClientIOS?.enableMic(enable: !self.isMicEnabled) { result in
             switch result {
             case .success():
-                self.isMicEnabled = self.rtviClientIOS?.isMicEnabled ?? false
+                self.isMicEnabled = self.pipecatClientIOS?.isMicEnabled ?? false
             case .failure(let error):
                 self.showError(message: error.localizedDescription)
             }
@@ -122,10 +114,10 @@ class CallContainerModel: ObservableObject {
     
     @MainActor
     func toggleCamInput() {
-        self.rtviClientIOS?.enableCam(enable: !self.isCamEnabled) { result in
+        self.pipecatClientIOS?.enableCam(enable: !self.isCamEnabled) { result in
             switch result {
             case .success():
-                self.isCamEnabled = self.rtviClientIOS?.isCamEnabled ?? false
+                self.isCamEnabled = self.pipecatClientIOS?.isCamEnabled ?? false
             case .failure(let error):
                 self.showError(message: error.localizedDescription)
             }
@@ -142,7 +134,7 @@ class CallContainerModel: ObservableObject {
     @MainActor
     func selectMic(_ mic: MediaDeviceId) {
         self.selectedMic = mic
-        self.rtviClientIOS?.updateMic(micId: mic, completion: nil)
+        self.pipecatClientIOS?.updateMic(micId: mic, completion: nil)
     }
     
     private func createLiveMessage(content:String = "", type:MessageType) {
@@ -176,7 +168,7 @@ class CallContainerModel: ObservableObject {
     }
 }
 
-extension CallContainerModel:RTVIClientDelegate, LLMHelperDelegate {
+extension CallContainerModel:PipecatClientDelegate {
     
     private func handleEvent(eventName: String, eventValue: Any? = nil) {
         if let value = eventValue {
@@ -205,8 +197,8 @@ extension CallContainerModel:RTVIClientDelegate, LLMHelperDelegate {
     func onConnected() {
         Task { @MainActor in
             self.handleEvent(eventName: "onConnected")
-            self.isMicEnabled = self.rtviClientIOS?.isMicEnabled ?? false
-            self.isCamEnabled = self.rtviClientIOS?.isCamEnabled ?? false
+            self.isMicEnabled = self.pipecatClientIOS?.isMicEnabled ?? false
+            self.isCamEnabled = self.pipecatClientIOS?.isCamEnabled ?? false
         }
     }
     
@@ -217,10 +209,10 @@ extension CallContainerModel:RTVIClientDelegate, LLMHelperDelegate {
         }
     }
     
-    func onError(message: String) {
+    func onError(message: RTVIMessageInbound) {
         Task { @MainActor in
             self.handleEvent(eventName: "onError", eventValue: message)
-            self.showError(message: message)
+            self.showError(message: message.data ?? "")
         }
     }
     
@@ -236,15 +228,24 @@ extension CallContainerModel:RTVIClientDelegate, LLMHelperDelegate {
         }
     }
     
-    func onBotTranscript(data: String) {
-        self.handleEvent(eventName: "onBotTranscript", eventValue: data)
-    }
-    
-    func onTracksUpdated(tracks: Tracks) {
+    //TODO: need to refactor this
+    /*func onTracksUpdated(tracks: Tracks) {
         self.handleEvent(eventName: "onTracksUpdated", eventValue: tracks)
         Task { @MainActor in
             self.localCamId = tracks.local.video
             self.botCamId = tracks.bot?.video ?? nil
+        }
+    }*/
+    
+    func onTrackStarted(track: MediaStreamTrack, participant: Participant?) {
+        Task { @MainActor in
+            self.handleEvent(eventName: "onTrackStarted", eventValue: track)
+        }
+    }
+
+    func onTrackStopped(track: MediaStreamTrack, participant: Participant?) {
+        Task { @MainActor in
+            self.handleEvent(eventName: "onTrackStopped", eventValue: track)
         }
     }
     
@@ -277,7 +278,8 @@ extension CallContainerModel:RTVIClientDelegate, LLMHelperDelegate {
         }
     }
     
-    func onBotTTSText(data: BotTTSText) {
+    func onBotTranscript(data: BotLLMText) {
+        self.handleEvent(eventName: "onBotTranscript", eventValue: data)
         self.appendTextToLiveMessage(fromBot: true, content: data.text)
     }
     
