@@ -65,7 +65,10 @@ class CallContainerModel: ObservableObject {
         let headers = [["Authorization": "Bearer \(authorizationToken)"]]
         let startParams = APIRequest.init(
             endpoint: URL(string: baseUrl + "/start")!,
-            headers: headers
+            headers: headers,
+            requestData: Value.object([
+                "enableDefaultIceServers": .boolean(true)
+            ])
         )
         self.pipecatClientIOS?.startBotAndConnect(startBotParams: startParams) { (result: Result<SmallWebRTCStartBotResult, AsyncExecutionError>) in
             switch result {
