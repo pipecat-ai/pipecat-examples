@@ -5,5 +5,6 @@ struct SettingsPreference: Codable {
     var enableMic: Bool
     var enableCam: Bool
     var backendURL: String
+    var apiKey: String
 }
 

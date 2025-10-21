@@ -40,7 +40,7 @@ class CallContainerModel: ObservableObject {
     }
     
     @MainActor
-    func connect(backendURL: String) {
+    func connect(backendURL: String, apiKey: String) {
         self.resetLiveMessages()
         
         let baseUrl = backendURL.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -60,18 +60,19 @@ class CallContainerModel: ObservableObject {
         )
         self.pipecatClientIOS?.delegate = self
         
-        let transportParams = SmallWebRTCTransportConnectionParams.init(
-            webrtcRequestParams: APIRequest.init(
-                endpoint: URL(string: baseUrl + "/api/offer")!
-            )
+        let authorizationToken = apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        print("authorizationToken: \(authorizationToken)")
+        let headers = [["Authorization": "Bearer \(authorizationToken)"]]
+        let startParams = APIRequest.init(
+            endpoint: URL(string: baseUrl + "/start")!,
+            headers: headers
         )
-        //TODO: replace for startBotAndConnect once we implement support for it on iOS as we did on web
-        self.pipecatClientIOS?.connect(transportParams: transportParams, ) { result in
+        self.pipecatClientIOS?.startBotAndConnect(startBotParams: startParams) { (result: Result<SmallWebRTCStartBotResult, AsyncExecutionError>) in
             switch result {
             case .failure(let error):
                 self.showError(message: error.localizedDescription)
                 self.pipecatClientIOS = nil
-            case .success():
+            case .success(_):
                 // Apply initial mic preference
                 if let selectedMic = SettingsManager.getSettings().selectedMic {
                     self.selectMic(MediaDeviceId(id: selectedMic))
@@ -80,7 +81,7 @@ class CallContainerModel: ObservableObject {
                 self.availableMics = self.pipecatClientIOS?.getAllMics() ?? []
             }
         }
-        self.saveCredentials(backendURL: backendURL)
+        self.saveCredentials(backendURL: baseUrl, apiKey: authorizationToken)
     }
     
     @MainActor
@@ -125,9 +126,10 @@ class CallContainerModel: ObservableObject {
         }
     }
     
-    func saveCredentials(backendURL: String) {
+    func saveCredentials(backendURL: String, apiKey: String) {
         var currentSettings = SettingsManager.getSettings()
         currentSettings.backendURL = backendURL
+        currentSettings.apiKey = apiKey
         // Saving the settings
         SettingsManager.updateSettings(settings: currentSettings)
     }
