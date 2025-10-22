@@ -2,6 +2,9 @@
 
 A privacy-focused, real-time voice AI assistant that runs entirely on your local machine. Built with [Pipecat](https://github.com/pipecat-ai/pipecat) framework.
 
+
+I walk through the entire setup in this 12-minute tutorial: 👉 https://youtu.be/URnVU5OyEQI
+
 ## ✨ Features
 
 - 🔒 **Privacy First**: All processing happens locally - your conversations never leave your machine
