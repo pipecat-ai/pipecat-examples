@@ -21,7 +21,6 @@ class WebRTCApp {
   private declare pcClient: PipecatClient;
 
   private declare baseUrl: string;
-  private declare agentName: string;
   private declare startUrl: string;
   private declare apiKey: string;
 
@@ -33,9 +32,8 @@ class WebRTCApp {
   }
 
   private setupEnvironmentVariables() {
-    this.baseUrl = import.meta.env.VITE_PIPECAT_BASE_URL;
-    this.agentName = import.meta.env.VITE_PIPECAT_AGENT_NAME;
-    this.startUrl = `${this.baseUrl}/v1/public/${this.agentName}/start`
+    this.baseUrl = import.meta.env.VITE_PIPECAT_BASE_URL
+    this.startUrl = `${this.baseUrl}/start`
     this.apiKey = import.meta.env.VITE_PIPECAT_PUBLIC_API;
   }
 
@@ -167,35 +165,14 @@ class WebRTCApp {
       this.updateStatus('Starting the bot');
       const headers = new Headers();
       headers.append("Authorization", `Bearer ${this.apiKey}`);
-
-      const startBotResult = await this.pcClient.startBot({
+      await this.pcClient.startBotAndConnect({
           endpoint: this.startUrl,
           headers: headers,
           requestData: {
             createDailyRoom: false,
             enableDefaultIceServers: true
           }
-      }) as any;
-
-      console.log("startBotResult", startBotResult)
-      const sessionId = startBotResult?.sessionId;
-      if (!sessionId) {
-        throw new Error("session_id not found in startBotResult")
-      }
-
-      const iceServers = startBotResult?.iceConfig?.iceServers
-      if (iceServers) {
-        (this.pcClient.transport as SmallWebRTCTransport).iceServers = iceServers
-      }
-
-      this.updateStatus('Connecting');
-      const offerUrl = `${this.baseUrl}/v1/public/${this.agentName}/sessions/${sessionId}/api/offer`
-      const webrtcRequestParams: APIRequest = {
-        endpoint: offerUrl,
-        headers: headers
-      }
-      console.log("webrtcRequestParams", webrtcRequestParams)
-      await this.pcClient.connect({webrtcRequestParams});
+      });
     } catch (e) {
       console.log(`Failed to connect ${e}`);
       this.stop();
