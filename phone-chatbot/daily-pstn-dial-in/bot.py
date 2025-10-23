@@ -4,9 +4,10 @@
 # SPDX-License-Identifier: BSD 2-Clause License
 #
 
-"""simple_dialin.py.
+"""Daily PSTN dial-in bot.
 
-Daily PSTN Dial-in Bot.
+This bot demonstrates how to receive inbound phone calls using Daily's PSTN capabilities.
+The bot answers incoming calls and conducts voice conversations with callers.
 """
 
 import os
@@ -20,7 +21,8 @@ from pipecat.frames.frames import LLMRunFrame
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineParams, PipelineTask
-from pipecat.processors.aggregators.openai_llm_context import OpenAILLMContext
+from pipecat.processors.aggregators.llm_context import LLMContext
+from pipecat.processors.aggregators.llm_response_universal import LLMContextAggregatorPair
 from pipecat.runner.types import RunnerArguments
 from pipecat.services.cartesia.tts import CartesiaTTSService
 from pipecat.services.deepgram.stt import DeepgramSTTService
@@ -34,7 +36,15 @@ load_dotenv()
 
 
 async def run_bot(transport: BaseTransport, handle_sigint: bool) -> None:
-    """Run the voice bot with the given parameters."""
+    """Run the voice bot for an inbound call.
+
+    Sets up the bot pipeline with STT, LLM, and TTS services, then handles
+    the conversation when a caller connects.
+
+    Args:
+        transport: Daily transport for the call
+        handle_sigint: Whether to handle SIGINT signals
+    """
 
     stt = DeepgramSTTService(api_key=os.getenv("DEEPGRAM_API_KEY"))
 
@@ -58,8 +68,8 @@ async def run_bot(transport: BaseTransport, handle_sigint: bool) -> None:
     ]
 
     # Setup the conversational context
-    context = OpenAILLMContext(messages)
-    context_aggregator = llm.create_context_aggregator(context)
+    context = LLMContext(messages)
+    context_aggregator = LLMContextAggregatorPair(context)
 
     pipeline = Pipeline(
         [
@@ -86,9 +96,9 @@ async def run_bot(transport: BaseTransport, handle_sigint: bool) -> None:
         logger.debug(f"First participant joined: {participant['id']}")
         await task.queue_frames([LLMRunFrame()])
 
-    @transport.event_handler("on_participant_left")
-    async def on_participant_left(transport, participant, reason):
-        logger.debug(f"Participant left: {participant}, reason: {reason}")
+    @transport.event_handler("on_client_disconnected")
+    async def on_client_disconnected(transport, client):
+        logger.info(f"Client disconnected")
         await task.cancel()
 
     @transport.event_handler("on_dialin_error")
@@ -101,8 +111,18 @@ async def run_bot(transport: BaseTransport, handle_sigint: bool) -> None:
 
 
 async def bot(runner_args: RunnerArguments):
-    """Main bot entry point compatible with Pipecat Cloud."""
-    # Krisp is available when deployed to Pipecat Cloud
+    """Main bot entry point compatible with Pipecat Cloud.
+
+    Parses the runner arguments, configures the Daily transport with dial-in
+    settings, and starts the bot to handle the incoming call.
+
+    Args:
+        runner_args: Arguments from the Pipecat runner containing room details,
+            call ID, and call domain for the inbound call
+
+    Raises:
+        Exception: If bot initialization or execution fails
+    """
 
     try:
         request = AgentRequest.model_validate(runner_args.body)
@@ -123,7 +143,7 @@ async def bot(runner_args: RunnerArguments):
         transport = DailyTransport(
             request.room_url,
             request.token,
-            "Simple Dial-in Bot",
+            "Daily PSTN Dial-in Bot",
             transport_params,
         )
 
