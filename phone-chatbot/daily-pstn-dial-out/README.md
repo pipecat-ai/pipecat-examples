@@ -1,15 +1,38 @@
 # Daily PSTN dial-out simple chatbot
 
-This project demonstrates how to create a voice bot that uses Daily's PSTN capabilities to make calls to phone numbers.
+This project demonstrates how to create a voice bot that uses Daily's PSTN capabilities to make outbound calls to phone numbers.
 
 ## How It Works
 
-1. The server receives a request with the phone number to dial out to
-2. The server creates a Daily room with SIP capabilities
+1. The server receives a dial-out request with the phone number to call
+2. The server creates a Daily room with dial-out capabilities
 3. The server starts the bot process (locally or via Pipecat Cloud based on ENV)
-4. When the bot has joined, it starts the dial-out process and rings the number provided
-5. The user answers the phone and is brought into the call
-6. The end user and bot are connected, and the bot handles the conversation
+4. The bot joins the room and initiates the dial-out to the specified number
+5. The bot automatically retries on failure (up to 5 attempts)
+6. When the call is answered, the bot conducts the conversation
+
+## Project Structure
+
+This example is organized to be production-ready and easy to customize:
+
+- **`server.py`** - FastAPI server that handles dial-out requests
+
+  - Receives dial-out requests via `/dialout` endpoint
+  - Creates Daily rooms with dial-out capabilities
+  - Routes to local or production bot deployment
+  - Uses shared HTTP session for optimal performance
+
+- **`server_utils.py`** - Utility functions for Daily API interactions
+
+  - Data models for dial-out requests and agent configuration
+  - Room creation logic
+  - Bot starting logic (production and local modes)
+  - Easy to extend with custom business logic
+
+- **`bot.py`** - The voice bot implementation
+  - `DialoutManager` class for retry logic
+  - Handles the conversation with the person being called
+  - Deployed to Pipecat Cloud in production or run locally for development
 
 ## Prerequisites
 
@@ -29,7 +52,6 @@ This project demonstrates how to create a voice bot that uses Daily's PSTN capab
 
 - Python 3.10+
 - `uv` package manager (recommended) or pip
-- ngrok (for local development)
 - Docker (for production deployment)
 
 ## Setup
@@ -74,18 +96,30 @@ The bot supports two deployment modes controlled by the `ENV` variable:
 
 ## Run the Bot Locally
 
-1. Start the server:
+You'll need two terminal windows open:
+
+1. **Terminal 1**: Start the webhook server:
 
    ```bash
    uv run server.py
    ```
 
-2. Test the dial-out functionality
+   This runs on port 8080 and handles dial-out requests.
 
-   With server.py running, send the following curl command from your terminal:
+2. **Terminal 2**: Start the bot server:
 
    ```bash
-   curl -X POST "http://localhost:7860/start" \
+   uv run bot.py -t daily
+   ```
+
+   This runs on port 7860 and handles the bot logic.
+
+3. **Test the dial-out functionality**
+
+   With both servers running, send a dial-out request:
+
+   ```bash
+   curl -X POST "http://localhost:8080/dialout" \
      -H "Content-Type: application/json" \
      -d '{
        "dialout_settings": {
@@ -94,26 +128,26 @@ The bot supports two deployment modes controlled by the `ENV` variable:
      }'
    ```
 
-   The server should create a room, the bot will join and then ring the number provided. Answer the call to speak with the bot.
+   The server will create a room, start the bot, and the bot will call the specified number. Answer the call to speak with the bot.
 
 ## Production Deployment
 
 You can deploy your bot to Pipecat Cloud and server to your infrastructure to run this bot in a production environment.
 
-#### Deploy your Bot to Pipecat Cloud
+### Deploy your Bot to Pipecat Cloud
 
 Follow the [quickstart instructions](https://docs.pipecat.ai/getting-started/quickstart#step-2%3A-deploy-to-production) for tips on how to create secrets, build and push a docker image, and deploy your agent to Pipecat Cloud.
 
 You'll only deploy your `bot.py` file.
 
-#### Deploy the Server
+### Deploy the Server
 
 The `server.py` handles dial-out requests and should be deployed separately from your bot:
 
 - **Bot**: Runs on Pipecat Cloud (handles the conversation)
-- **Server**: Runs on your infrastructure (receives requests and starts the bot)
+- **Server**: Runs on your infrastructure (receives dial-out requests and starts the bot)
 
-#### Environment Variables for Production
+### Environment Variables for Production
 
 Add these to your production environment:
 
@@ -124,6 +158,39 @@ PIPECAT_AGENT_NAME=your-agent-name
 ```
 
 The server automatically detects the environment and routes bot starting requests accordingly.
+
+## Customization
+
+This example is designed to be easily customized for your use case:
+
+### Adding Custom Data to Dial-out Requests
+
+You can extend the `DialoutSettings` model in `server_utils.py` to pass custom data:
+
+```python
+class DialoutSettings(BaseModel):
+    phone_number: str
+    caller_id: str | None = None
+    # Add your custom fields here
+    customer_name: str | None = None
+    account_id: str | None = None
+```
+
+Then populate this data in `server.py` before starting the bot:
+
+```python
+# Example: Look up customer information
+customer_info = await get_customer_by_phone(dialout_request.dialout_settings.phone_number)
+
+agent_request = AgentRequest(
+    room_url=daily_room_config.room_url,
+    token=daily_room_config.token,
+    dialout_settings=dialout_request.dialout_settings,
+    # Your custom data
+    customer_name=customer_info.name,
+    account_id=customer_info.id,
+)
+```
 
 ## Troubleshooting
 

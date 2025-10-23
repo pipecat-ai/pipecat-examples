@@ -1,17 +1,39 @@
 # Daily PSTN dial-in simple chatbot
 
-This project demonstrates how to create a voice bot that can receive phone calls via Dailys PSTN capabilities to enable voice conversations.
+This project demonstrates how to create a voice bot that can receive phone calls via Daily's PSTN capabilities to enable voice conversations.
 
 ## How It Works
 
-1. Daily receives an incoming call to your phone number.
-2. Daily calls your webhook server (`/start` endpoint).
+1. Daily receives an incoming call to your phone number
+2. Daily calls your webhook server (`/daily-webhook` endpoint in `server.py`)
 3. The server creates a Daily room with dial-in capabilities
-4. The server starts the bot process with the room details
+4. The server starts the bot process with the room details (locally or via Pipecat Cloud)
 5. The caller is put on hold with music
 6. The bot joins the Daily room and signals readiness
 7. Daily forwards the call to the Daily room
 8. The caller and the bot are connected, and the bot handles the conversation
+
+## Project Structure
+
+This example is organized to be production-ready and easy to customize:
+
+- **`server.py`** - FastAPI webhook server that handles incoming calls
+
+  - Receives Daily PSTN webhooks
+  - Creates Daily rooms
+  - Routes to local or production bot deployment
+  - Uses shared HTTP session for optimal performance
+
+- **`server_utils.py`** - Utility functions for Daily API interactions
+
+  - Data models for call data and agent requests
+  - Room creation logic
+  - Bot starting logic (production and local modes)
+  - Easy to extend with custom business logic
+
+- **`bot.py`** - The voice bot implementation
+  - Handles the conversation with the caller
+  - Deployed to Pipecat Cloud in production or run locally for development
 
 ## Prerequisites
 
@@ -57,7 +79,7 @@ Copy the example file and fill in your API keys:
 
    Instructions on how to do that can be found at this [docs link:](https://docs.daily.co/reference/rest-api/domainDialinConfig).
 
-   Note that the `room_creation_api` is the address and route of your server that will handle the webhook that fires when a call is received. For local testing this will be your `ngrok` tunnel URL and the route should match your server's endpoint. In testing your demo, this will be `https://your-ngrok-url.ngrok.io/start`.
+   Note that the `room_creation_api` is the address and route of your server that will handle the webhook that fires when a call is received. For local testing this will be your `ngrok` tunnel URL and the route should match your server's endpoint. In testing your demo, this will be `https://your-ngrok-url.ngrok.io/daily-webhook`.
 
    > Tip: If you're using Pipecat Cloud, you can purchase a number using the Pipecat Cloud dashboard (Settings > Telephony).
 
@@ -78,23 +100,33 @@ The bot supports two deployment modes controlled by the `ENV` variable:
 
 ## Run the Bot Locally
 
-1. Start the webhook server:
+You'll need three terminal windows open:
+
+1. Terminal 1: Start the webhook server:
 
    ```bash
-   python server.py
+   uv run server.py
    ```
 
-2. Start an ngrok tunnel to expose your local server
+2. Terminal 2: Start an ngrok tunnel to expose the FastAPI server running on server.py
 
    ```bash
-   ngrok http 7860
+   ngrok http 8080
    ```
 
    Important: Make sure that this URL matches the `room_creation_api` URL for your phone number.
 
    > Tip: Use the `--subdomain` for a reusable ngrok link.
 
-3. Call your bot!
+3. Terminal 3: Run your bot:
+
+   ```bash
+   uv run bot.py -t daily
+   ```
+
+   > The bot.py file includes a FastAPI server. This emulates the Pipecat Cloud service, and is as if you're running with `min_agents=1`.
+
+4. Call your bot!
 
    Call the number you configured to talk to your bot.
 
@@ -102,20 +134,20 @@ The bot supports two deployment modes controlled by the `ENV` variable:
 
 You can deploy your bot to Pipecat Cloud and server to your infrastructure to run this bot in a production environment.
 
-#### Deploy your Bot to Pipecat Cloud
+### Deploy your Bot to Pipecat Cloud
 
 Follow the [quickstart instructions](https://docs.pipecat.ai/getting-started/quickstart#step-2%3A-deploy-to-production) for tips on how to create secrets, build and push a docker image, and deploy your agent to Pipecat Cloud.
 
 You'll only deploy your `bot.py` file.
 
-#### Deploy the Server
+### Deploy the Server
 
 The `server.py` handles inbound call webhooks and should be deployed separately from your bot:
 
 - **Bot**: Runs on Pipecat Cloud (handles the conversation)
 - **Server**: Runs on your infrastructure (receives webhooks and starts the bot)
 
-#### Environment Variables for Production
+### Environment Variables for Production
 
 Add these to your production environment:
 
@@ -126,6 +158,37 @@ PIPECAT_AGENT_NAME=your-agent-name
 ```
 
 The server automatically detects the environment and routes bot starting requests accordingly.
+
+## Adding Custom Data to Agent Requests
+
+You can extend the `AgentRequest` model in `server_utils.py` to pass custom data to your bot:
+
+```python
+class AgentRequest(BaseModel):
+    room_url: str
+    token: str
+    call_id: str
+    call_domain: str
+    # Add your custom fields here
+    customer_name: str | None = None
+    account_id: str | None = None
+```
+
+Then populate this data in `server.py` before starting the bot:
+
+```python
+# Example: Look up customer information
+customer_info = await get_customer_by_phone(call_data.from_phone)
+
+agent_request = AgentRequest(
+    room_url=daily_room_config.room_url,
+    token=daily_room_config.token,
+    call_id=call_data.call_id,
+    call_domain=call_data.call_domain,
+    customer_name=customer_info.name,
+    account_id=customer_info.id,
+)
+```
 
 ## Troubleshooting
 
