@@ -9,12 +9,13 @@
 Daily PSTN Dial-in Bot.
 """
 
-import json
 import os
 
 from dotenv import load_dotenv
 from loguru import logger
+from pipecat.audio.turn.smart_turn.local_smart_turn_v3 import LocalSmartTurnAnalyzerV3
 from pipecat.audio.vad.silero import SileroVADAnalyzer
+from pipecat.audio.vad.vad_analyzer import VADParams
 from pipecat.frames.frames import LLMRunFrame
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
@@ -26,6 +27,8 @@ from pipecat.services.deepgram.stt import DeepgramSTTService
 from pipecat.services.openai.llm import OpenAILLMService
 from pipecat.transports.base_transport import BaseTransport
 from pipecat.transports.daily.transport import DailyDialinSettings, DailyParams, DailyTransport
+
+from server_utils import AgentRequest
 
 load_dotenv()
 
@@ -88,28 +91,10 @@ async def run_bot(transport: BaseTransport, handle_sigint: bool) -> None:
         logger.debug(f"Participant left: {participant}, reason: {reason}")
         await task.cancel()
 
-    @transport.event_handler("on_dialin_ready")
-    async def on_dialin_ready(transport, cdata):
-        logger.debug(f"Dial-in ready: {cdata}")
-
-    @transport.event_handler("on_dialin_connected")
-    async def on_dialin_connected(transport, data):
-        logger.debug(f"Dial-in connected: {data}")
-
-    @transport.event_handler("on_dialin_stopped")
-    async def on_dialin_stopped(transport, data):
-        logger.debug(f"Dial-in stopped: {data}")
-
     @transport.event_handler("on_dialin_error")
     async def on_dialin_error(transport, data):
         logger.error(f"Dial-in error: {data}")
-        # If there is an error, the bot should leave the call
-        # This may be also handled in on_participant_left with
-        # await task.cancel()
-
-    @transport.event_handler("on_dialin_warning")
-    async def on_dialin_warning(transport, data):
-        logger.warning(f"Dial-in warning: {data}")
+        await task.cancel()
 
     runner = PipelineRunner(handle_sigint=handle_sigint)
     await runner.run(task)
@@ -117,35 +102,39 @@ async def run_bot(transport: BaseTransport, handle_sigint: bool) -> None:
 
 async def bot(runner_args: RunnerArguments):
     """Main bot entry point compatible with Pipecat Cloud."""
-    # Body is always a dict (compatible with both local and Pipecat Cloud)
-    body_data = runner_args.body
-    room_url = body_data.get("room_url")
-    token = body_data.get("token")
-    call_id = body_data.get("callId")
-    call_domain = body_data.get("callDomain")
+    # Krisp is available when deployed to Pipecat Cloud
 
-    if not all([call_id, call_domain]):
-        logger.error("Call ID and Call Domain are required in the body.")
-        return None
+    try:
+        request = AgentRequest.model_validate(runner_args.body)
 
-    daily_dialin_settings = DailyDialinSettings(call_id=call_id, call_domain=call_domain)
+        daily_dialin_settings = DailyDialinSettings(
+            call_id=request.call_id, call_domain=request.call_domain
+        )
 
-    transport_params = DailyParams(
-        api_url=os.getenv("DAILY_API_URL", "https://api.daily.co/v1"),
-        api_key=os.getenv("DAILY_API_KEY", ""),
-        dialin_settings=daily_dialin_settings,
-        audio_in_enabled=True,
-        audio_out_enabled=True,
-        video_out_enabled=False,
-        vad_analyzer=SileroVADAnalyzer(),
-        transcription_enabled=True,
-    )
+        transport_params = DailyParams(
+            api_key=os.getenv("DAILY_API_KEY", ""),
+            dialin_settings=daily_dialin_settings,
+            audio_in_enabled=True,
+            audio_out_enabled=True,
+            vad_analyzer=SileroVADAnalyzer(params=VADParams(stop_secs=0.2)),
+            turn_analyzer=LocalSmartTurnAnalyzerV3(),
+        )
 
-    transport = DailyTransport(
-        room_url,
-        token,
-        "Simple Dial-in Bot",
-        transport_params,
-    )
+        transport = DailyTransport(
+            request.room_url,
+            request.token,
+            "Simple Dial-in Bot",
+            transport_params,
+        )
 
-    await run_bot(transport, runner_args.handle_sigint)
+        await run_bot(transport, runner_args.handle_sigint)
+
+    except Exception as e:
+        logger.error(f"Error running bot: {e}")
+        raise e
+
+
+if __name__ == "__main__":
+    from pipecat.runner.run import main
+
+    main()
