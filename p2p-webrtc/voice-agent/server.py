@@ -5,59 +5,51 @@
 #
 
 import argparse
-import asyncio
 import sys
 from contextlib import asynccontextmanager
-from typing import Dict
 
 import uvicorn
 from bot import run_bot
 from dotenv import load_dotenv
-from fastapi import BackgroundTasks, FastAPI
+from fastapi import BackgroundTasks, FastAPI, Request
 from fastapi.responses import FileResponse
 from loguru import logger
-from pipecat.transports.smallwebrtc.connection import IceServer, SmallWebRTCConnection
+from pipecat.transports.smallwebrtc.request_handler import (
+    SmallWebRTCPatchRequest,
+    SmallWebRTCRequest,
+    SmallWebRTCRequestHandler,
+)
 
 # Load environment variables
 load_dotenv(override=True)
 
 app = FastAPI()
 
-# Store connections by pc_id
-pcs_map: Dict[str, SmallWebRTCConnection] = {}
-
-
-ice_servers = [
-    IceServer(
-        urls="stun:stun.l.google.com:19302",
-    )
-]
+# Initialize the SmallWebRTC request handler
+small_webrtc_handler: SmallWebRTCRequestHandler = SmallWebRTCRequestHandler()
 
 
 @app.post("/api/offer")
-async def offer(request: dict, background_tasks: BackgroundTasks):
-    pc_id = request.get("pc_id")
+async def offer(request: SmallWebRTCRequest, background_tasks: BackgroundTasks):
+    """Handle WebRTC offer requests via SmallWebRTCRequestHandler."""
 
-    if pc_id and pc_id in pcs_map:
-        pipecat_connection = pcs_map[pc_id]
-        logger.info(f"Reusing existing connection for pc_id: {pc_id}")
-        await pipecat_connection.renegotiate(sdp=request["sdp"], type=request["type"])
-    else:
-        pipecat_connection = SmallWebRTCConnection(ice_servers)
-        await pipecat_connection.initialize(sdp=request["sdp"], type=request["type"])
+    # Prepare runner arguments with the callback to run your bot
+    async def webrtc_connection_callback(connection):
+        background_tasks.add_task(run_bot, connection)
 
-        @pipecat_connection.event_handler("closed")
-        async def handle_disconnected(webrtc_connection: SmallWebRTCConnection):
-            logger.info(f"Discarding peer connection for pc_id: {webrtc_connection.pc_id}")
-            pcs_map.pop(webrtc_connection.pc_id, None)
-
-        background_tasks.add_task(run_bot, pipecat_connection)
-
-    answer = pipecat_connection.get_answer()
-    # Updating the peer connection inside the map
-    pcs_map[answer["pc_id"]] = pipecat_connection
-
+    # Delegate handling to SmallWebRTCRequestHandler
+    answer = await small_webrtc_handler.handle_web_request(
+        request=request,
+        webrtc_connection_callback=webrtc_connection_callback,
+    )
     return answer
+
+
+@app.patch("/api/offer")
+async def ice_candidate(request: SmallWebRTCPatchRequest):
+    logger.debug(f"Received patch request: {request}")
+    await small_webrtc_handler.handle_patch_request(request)
+    return {"status": "success"}
 
 
 @app.get("/")
@@ -68,9 +60,7 @@ async def serve_index():
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     yield  # Run app
-    coros = [pc.disconnect() for pc in pcs_map.values()]
-    await asyncio.gather(*coros)
-    pcs_map.clear()
+    await small_webrtc_handler.close()
 
 
 if __name__ == "__main__":
