@@ -89,8 +89,13 @@ async def run_bot(transport: BaseTransport, handle_sigint: bool):
 async def bot(runner_args: RunnerArguments):
     """Main bot entry point compatible with Pipecat Cloud."""
 
-    transport_type, call_data = await parse_telephony_websocket(runner_args.websocket)
-    logger.info(f"Auto-detected transport: {transport_type}")
+    _, call_data = await parse_telephony_websocket(runner_args.websocket)
+    from_number = call_data["from"]
+
+    # Extract the from number from the call data, which allows you to identify the caller.
+    # With this information, you can make a request to your API to get the user's information
+    # and inject that information into your bot's configuration.
+    logger.info(f"From number: {from_number}")
 
     serializer = TelnyxFrameSerializer(
         stream_id=call_data["stream_id"],

@@ -71,17 +71,38 @@ To run the twilio-chatbot for inbound calling locally, we'll first set up an ngr
    - Log in to the Telnyx developer portal: https://portal.telnyx.com/
    - Buy a number: https://portal.telnyx.com/#/numbers/buy-numbers
 
-3. Create a Telnyx TeXML application:
+3. Create your TeXML Bin:
+
+   - Go to your TeXML Bin configuration page: https://portal.telnyx.com/#/call-control/texml-bin
+   - Create a new TeXML Bin
+   - In the "Name" field, provide a name
+   - Leave the "URL" field blank
+   - In the "Content" field, add the TeXML:
+
+     ```xml
+      <?xml version="1.0" encoding="UTF-8"?>
+         <Response>
+         <Connect>
+            <Stream url="wss://your-url.ngrok.io/ws" bidirectionalMode="rtp"></Stream>
+         </Connect>
+         <Pause length="40"/>
+      </Response>
+     ```
+
+4. Create a Telnyx TeXML application:
 
    - Go to your TeXML configuration page: https://portal.telnyx.com/#/call-control/texml
    - Create a new TeXML app, if one doesn't exist already:
      - Add an application name
      - Under Webhooks, select POST as the "Voice Method"
-     - Select "Custom URL" under Webhook URL Method
-     - Enter your ngrok URL in the "Webhook URL" field (e.g. https://your-name.ngrok.io)
+     - Select "TeXML Bin URL" under Webhook URL Method
+     - Select the TeXML Bin you created in the previous step
      - Click "Create" to save
        Note: You'll see subsequent pages to set up SIP and Outbound, both are not required, so just skip.
-   - Navigate to "Manage Numbers" (https://portal.telnyx.com/#/numbers/my-numbers) and under SIP connection, select the pencil icon to edit and select the TeXML application that you just created.
+
+5. Add TeXML application to your number:
+   - Navigate to "Manage Numbers" (https://portal.telnyx.com/#/numbers/my-numbers)
+   - Select the pencil icon next to the phone number of interest and select the TeXML application that you just created
 
 ### Run your bot
 
@@ -89,11 +110,11 @@ The bot.py file uses the Pipecat development runner, which runs a FastAPI server
 
 1. To get started, we'll run our bot.py file:
 
-```bash
-uv run bot.py --transport telnyx --proxy your_ngrok_url
-```
+   ```bash
+   uv run bot.py --transport telnyx --proxy your_ngrok_url
+   ```
 
-> Replace `your_ngrok_url` with your ngrok URL (e.g. your-subdomain.ngrok.io)
+   > Replace `your_ngrok_url` with your ngrok URL (e.g. your-subdomain.ngrok.io)
 
 2. Call the number associated with your TeXML applicaiton. Your bot will answer and begin talking to you!
 
@@ -105,51 +126,26 @@ To deploy your telnyx-chatbot for inbound calling, we'll use [Pipecat Cloud](htt
 
 Follow the [quickstart instructions](https://docs.pipecat.ai/getting-started/quickstart#step-2%3A-deploy-to-production) for tips on how to create secrets, build and push a docker image, and deploy your agent to Pipecat Cloud.
 
-### Configure Telnyx TeXML application
+### Configure Telnyx for production
 
-We'll create a new TeXML application that returns TeXML and uses a different number. This will enable your bot to run without a FastAPI server and will provide you with a separate phone number to use for production testing.
+You'll want to purchase additional phone numbers for your production use. You can follow the steps above.
 
-1. If you haven't already, purchase a number from Telnyx.
+To run on Pipecat Cloud, the one change you'll have to make is to your TeXML Bin. You'll need to update the websocket URL to point to Pipecat Cloud. Your TeXML should look like this:
 
-   - Log in to the Telnyx developer portal: https://portal.telnyx.com/
-   - Buy a number: https://portal.telnyx.com/#/numbers/buy-numbers
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+   <Connect>
+      <Stream url="wss://api.pipecat.daily.co/ws/telnyx?serviceHost=AGENT_NAME.ORGANIZATION_NAME" bidirectionalMode="rtp"></Stream>
+   </Connect>
+   <Pause length="40"/>
+</Response>
+```
 
-2. Create your TeXML Bin:
+Replace:
 
-   - Go to your TeXML Bin configuration page: https://portal.telnyx.com/#/call-control/texml-bin
-   - Create a new TeXML Bin
-   - In the "Name" field, provide a name
-   - Leave the "URL" field blank
-   - In the "Content" field, add the TeXML:
-
-     ```bash
-     <?xml version="1.0" encoding="UTF-8"?>
-     <Response>
-        <Connect>
-           <Stream url="wss://api.pipecat.daily.co/ws/telnyx?serviceHost=AGENT_NAME.ORGANIZATION_NAME" bidirectionalMode="rtp"></Stream>
-        </Connect>
-        <Pause length="40"/>
-     </Response>
-     ```
-
-   Replace:
-
-   - `AGENT_NAME` with the name of the agent you deployed in the previous stepyour deployed agent name
-   - `ORGANIZATION_NAME` with your Pipecat Cloud organization name
-
-   - Click "Save" to save your TeXML Bin
-
-3. Create a Telnyx TeXML application:
-
-   - Go to your TeXML configuration page: https://portal.telnyx.com/#/call-control/texml
-   - Create a new TeXML app, if one doesn't exist already:
-     - Add an application name
-     - Under Webhooks, select POST as the "Voice Method"
-     - Select "TeXML Bin URL" under Webhook URL Method
-     - In the "TeXML Bins" dropdown, select the TeXML Bin we created in the previous step
-     - Click "Create" to save
-       Note: You'll see subsequent pages to set up SIP and Outbound, both are not required, so just skip.
-   - Navigate to "Manage Numbers" (https://portal.telnyx.com/#/numbers/my-numbers) and under SIP connection, select the pencil icon to edit and select the TeXML application that you just created.
+- `AGENT_NAME` with the name of the agent you deployed in the previous stepyour deployed agent name
+- `ORGANIZATION_NAME` with your Pipecat Cloud organization name
 
 ### Call your Bot
 
