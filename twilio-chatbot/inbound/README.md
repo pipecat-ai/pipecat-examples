@@ -120,7 +120,7 @@ The bot supports two deployment modes controlled by the `ENV` variable:
 Run your bot by passing in the `twilio` command line arg
 
 ```bash
-uv run bot.py -t twilio
+uv run bot.py --transport twilio --proxy your_ngrok_url
 ```
 
 > Note: This bot uses [Pipecat's development runner](https://docs.pipecat.ai/server/utilities/runner/guide), which runs a FastAPI server that handles and routes incoming WebSocket messages to your bot.
