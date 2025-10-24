@@ -165,6 +165,26 @@ class VoiceClientManager(private val context: Context) {
             override fun onRemoteAudioLevel(level: Float, participant: Participant) {
                 botAudioLevel.floatValue = level
             }
+
+            override fun onConnected() {
+                Log.i(TAG, "Connected")
+            }
+
+            override fun onBotConnected(participant: Participant) {
+                Log.i(TAG, "Bot connected: $participant")
+            }
+
+            override fun onBotDisconnected(participant: Participant) {
+                Log.i(TAG, "Bot disconnected: $participant")
+            }
+
+            override fun onParticipantJoined(participant: Participant) {
+                Log.i(TAG, "Participant joined: $participant")
+            }
+
+            override fun onParticipantLeft(participant: Participant) {
+                Log.i(TAG, "Participant left: $participant")
+            }
         }
 
         val options = PipecatClientOptions(
