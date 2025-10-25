@@ -117,6 +117,62 @@ async def handle_call(request: Request):
         raise HTTPException(status_code=500, detail=f"Server error: {e!s}")
 
 
+@app.post("/start")
+async def start_bot_endpoint(request: Request):
+    """Start bot endpoint for local development.
+
+    This endpoint mimics the Pipecat Cloud API pattern, receiving the same body data
+    structure and starting the bot locally. Used only in local development mode.
+
+    Args:
+        request: FastAPI request containing body with room_url, token, call_id, sip_uri
+
+    Returns:
+        dict: Success status and call_id
+    """
+
+    try:
+        # Parse the request body
+        request_data = await request.json()
+        body = request_data.get("body", {})
+
+        # Extract required data from body
+        room_url = body.get("room_url")
+        token = body.get("token")
+        call_sid = body.get("call_sid")
+        sip_uri = body.get("sip_uri")
+
+        if not all([room_url, token, call_sid, sip_uri]):
+            raise HTTPException(
+                status_code=400,
+                detail="Missing required parameters in body: room_url, token, call_id, sip_uri",
+            )
+
+        from pipecat.runner.types import DailyRunnerArguments
+
+        from bot import bot as bot_function
+
+        # Create runner arguments with body data
+        # Note: room_url and token are passed via body, not as direct arguments
+        runner_args = DailyRunnerArguments(
+            room_url=None,  # Data comes from body
+            token=None,  # Data comes from body
+            body=body,
+        )
+        runner_args.handle_sigint = False
+
+        # Start the bot in the background
+        import asyncio
+
+        asyncio.create_task(bot_function(runner_args))
+
+        return {"status": "Bot started successfully", "call_sid": call_sid}
+
+    except Exception as e:
+        logger.error(f"Error in /start endpoint: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to start bot: {str(e)}")
+
+
 @app.get("/health")
 async def health_check():
     """Health check endpoint.
