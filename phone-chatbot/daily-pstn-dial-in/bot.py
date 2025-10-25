@@ -32,7 +32,7 @@ from pipecat.transports.daily.transport import DailyDialinSettings, DailyParams,
 
 from server_utils import AgentRequest
 
-load_dotenv()
+load_dotenv(override=True)
 
 
 async def run_bot(transport: BaseTransport, handle_sigint: bool) -> None:

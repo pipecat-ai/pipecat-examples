@@ -36,8 +36,6 @@ from server_utils import (
 
 load_dotenv()
 
-# ----------------- API ----------------- #
-
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -116,9 +114,6 @@ async def health_check():
         dict: Status indicating server health
     """
     return {"status": "healthy"}
-
-
-# ----------------- Main ----------------- #
 
 
 if __name__ == "__main__":
