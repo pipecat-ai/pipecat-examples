@@ -3,12 +3,14 @@ import SwiftUI
 struct PreJoinView: View {
 
     @State var backendURL: String
+    @State var apiKey: String
 
     @EnvironmentObject private var model: CallContainerModel
 
     init() {
         let currentSettings = SettingsManager.getSettings()
         self.backendURL = currentSettings.backendURL
+        self.apiKey = currentSettings.apiKey
     }
 
     var body: some View {
@@ -22,9 +24,13 @@ struct PreJoinView: View {
                 .textFieldStyle(RoundedBorderTextFieldStyle())
                 .frame(maxWidth: .infinity)
                 .padding([.bottom, .horizontal])
+            SecureField("Authorization token", text: $apiKey)
+                .textFieldStyle(RoundedBorderTextFieldStyle())
+                .frame(maxWidth: .infinity)
+                .padding([.horizontal])
             Button("Connect") {
                 Task {
-                    await self.model.connect(backendURL: self.backendURL)
+                    self.model.connect(backendURL: self.backendURL, apiKey: self.apiKey)
                 }
             }
             .padding()

@@ -9,10 +9,14 @@ struct SettingsView: View {
     @State private var isMicEnabled: Bool = true
     @State private var isCamEnabled: Bool = true
     @State private var backendURL: String = ""
+    @State private var apiKey: String = ""
     
     var body: some View {
         NavigationView {
             Form {
+                Section(header: Text("Credentials")) {
+                    SecureField("API Key", text: $apiKey)
+                }
                 Section {
                     List(model.availableMics, id: \.self.id.id) { mic in
                         Button(action: {
@@ -62,7 +66,8 @@ struct SettingsView: View {
             selectedMic: model.selectedMic?.id,
             enableMic: isMicEnabled,
             enableCam: isCamEnabled,
-            backendURL: backendURL
+            backendURL: backendURL,
+            apiKey: apiKey
         )
         SettingsManager.updateSettings(settings: newSettings)
     }
@@ -72,6 +77,7 @@ struct SettingsView: View {
         self.isMicEnabled = savedSettings.enableMic
         self.isCamEnabled = savedSettings.enableCam
         self.backendURL = savedSettings.backendURL
+        self.apiKey = savedSettings.apiKey
     }
 }
 
