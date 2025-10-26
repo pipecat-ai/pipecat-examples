@@ -25,12 +25,10 @@ class DialoutSettings(BaseModel):
     """Settings for outbound call.
 
     Attributes:
-        phone_number: The phone number to dial
-        caller_id: Optional caller ID to display (if not provided, uses your Daily number)
+        sip_uri: The SIP URI to dial
     """
 
-    phone_number: str
-    caller_id: str | None = None
+    sip_uri: str
     # Include any custom data here needed for the call
 
 
@@ -90,10 +88,10 @@ async def dialout_request_from_request(request: Request) -> DialoutRequest:
 async def create_daily_room(
     dialout_request: DialoutRequest, session: aiohttp.ClientSession
 ) -> DailyRoomConfig:
-    """Create a Daily room configured for PSTN dial-out.
+    """Create a Daily room configured for SIP dial-out.
 
     Args:
-        dialout_request: Dial-out request containing phone number and settings
+        dialout_request: Dial-out request containing SIP URI
         session: Shared aiohttp session for making HTTP requests
 
     Returns:
@@ -102,10 +100,16 @@ async def create_daily_room(
     Raises:
         HTTPException: If room creation fails
     """
+    sip_uri = dialout_request.dialout_settings.sip_uri
+
+    if sip_uri.startswith("sip:") and "@" in sip_uri:
+        phone_part = sip_uri[4:]  # Remove 'sip:' prefix
+        sip_caller_phone = phone_part.split("@")[0]  # Get everything before '@'
+    else:
+        raise HTTPException(status_code=400, detail="Invalid SIP URI")
+
     try:
-        return await configure(
-            session, sip_caller_phone=dialout_request.dialout_settings.phone_number
-        )
+        return await configure(session, sip_caller_phone=sip_caller_phone)
     except Exception as e:
         logger.error(f"Error creating Daily room: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to create Daily room: {str(e)}")
@@ -131,7 +135,7 @@ async def start_bot_production(agent_request: AgentRequest, session: aiohttp.Cli
         )
 
     logger.debug(
-        f"Starting bot via Pipecat Cloud for dial-out to {agent_request.dialout_settings.phone_number}"
+        f"Starting bot via Pipecat Cloud for dial-out to {agent_request.dialout_settings.sip_uri}"
     )
 
     body_data = agent_request.model_dump(exclude_none=True)
@@ -169,7 +173,7 @@ async def start_bot_local(agent_request: AgentRequest, session: aiohttp.ClientSe
     local_server_url = os.getenv("LOCAL_SERVER_URL", "http://localhost:7860")
 
     logger.debug(
-        f"Starting bot via local /start endpoint for dial-out to {agent_request.dialout_settings.phone_number}"
+        f"Starting bot via local /start endpoint for dial-out to {agent_request.dialout_settings.sip_uri}"
     )
 
     body_data = agent_request.model_dump(exclude_none=True)

@@ -36,8 +36,6 @@ from server_utils import (
 
 load_dotenv()
 
-# ----------------- API ----------------- #
-
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):

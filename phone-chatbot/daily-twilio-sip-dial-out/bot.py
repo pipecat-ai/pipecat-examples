@@ -7,48 +7,104 @@
 """Daily + Twilio SIP dial-out voice bot implementation."""
 
 import os
-import sys
-from typing import Any
+from typing import Any, Optional
 
 from dotenv import load_dotenv
 from loguru import logger
+from pipecat.audio.turn.smart_turn.local_smart_turn_v3 import LocalSmartTurnAnalyzerV3
 from pipecat.audio.vad.silero import SileroVADAnalyzer
+from pipecat.audio.vad.vad_analyzer import VADParams
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineParams, PipelineTask
-from pipecat.processors.aggregators.openai_llm_context import OpenAILLMContext
+from pipecat.processors.aggregators.llm_context import LLMContext
+from pipecat.processors.aggregators.llm_response_universal import LLMContextAggregatorPair
 from pipecat.runner.types import RunnerArguments
 from pipecat.services.cartesia.tts import CartesiaTTSService
 from pipecat.services.deepgram.stt import DeepgramSTTService
 from pipecat.services.openai.llm import OpenAILLMService
 from pipecat.transports.daily.transport import DailyParams, DailyTransport
 
+from server_utils import AgentRequest, DialoutSettings
+
 load_dotenv(override=True)
 
-logger.remove(0)
-logger.add(sys.stderr, level="DEBUG")
 
-daily_api_key = os.getenv("DAILY_API_KEY", "")
-daily_api_url = os.getenv("DAILY_API_URL", "https://api.daily.co/v1")
+class DialoutManager:
+    """Manages dialout attempts with retry logic.
+
+    Handles the complexity of initiating outbound calls with automatic retry
+    on failure, up to a configurable maximum number of attempts.
+
+    Args:
+        transport: The Daily transport instance for making the dialout
+        dialout_settings: Settings containing SIP URI
+        max_retries: Maximum number of dialout attempts (default: 5)
+    """
+
+    def __init__(
+        self,
+        transport: DailyTransport,
+        dialout_settings: DialoutSettings,
+        max_retries: Optional[int] = 5,
+    ):
+        self._transport = transport
+        self._sip_uri = dialout_settings.sip_uri
+        self._max_retries = max_retries
+        self._attempt_count = 0
+        self._is_successful = False
+
+    async def attempt_dialout(self) -> bool:
+        """Attempt to start a dialout call.
+
+        Initiates an outbound call if retry limit hasn't been reached and
+        no successful connection has been made yet.
+
+        Returns:
+            True if dialout attempt was initiated, False if max retries reached
+            or call already successful
+        """
+        if self._attempt_count >= self._max_retries:
+            logger.error(
+                f"Maximum retry attempts ({self._max_retries}) reached. Giving up on dialout."
+            )
+            return False
+
+        if self._is_successful:
+            logger.debug("Dialout already successful, skipping attempt")
+            return False
+
+        self._attempt_count += 1
+        logger.info(
+            f"Attempting dialout (attempt {self._attempt_count}/{self._max_retries}) to: {self._sip_uri}"
+        )
+
+        await self._transport.start_dialout({"sipUri": self._sip_uri})
+        return True
+
+    def mark_successful(self):
+        """Mark the dialout as successful to prevent further retry attempts."""
+        self._is_successful = True
+
+    def should_retry(self) -> bool:
+        """Check if another dialout attempt should be made.
+
+        Returns:
+            True if retry limit not reached and call not yet successful
+        """
+        return self._attempt_count < self._max_retries and not self._is_successful
 
 
-async def run_bot(transport: DailyTransport, dialout_settings: dict, handle_sigint: bool) -> None:
+async def run_bot(
+    transport: DailyTransport, dialout_settings: DialoutSettings, handle_sigint: bool
+) -> None:
     """Run the voice bot with the given parameters.
 
     Args:
         transport: The Daily transport instance
-        dialout_settings: Dial-out configuration containing SIP URI
+        dialout_settings: Settings containing SIP URI for dialout
     """
-    logger.info(f"Starting dial-out bot")
-    logger.debug(f"Dialout settings: {dialout_settings}")
-
-    if not dialout_settings.get("sip_uri"):
-        logger.error("Dial-out sip_uri not found in the dial-out settings")
-        return
-
-    # Extract sip_uri
-    sip_uri = dialout_settings["sip_uri"]
-    logger.info(f"Will dial out to: {sip_uri}")
+    logger.info(f"Starting dial-out bot, dialing out to: {dialout_settings.sip_uri}")
 
     stt = DeepgramSTTService(api_key=os.getenv("DEEPGRAM_API_KEY"))
     llm = OpenAILLMService(api_key=os.getenv("OPENAI_API_KEY"))
@@ -69,8 +125,8 @@ async def run_bot(transport: DailyTransport, dialout_settings: dict, handle_sigi
         },
     ]
 
-    context = OpenAILLMContext(messages)
-    context_aggregator = llm.create_context_aggregator(context)
+    context = LLMContext(messages)
+    context_aggregator = LLMContextAggregatorPair(context)
 
     # Build pipeline
     pipeline = Pipeline(
@@ -94,101 +150,63 @@ async def run_bot(transport: DailyTransport, dialout_settings: dict, handle_sigi
         ),
     )
 
-    max_retries = 5
-    retry_count = 0
-    dialout_successful = False
-
-    # Build dialout parameters conditionally
-    dialout_params = {"sipUri": sip_uri}
-
-    logger.debug(f"Dialout parameters: {dialout_params}")
-
-    async def attempt_dialout():
-        """Attempt to start dialout with retry logic."""
-        nonlocal retry_count, dialout_successful
-
-        if retry_count < max_retries and not dialout_successful:
-            retry_count += 1
-            logger.info(f"Attempting dialout (attempt {retry_count}/{max_retries}) to: {sip_uri}")
-            await transport.start_dialout(dialout_params)
-        else:
-            logger.error(f"Maximum retry attempts ({max_retries}) reached. Giving up on dialout.")
+    # Initialize dialout manager
+    dialout_manager = DialoutManager(transport, dialout_settings)
 
     @transport.event_handler("on_joined")
     async def on_joined(transport, data):
-        # Start initial dialout attempt
-        logger.debug(f"Dialout settings detected; starting dialout to number: {sip_uri}")
-        await attempt_dialout()
-
-    @transport.event_handler("on_dialout_connected")
-    async def on_dialout_connected(transport, data):
-        logger.debug(f"Dial-out connected: {data}")
+        await dialout_manager.attempt_dialout()
 
     @transport.event_handler("on_dialout_answered")
     async def on_dialout_answered(transport, data):
-        nonlocal dialout_successful
         logger.debug(f"Dial-out answered: {data}")
-        dialout_successful = True  # Mark as successful to stop retries
-        # Automatically start capturing transcription for the participant
-        await transport.capture_participant_transcription(data["sessionId"])
-        # The bot will wait to hear the user before the bot speaks
+        dialout_manager.mark_successful()
 
     @transport.event_handler("on_dialout_error")
     async def on_dialout_error(transport, data: Any):
-        logger.error(f"Dial-out error (attempt {retry_count}/{max_retries}): {data}")
+        logger.error(f"Dial-out error, retrying: {data}")
 
-        if retry_count < max_retries:
-            logger.info(f"Retrying dialout")
-            await attempt_dialout()
+        if dialout_manager.should_retry():
+            await dialout_manager.attempt_dialout()
         else:
-            logger.error(f"All {max_retries} dialout attempts failed. Stopping bot.")
+            logger.error(f"No more retries allowed, stopping bot.")
             await task.cancel()
 
-    @transport.event_handler("on_first_participant_joined")
-    async def on_first_participant_joined(transport, participant):
-        logger.debug(f"First participant joined: {participant['id']}")
-
-    @transport.event_handler("on_participant_left")
-    async def on_participant_left(transport, participant, reason):
-        logger.debug(f"Participant left: {participant}, reason: {reason}")
+    @transport.event_handler("on_client_disconnected")
+    async def on_client_disconnected(transport, client):
+        logger.info(f"Client disconnected")
         await task.cancel()
 
     runner = PipelineRunner(handle_sigint=handle_sigint)
+
     await runner.run(task)
 
 
 async def bot(runner_args: RunnerArguments):
     """Main bot entry point compatible with Pipecat Cloud."""
+    try:
+        request = AgentRequest.model_validate(runner_args.body)
 
-    # Extract all details from the body parameter
-    body = getattr(runner_args, "body", {})
-    room_url = body.get("room_url")
-    token = body.get("token")
-    dialout_settings = body.get("dialout_settings", {})
-    handle_sigint = body.get("handle_sigint", False)
+        transport = DailyTransport(
+            request.room_url,
+            request.token,
+            "SIP Dial-out Bot",
+            params=DailyParams(
+                audio_in_enabled=True,
+                audio_out_enabled=True,
+                vad_analyzer=SileroVADAnalyzer(params=VADParams(stop_secs=0.2)),
+                turn_analyzer=LocalSmartTurnAnalyzerV3(),
+            ),
+        )
 
-    if not dialout_settings:
-        logger.error("Missing dialout_settings in body")
-        raise ValueError("dialout_settings are required in the body parameter")
+        await run_bot(transport, request.dialout_settings, runner_args.handle_sigint)
 
-    if not room_url or not token:
-        logger.error(f"Missing room connection details: room_url={room_url}, token={token}")
-        raise ValueError("room_url and token are required")
+    except Exception as e:
+        logger.error(f"Error running bot: {e}")
+        raise e
 
-    logger.info(f"Starting bot for room: {room_url}")
 
-    transport = DailyTransport(
-        room_url,
-        token,
-        "Dial-out Bot",
-        params=DailyParams(
-            api_url=daily_api_url,
-            api_key=daily_api_key,
-            audio_in_enabled=True,
-            audio_out_enabled=True,
-            video_out_enabled=False,
-            vad_analyzer=SileroVADAnalyzer(),
-        ),
-    )
+if __name__ == "__main__":
+    from pipecat.runner.run import main
 
-    await run_bot(transport, dialout_settings, handle_sigint)
+    main()

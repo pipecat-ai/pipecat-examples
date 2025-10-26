@@ -186,6 +186,7 @@ async def run_bot(
         await task.cancel()
 
     runner = PipelineRunner(handle_sigint=handle_sigint)
+
     await runner.run(task)
 
 
@@ -205,20 +206,16 @@ async def bot(runner_args: RunnerArguments):
     try:
         request = AgentRequest.model_validate(runner_args.body)
 
-        transport_params = DailyParams(
-            api_key=os.getenv("DAILY_API_KEY", ""),
-            audio_in_enabled=True,
-            audio_out_enabled=True,
-            video_out_enabled=False,
-            vad_analyzer=SileroVADAnalyzer(params=VADParams(stop_secs=0.2)),
-            turn_analyzer=LocalSmartTurnAnalyzerV3(),
-        )
-
         transport = DailyTransport(
             request.room_url,
             request.token,
             "Daily PSTN Dial-out Bot",
-            transport_params,
+            params=DailyParams(
+                audio_in_enabled=True,
+                audio_out_enabled=True,
+                vad_analyzer=SileroVADAnalyzer(params=VADParams(stop_secs=0.2)),
+                turn_analyzer=LocalSmartTurnAnalyzerV3(),
+            ),
         )
 
         await run_bot(transport, runner_args.handle_sigint, request.dialout_settings)
