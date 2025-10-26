@@ -131,20 +131,17 @@ async def bot(runner_args: RunnerArguments):
             call_id=request.call_id, call_domain=request.call_domain
         )
 
-        transport_params = DailyParams(
-            api_key=os.getenv("DAILY_API_KEY", ""),
-            dialin_settings=daily_dialin_settings,
-            audio_in_enabled=True,
-            audio_out_enabled=True,
-            vad_analyzer=SileroVADAnalyzer(params=VADParams(stop_secs=0.2)),
-            turn_analyzer=LocalSmartTurnAnalyzerV3(),
-        )
-
         transport = DailyTransport(
             request.room_url,
             request.token,
             "Daily PSTN Dial-in Bot",
-            transport_params,
+            params=DailyParams(
+                dialin_settings=daily_dialin_settings,
+                audio_in_enabled=True,
+                audio_out_enabled=True,
+                vad_analyzer=SileroVADAnalyzer(params=VADParams(stop_secs=0.2)),
+                turn_analyzer=LocalSmartTurnAnalyzerV3(),
+            ),
         )
 
         await run_bot(transport, runner_args.handle_sigint)

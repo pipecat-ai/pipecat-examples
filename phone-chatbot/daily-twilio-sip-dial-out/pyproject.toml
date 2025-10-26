@@ -4,9 +4,8 @@ version = "0.1.0"
 description = "Daily SIP + Twilio Dial-out example"
 requires-python = ">=3.10"
 dependencies = [
-    "pipecat-ai[daily,cartesia,deepgram,openai,silero,runner]>=0.0.83",
-    "pipecatcloud>=0.2.4",
-    "twilio",
+    "pipecat-ai[daily,cartesia,deepgram,openai,silero,local-smart-turn-v3,runner]>=0.0.91",
+    "pipecatcloud>=0.2.7",
 ]
 
 [dependency-groups]

@@ -130,7 +130,7 @@ async def bot(runner_args: RunnerArguments):
         transport = DailyTransport(
             request.room_url,
             request.token,
-            "Sandra AI",
+            "SIP Dial-in Bot",
             params=DailyParams(
                 audio_in_enabled=True,
                 audio_out_enabled=True,
