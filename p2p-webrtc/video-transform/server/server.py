@@ -101,6 +101,7 @@ async def rtvi_start(request: Request):
 
     return result
 
+
 @app.api_route(
     "/sessions/{session_id}/{path:path}",
     methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
