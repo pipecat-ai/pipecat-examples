@@ -88,11 +88,12 @@ This example is organized to be production-ready and easy to customize:
    ```xml
    <?xml version="1.0" encoding="UTF-8"?>
    <Response>
-     <Dial callerId="+1234567890">{{#e164}}{{To}}{{/e164}}</Dial>
+     <Dial answerOnBridge="true" callerId="+1234567890">{{#e164}}{{To}}{{/e164}}</Dial>
    </Response>
    ```
 
    - callerId must be a valid number that you own on [Twilio](https://console.twilio.com/us1/develop/phone-numbers/manage/incoming)
+   - answerOnBridge="true|false" based on your use-case
    - Save the file. We will use this when creating the SIP domain
 
 4. Create and configure a SIP domain
