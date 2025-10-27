@@ -8,16 +8,18 @@ import argparse
 import sys
 import uuid
 from contextlib import asynccontextmanager
+from http import HTTPMethod
 from typing import Any, Dict, List, Optional, TypedDict
 
 import uvicorn
 from bot import run_bot
 from dotenv import load_dotenv
-from fastapi import BackgroundTasks, FastAPI, Request
+from fastapi import BackgroundTasks, FastAPI, Request, Response
 from fastapi.responses import RedirectResponse
 from loguru import logger
 from pipecat.transports.smallwebrtc.connection import IceServer
 from pipecat.transports.smallwebrtc.request_handler import (
+    IceCandidate,
     SmallWebRTCPatchRequest,
     SmallWebRTCRequest,
     SmallWebRTCRequestHandler,
@@ -93,9 +95,49 @@ async def rtvi_start(request: Request):
 
     result: StartBotResult = {"sessionId": session_id}
     if request_data.get("enableDefaultIceServers"):
-        result["iceConfig"] = IceConfig(iceServers=[IceServer(urls="stun:stun.l.google.com:19302")])
+        result["iceConfig"] = IceConfig(
+            iceServers=[IceServer(urls=["stun:stun.l.google.com:19302"])]
+        )
 
     return result
+
+@app.api_route(
+    "/sessions/{session_id}/{path:path}",
+    methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
+)
+async def proxy_request(
+    session_id: str, path: str, request: Request, background_tasks: BackgroundTasks
+):
+    """Mimic Pipecat Cloud's proxy."""
+    active_session = active_sessions.get(session_id)
+    if active_session is None:
+        return Response(content="Invalid or not-yet-ready session_id", status_code=404)
+
+    if path.endswith("api/offer"):
+        # Parse the request body and convert to SmallWebRTCRequest
+        try:
+            request_data = await request.json()
+            if request.method == HTTPMethod.POST.value:
+                webrtc_request = SmallWebRTCRequest(
+                    sdp=request_data["sdp"],
+                    type=request_data["type"],
+                    pc_id=request_data.get("pc_id"),
+                    restart_pc=request_data.get("restart_pc"),
+                    request_data=request_data,
+                )
+                return await offer(webrtc_request, background_tasks)
+            elif request.method == HTTPMethod.PATCH.value:
+                patch_request = SmallWebRTCPatchRequest(
+                    pc_id=request_data["pc_id"],
+                    candidates=[IceCandidate(**c) for c in request_data.get("candidates", [])],
+                )
+                return await ice_candidate(patch_request)
+        except Exception as e:
+            logger.error(f"Failed to parse WebRTC request: {e}")
+            return Response(content="Invalid WebRTC request", status_code=400)
+
+    logger.info(f"Received request for path: {path}")
+    return Response(status_code=200)
 
 
 @asynccontextmanager
