@@ -23,7 +23,7 @@ class MockCallContainerModel: CallContainerModel {
         self.messages = [ liveMessageFromSystem, liveMessageFromUser, liveMessageFromBot ]
     }
 
-    override func connect(backendURL: String) {
+    override func connect(backendURL: String, apiKey: String) {
         print("connect")
     }
     
