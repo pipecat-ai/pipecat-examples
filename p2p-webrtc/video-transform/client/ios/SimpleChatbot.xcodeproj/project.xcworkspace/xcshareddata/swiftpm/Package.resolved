@@ -6,8 +6,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/pipecat-ai/pipecat-client-ios.git",
       "state" : {
-        "revision" : "992641fb5f7d1a794ecfc33babb5fe36e2a8ffdd",
-        "version" : "0.3.5"
+        "revision" : "98133fc35c85774d57bb10fbb671f222144f48bc",
+        "version" : "1.1.1"
       }
     },
     {
@@ -15,8 +15,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/pipecat-ai/pipecat-client-ios-small-webrtc",
       "state" : {
-        "revision" : "a6e4516b1fcbed772ca97a9616dddc9329097958",
-        "version" : "0.0.1"
+        "revision" : "f73742af91b49493f7e7b5022f83b7fc15f1c2ef",
+        "version" : "1.1.1"
       }
     },
     {
