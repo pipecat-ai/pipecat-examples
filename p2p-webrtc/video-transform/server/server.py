@@ -5,18 +5,23 @@
 #
 
 import argparse
-import asyncio
 import sys
+import uuid
 from contextlib import asynccontextmanager
-from typing import Dict
+from typing import Any, Dict, List, Optional, TypedDict
 
 import uvicorn
 from bot import run_bot
 from dotenv import load_dotenv
-from fastapi import BackgroundTasks, FastAPI
+from fastapi import BackgroundTasks, FastAPI, Request
 from fastapi.responses import RedirectResponse
 from loguru import logger
-from pipecat.transports.smallwebrtc.connection import IceServer, SmallWebRTCConnection
+from pipecat.transports.smallwebrtc.connection import IceServer
+from pipecat.transports.smallwebrtc.request_handler import (
+    SmallWebRTCPatchRequest,
+    SmallWebRTCRequest,
+    SmallWebRTCRequestHandler,
+)
 from pipecat_ai_small_webrtc_prebuilt.frontend import SmallWebRTCPrebuiltUI
 
 # Load environment variables
@@ -24,17 +29,14 @@ load_dotenv(override=True)
 
 app = FastAPI()
 
-# Store connections by pc_id
-pcs_map: Dict[str, SmallWebRTCConnection] = {}
-
-ice_servers = [
-    IceServer(
-        urls="stun:stun.l.google.com:19302",
-    )
-]
-
 # Mount the frontend at /
 app.mount("/prebuilt", SmallWebRTCPrebuiltUI)
+
+# Initialize the SmallWebRTC request handler
+small_webrtc_handler: SmallWebRTCRequestHandler = SmallWebRTCRequestHandler()
+
+# In-memory store of active sessions: session_id -> session info
+active_sessions: Dict[str, Dict[str, Any]] = {}
 
 
 @app.get("/", include_in_schema=False)
@@ -43,39 +45,63 @@ async def root_redirect():
 
 
 @app.post("/api/offer")
-async def offer(request: dict, background_tasks: BackgroundTasks):
-    pc_id = request.get("pc_id")
+async def offer(request: SmallWebRTCRequest, background_tasks: BackgroundTasks):
+    """Handle WebRTC offer requests via SmallWebRTCRequestHandler."""
 
-    if pc_id and pc_id in pcs_map:
-        pipecat_connection = pcs_map[pc_id]
-        logger.info(f"Reusing existing connection for pc_id: {pc_id}")
-        await pipecat_connection.renegotiate(
-            sdp=request["sdp"], type=request["type"], restart_pc=request.get("restart_pc", False)
-        )
-    else:
-        pipecat_connection = SmallWebRTCConnection(ice_servers)
-        await pipecat_connection.initialize(sdp=request["sdp"], type=request["type"])
+    # Prepare runner arguments with the callback to run your bot
+    async def webrtc_connection_callback(connection):
+        background_tasks.add_task(run_bot, connection)
 
-        @pipecat_connection.event_handler("closed")
-        async def handle_disconnected(webrtc_connection: SmallWebRTCConnection):
-            logger.info(f"Discarding peer connection for pc_id: {webrtc_connection.pc_id}")
-            pcs_map.pop(webrtc_connection.pc_id, None)
-
-        background_tasks.add_task(run_bot, pipecat_connection)
-
-    answer = pipecat_connection.get_answer()
-    # Updating the peer connection inside the map
-    pcs_map[answer["pc_id"]] = pipecat_connection
-
+    # Delegate handling to SmallWebRTCRequestHandler
+    answer = await small_webrtc_handler.handle_web_request(
+        request=request,
+        webrtc_connection_callback=webrtc_connection_callback,
+    )
     return answer
+
+
+@app.patch("/api/offer")
+async def ice_candidate(request: SmallWebRTCPatchRequest):
+    """Handle WebRTC new ice candidate requests."""
+    logger.debug(f"Received patch request: {request}")
+    await small_webrtc_handler.handle_patch_request(request)
+    return {"status": "success"}
+
+
+@app.post("/start")
+async def rtvi_start(request: Request):
+    """Mimic Pipecat Cloud's /start endpoint."""
+
+    class IceConfig(TypedDict):
+        iceServers: List[IceServer]
+
+    class StartBotResult(TypedDict, total=False):
+        sessionId: str
+        iceConfig: Optional[IceConfig]
+
+    # Parse the request body
+    try:
+        request_data = await request.json()
+        logger.debug(f"Received request: {request_data}")
+    except Exception as e:
+        logger.error(f"Failed to parse request body: {e}")
+        request_data = {}
+
+    # Store session info immediately in memory, replicate the behavior expected on Pipecat Cloud
+    session_id = str(uuid.uuid4())
+    active_sessions[session_id] = request_data
+
+    result: StartBotResult = {"sessionId": session_id}
+    if request_data.get("enableDefaultIceServers"):
+        result["iceConfig"] = IceConfig(iceServers=[IceServer(urls="stun:stun.l.google.com:19302")])
+
+    return result
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     yield  # Run app
-    coros = [pc.disconnect() for pc in pcs_map.values()]
-    await asyncio.gather(*coros)
-    pcs_map.clear()
+    await small_webrtc_handler.close()
 
 
 if __name__ == "__main__":
