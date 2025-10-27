@@ -88,6 +88,8 @@ async def run_bot(transport: BaseTransport, handle_sigint: bool) -> None:
         params=PipelineParams(
             enable_metrics=True,
             enable_usage_metrics=True,
+            audio_in_sample_rate=8000,
+            audio_out_sample_rate=8000,
         ),
     )
 
