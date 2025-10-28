@@ -57,7 +57,7 @@ class CallContainerModel: ObservableObject {
             options: pipecatClientOptions
         )
         self.pipecatClientIOS?.delegate = self
-        let startBotParams = APIRequest.init(endpoint: URL(string: baseUrl + "/connect")!)
+        let startBotParams = APIRequest.init(endpoint: URL(string: baseUrl + "/start")!)
         self.pipecatClientIOS?.startBotAndConnect(startBotParams: startBotParams) { (result: Result<DailyTransportConnectionParams, AsyncExecutionError>) in
             switch result {
             case .failure(let error):
