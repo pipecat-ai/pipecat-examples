@@ -10,7 +10,7 @@ export interface SettingsManager {
 const defaultSettings: SettingsManager = {
   enableCam: false,
   enableMic: true,
-  backendURL: process.env.EXPO_SIMPLE_CHATBOT_SERVER || "",
+  backendURL: process.env.EXPO_PUBLIC_SIMPLE_CHATBOT_SERVER || "",
 };
 
 export class SettingsManager {
