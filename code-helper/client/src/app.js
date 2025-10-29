@@ -25,7 +25,8 @@ class VoiceChatClient {
     this.conversationLog = document.getElementById('conversation-log');
     this.eventsLog = document.getElementById('events-log');
     this.lastConversationBubble = null;
-    this.lastBotBubble = null;
+    this.botBubbles = [];
+    this.curBotBubble = -1;
     this.sendBtn = document.getElementById('send-btn');
 
     // Populate transport selector with available transports
@@ -208,14 +209,24 @@ class VoiceChatClient {
   }
 
   emboldenBotWord(word) {
-    if (!this.lastBotBubble) return;
-    const textDiv = this.lastBotBubble.querySelector('div:last-child');
+    if (this.curBotBubble < 0) return;
+    const textDiv =
+      this.botBubbles[this.curBotBubble].querySelector('div:last-child');
     const textContent = textDiv.textContent;
     const alreadyEmboldened = textContent.slice(0, this.lastBotWordIndex);
     const yetToEmbolden = textContent.slice(this.lastBotWordIndex || 0);
 
     const wordIndex = yetToEmbolden.indexOf(word);
     if (wordIndex === -1) {
+      if (this.botBubbles.length > this.curBotBubble + 1) {
+        const unboldenedText = textContent.replace(/<\/?strong>/g, '');
+        textDiv.innerHTML = unboldenedText;
+        // Move to next bubble
+        this.curBotBubble += 1;
+        this.lastBotWordIndex = 0;
+        this.emboldenBotWord(word);
+        return;
+      }
       console.log('! Word not found for emboldening:', word, yetToEmbolden);
       return;
     } else {
@@ -251,8 +262,11 @@ class VoiceChatClient {
     this.lastConversationBubble.role = role;
     this.lastConversationBubble.type = type;
     if (role === 'bot' && type === 'sentence') {
-      this.lastBotBubble = this.lastConversationBubble;
-      this.lastBotWordIndex = 0;
+      this.botBubbles.push(this.lastConversationBubble);
+      if (this.curBotBubble === -1) {
+        this.curBotBubble = 0;
+        this.lastBotWordIndex = 0;
+      }
     }
 
     if (role === 'placeholder') {

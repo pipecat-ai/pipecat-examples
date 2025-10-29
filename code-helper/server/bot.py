@@ -140,7 +140,7 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
                 logger.info(f"Transcript: {line}")
 
     @rtvi.event_handler("on_client_message")
-    async def on_junk(rtvi, msg):
+    async def on_message(rtvi, msg):
         print("RTVI junk message:", msg.type, msg.data)
 
     runner = PipelineRunner(handle_sigint=runner_args.handle_sigint)
