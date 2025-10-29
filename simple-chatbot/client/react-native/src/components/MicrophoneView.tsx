@@ -5,7 +5,7 @@ import Colors from '../theme/Colors';
 import { useVoiceClient } from '../context/VoiceClientContext';
 
 interface MicrophoneViewProps {
-  style?: ViewStyle; // Optional additional styles for the button container
+  style?: ViewStyle;
 }
 
 const MicrophoneView: React.FC<MicrophoneViewProps> = ({ style }) => {
@@ -14,7 +14,7 @@ const MicrophoneView: React.FC<MicrophoneViewProps> = ({ style }) => {
 
   const onLayout = (event: LayoutChangeEvent) => {
     const { width, height } = event.nativeEvent.layout;
-      setDimensions({ width, height });
+    setDimensions({ width, height });
   };
 
   const { width } = dimensions;
@@ -22,47 +22,50 @@ const MicrophoneView: React.FC<MicrophoneViewProps> = ({ style }) => {
   const circleSize = useMemo(() => width * 0.9, [width]);
   const innerCircleSize = useMemo(() => width * 0.82, [width]);
   const audioCircleSize = useMemo(() => audioLevel * width * 0.95, [audioLevel, width]);
+  const iconSize = useMemo(() => width * 0.2, [width]);
 
   return (
     <View style={[styles.container, style]} onLayout={onLayout}>
-      <View
-        style={[
-          styles.outerCircle,
-          { width: circleSize, height: circleSize, borderRadius: circleSize / 2 },
-        ]}
-      >
+      {width > 0 && (
         <View
           style={[
-            styles.innerCircle,
-            {
-              backgroundColor: !isMicEnabled ? Colors.disabledMic : Colors.backgroundCircle,
-              width: innerCircleSize,
-              height: innerCircleSize,
-              borderRadius: innerCircleSize / 2,
-            },
+            styles.outerCircle,
+            { width: circleSize, height: circleSize, borderRadius: circleSize / 2 },
           ]}
-        />
-
-        {isMicEnabled && (
+        >
           <View
             style={[
-              styles.audioCircle,
+              styles.innerCircle,
               {
-                width: audioCircleSize,
-                height: audioCircleSize,
-                borderRadius: audioCircleSize / 2,
+                backgroundColor: !isMicEnabled ? Colors.disabledMic : Colors.backgroundCircle,
+                width: innerCircleSize,
+                height: innerCircleSize,
+                borderRadius: innerCircleSize / 2,
               },
             ]}
           />
-        )}
 
-        <MaterialIcons
-          name={!isMicEnabled ? "mic-off" : "mic"}
-          size={width * 0.2}
-          color="white"
-          style={styles.micIcon}
-        />
-      </View>
+          {isMicEnabled && audioCircleSize > 0 && (
+            <View
+              style={[
+                styles.audioCircle,
+                {
+                  width: audioCircleSize,
+                  height: audioCircleSize,
+                  borderRadius: audioCircleSize / 2,
+                },
+              ]}
+            />
+          )}
+
+          <MaterialIcons
+            name={!isMicEnabled ? "mic-off" : "mic"}
+            size={iconSize > 0 ? iconSize : 1}
+            color="white"
+            style={styles.micIcon}
+          />
+        </View>
+      )}
     </View>
   );
 };
