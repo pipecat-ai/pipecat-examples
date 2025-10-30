@@ -6,6 +6,12 @@ import {
   createTransport,
 } from './config';
 
+import hljs from 'highlight.js/lib/core';
+import javascript from 'highlight.js/lib/languages/javascript';
+import python from 'highlight.js/lib/languages/python';
+hljs.registerLanguage('javascript', javascript);
+hljs.registerLanguage('python', python);
+
 class VoiceChatClient {
   constructor() {
     this.client = null;
@@ -276,8 +282,18 @@ class VoiceChatClient {
       roleSpan.className = 'role';
       roleSpan.textContent = role === 'user' ? 'You' : 'Bot';
 
-      const textDiv = document.createElement('div');
-      textDiv.textContent = text;
+      let textDiv;
+      if (type !== 'code') {
+        textDiv = document.createElement('div');
+        textDiv.textContent = text;
+      } else {
+        textDiv = document.createElement('pre');
+        let codeDiv = document.createElement('code');
+        codeDiv.textContent = text;
+        textDiv.appendChild(codeDiv);
+        textDiv.className = 'language-html';
+        hljs.highlightElement(textDiv);
+      }
 
       messageDiv.appendChild(roleSpan);
       messageDiv.appendChild(textDiv);

@@ -11,7 +11,8 @@
   "dependencies": {
     "@pipecat-ai/client-js": "file:../../../pipecat-client-web/client-js",
     "@pipecat-ai/daily-transport": "file:../../../pipecat-client-web-transports/transports/daily",
-    "@pipecat-ai/small-webrtc-transport": "file:../../../pipecat-client-web-transports/transports/small-webrtc-transport"
+    "@pipecat-ai/small-webrtc-transport": "file:../../../pipecat-client-web-transports/transports/small-webrtc-transport",
+    "highlight.js": "^11.11.1"
   },
   "devDependencies": {
     "vite": "^7.1.7"

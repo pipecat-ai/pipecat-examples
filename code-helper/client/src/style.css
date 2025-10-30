@@ -149,7 +149,7 @@ body {
 }
 
 .conversation-message.code {
-  font-family: 'Courier New', monospace;
+  /* font-family: 'Courier New', monospace; */
   background-color: #374151;
   padding: 0.5rem;
   border-radius: 0.25rem;

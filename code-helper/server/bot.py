@@ -32,6 +32,7 @@ from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineParams, PipelineTask
 from pipecat.processors.aggregators.llm_context import LLMContext
+from pipecat.processors.aggregators.llm_response import LLMAssistantAggregatorParams
 from pipecat.processors.aggregators.llm_response_universal import LLMContextAggregatorPair
 from pipecat.processors.frameworks.rtvi import RTVIObserver, RTVIProcessor
 from pipecat.processors.transcript_processor import TranscriptProcessor
@@ -57,8 +58,8 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
 
     # Text-to-Speech service
     # Text aggregator to handle code snippets
-    aggregator = PatternPairAggregator()
-    aggregator.add_pattern_pair(
+    tts_aggregator = PatternPairAggregator()
+    tts_aggregator.add_pattern_pair(
         pattern_id="code",
         start_pattern="<code>",
         end_pattern="</code>",
@@ -68,7 +69,7 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     tts = ElevenLabsTTSService(
         api_key=os.getenv("ELEVENLABS_API_KEY"),
         voice_id=os.getenv("ELEVENLABS_VOICE_ID"),
-        text_aggregator=aggregator,
+        text_aggregator=tts_aggregator,
         skip_aggregator_types=["code"],
     )
 
@@ -82,8 +83,21 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
         },
     ]
 
+    # LLM aggregator context
+    # Text aggregator to handle code snippets when the tts is skipped
+    llm_aggregator = PatternPairAggregator()
+    llm_aggregator.add_pattern_pair(
+        pattern_id="code",
+        start_pattern="<code>",
+        end_pattern="</code>",
+        type="code",
+        action=MatchAction.AGGREGATE,
+    )
     context = LLMContext(messages)
-    context_aggregator = LLMContextAggregatorPair(context)
+    context_aggregator = LLMContextAggregatorPair(
+        context=context,
+        assistant_params=LLMAssistantAggregatorParams(llm_text_aggregator=llm_aggregator),
+    )
 
     # Transcription processor
     transcript_processor = TranscriptProcessor()
@@ -142,6 +156,9 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     @rtvi.event_handler("on_client_message")
     async def on_message(rtvi, msg):
         print("RTVI junk message:", msg.type, msg.data)
+        if msg.type == "get_context":
+            context = context_aggregator.assistant().messages
+            print(f"context: {context}")
 
     runner = PipelineRunner(handle_sigint=runner_args.handle_sigint)
 
