@@ -138,6 +138,7 @@ async def bot(runner_args: RunnerArguments):
             request.token,
             "Daily PSTN Dial-in Bot",
             params=DailyParams(
+                api_key=os.getenv("DAILY_API_KEY"),
                 dialin_settings=daily_dialin_settings,
                 audio_in_enabled=True,
                 audio_out_enabled=True,

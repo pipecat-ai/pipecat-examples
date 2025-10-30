@@ -32,7 +32,7 @@ When someone calls your Twilio number:
 
 ### AI Services
 
-- OpenAI API key for the LLM inference
+- Google API key for the LLM inference
 - Deepgram API key for speech-to-text
 - Cartesia API key for text-to-speech
 
