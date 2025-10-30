@@ -6,7 +6,7 @@ This project is a Pipecat-based chatbot that integrates with Twilio to make outb
 
 When you want to make an outbound call:
 
-1. **Send POST request**: `POST /start` with a phone number to call
+1. **Send POST request**: `POST /dialout` with a phone number to call
 2. **Server initiates call**: Uses Twilio's REST API to make the outbound call
 3. **Call answered**: When answered, Twilio fetches TwiML from your server's `/twiml` endpoint
 4. **Server returns TwiML**: Tells Twilio to start a WebSocket stream to your bot
@@ -16,7 +16,7 @@ When you want to make an outbound call:
 ## Architecture
 
 ```
-curl request → /start endpoint → Twilio REST API → Call initiated →
+curl request → /dialout endpoint → Twilio REST API → Call initiated →
 TwiML fetched → WebSocket connection → Bot conversation
 ```
 
@@ -30,7 +30,7 @@ TwiML fetched → WebSocket connection → Bot conversation
 
 ### AI Services
 
-- OpenAI API key for the LLM inference
+- Google API key for the LLM inference
 - Deepgram API key for speech-to-text
 - Cartesia API key for text-to-speech
 
@@ -97,7 +97,7 @@ The server will start on port 7860.
 
    > Tip: Use the `--subdomain` flag for a reusable ngrok URL.
 
-   Copy the ngrok URL (e.g., `https://abc123.ngrok.io`)
+   Copy the ngrok URL (e.g., `https://abc123.ngrok.io`) and update `LOCAL_SERVER_URL` in your `.env` file.
 
 3. No additional Twilio configuration needed
 
@@ -107,41 +107,22 @@ The server will start on port 7860.
 
 With the server running and exposed via ngrok, you can initiate outbound calls:
 
-### Basic Call
-
 ```bash
-curl -X POST https://your-ngrok-url.ngrok.io/start \
+curl -X POST https://your-ngrok-url.ngrok.io/dialout \
   -H "Content-Type: application/json" \
   -d '{
-    "phone_number": "+1234567890"
+    "to_number": "+15551234567",
+    "from_number": "+15559876543"
   }'
 ```
-
-### Call with Body Data
-
-You can include arbitrary body data that will be available to your bot:
-
-```bash
-curl -X POST https://your-ngrok-url.ngrok.io/start \
-  -H "Content-Type: application/json" \
-  -d '{
-    "phone_number": "+1234567890",
-    "body": {
-      "user": {
-        "id": "user123",
-        "name": "John Doe",
-        "account_type": "premium"
-      }
-    }
-  }'
-```
-
-The body data can be any JSON structure - nested objects, arrays, etc. Your bot will receive this data automatically.
 
 Replace:
 
 - `your-ngrok-url.ngrok.io` with your actual ngrok URL
-- `+1234567890` with the phone number you want to call
+- `+15551234567` with the phone number to call (E.164 format)
+- `+15559876543` with your Twilio phone number (E.164 format)
+
+> Note: the `from_number` must be a phone number owned by your Twilio account
 
 ## Production Deployment
 
@@ -181,31 +162,6 @@ As you did before, initiate a call via `curl` command to trigger your bot to dia
 
 ## Accessing Call Information in Your Bot
 
-Your bot automatically receives call information and body data through Twilio's Parameters:
+Your bot automatically receives call information through Twilio Stream Parameters. In this example, the phone numbers (`to_number` and `from_number`) are passed as parameters and extracted by the `parse_telephony_websocket` function.
 
-- **Body Data**: Any data you include in the `body` field is passed as a JSON string in the `body` parameter
-
-The Pipecat development runner extracts this data using the `parse_telephony_websocket` function:
-
-```python
-async def bot(runner_args: RunnerArguments):
-    transport_type, call_data = await parse_telephony_websocket(runner_args.websocket)
-
-    if transport_type == "twilio":
-        # Body data (JSON string parameter)
-        import json
-        body_param = call_data["custom_parameters"].get("body")
-        if body_param:
-            body_data = json.loads(body_param)
-
-            # Access nested data
-            user_data = body_data.get("user", {})
-            user_id = user_data.get("id")
-            user_name = user_data.get("name")
-            user_account_type = user_data.get("account_type")
-
-            # Use this data to personalize the conversation
-            print(f"User: {user_name} (ID: {user_id}, Type: {user_account_type})")
-```
-
-This allows your bot to provide personalized responses based on the body data and context.
+You can extend the `DialoutRequest` model in `server_utils.py` to include additional custom data (customer info, campaign data, etc.) and pass it through as stream parameters for personalized conversations. See `bot.py` for implementation details.

@@ -13,13 +13,14 @@ from pipecat.audio.vad.silero import SileroVADAnalyzer
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineParams, PipelineTask
-from pipecat.processors.aggregators.openai_llm_context import OpenAILLMContext
+from pipecat.processors.aggregators.llm_context import LLMContext
+from pipecat.processors.aggregators.llm_response_universal import LLMContextAggregatorPair
 from pipecat.runner.types import RunnerArguments
 from pipecat.runner.utils import parse_telephony_websocket
 from pipecat.serializers.twilio import TwilioFrameSerializer
 from pipecat.services.cartesia.tts import CartesiaTTSService
 from pipecat.services.deepgram.stt import DeepgramSTTService
-from pipecat.services.openai.llm import OpenAILLMService
+from pipecat.services.google.llm import GoogleLLMService
 from pipecat.transports.base_transport import BaseTransport
 from pipecat.transports.websocket.fastapi import (
     FastAPIWebsocketParams,
@@ -33,7 +34,7 @@ logger.add(sys.stderr, level="DEBUG")
 
 
 async def run_bot(transport: BaseTransport, handle_sigint: bool):
-    llm = OpenAILLMService(api_key=os.getenv("OPENAI_API_KEY"))
+    llm = GoogleLLMService(api_key=os.getenv("GOOGLE_API_KEY"))
 
     stt = DeepgramSTTService(api_key=os.getenv("DEEPGRAM_API_KEY"))
 
@@ -53,8 +54,8 @@ async def run_bot(transport: BaseTransport, handle_sigint: bool):
         },
     ]
 
-    context = OpenAILLMContext(messages)
-    context_aggregator = llm.create_context_aggregator(context)
+    context = LLMContext(messages)
+    context_aggregator = LLMContextAggregatorPair(context)
 
     pipeline = Pipeline(
         [
@@ -95,9 +96,17 @@ async def run_bot(transport: BaseTransport, handle_sigint: bool):
 
 async def bot(runner_args: RunnerArguments):
     """Main bot entry point compatible with Pipecat Cloud."""
-
     transport_type, call_data = await parse_telephony_websocket(runner_args.websocket)
     logger.info(f"Auto-detected transport: {transport_type}")
+
+    # Access custom stream parameters passed from TwiML
+    # Use the body data to personalize the conversation
+    # by loading customer data based on the to_number or from_number
+    body_data = call_data.get("body", {})
+    to_number = body_data.get("to_number")
+    from_number = body_data.get("from_number")
+
+    logger.info(f"Call metadata - To: {to_number}, From: {from_number}")
 
     serializer = TwilioFrameSerializer(
         stream_sid=call_data["stream_id"],
