@@ -107,7 +107,7 @@ export const VoiceClientProvider: React.FC<VoiceClientProviderProps> = ({ childr
     try {
       await client?.initDevices()
       await client?.startBotAndConnect({
-        endpoint: url + '/connect',
+        endpoint: url + '/start',
       });
       // updating the preferences
       const newSettings = await SettingsManager.getSettings();
