@@ -9,7 +9,7 @@ import sys
 import uuid
 from contextlib import asynccontextmanager
 from http import HTTPMethod
-from typing import Any, Dict, List, Optional, TypedDict
+from typing import Any, Dict, List, Optional, TypedDict, Union
 
 import uvicorn
 from bot import run_bot
@@ -17,7 +17,6 @@ from dotenv import load_dotenv
 from fastapi import BackgroundTasks, FastAPI, Request, Response
 from fastapi.responses import RedirectResponse
 from loguru import logger
-from pipecat.transports.smallwebrtc.connection import IceServer
 from pipecat.transports.smallwebrtc.request_handler import (
     IceCandidate,
     SmallWebRTCPatchRequest,
@@ -73,6 +72,9 @@ async def ice_candidate(request: SmallWebRTCPatchRequest):
 @app.post("/start")
 async def rtvi_start(request: Request):
     """Mimic Pipecat Cloud's /start endpoint."""
+
+    class IceServer(TypedDict, total=False):
+        urls: Union[str, List[str]]
 
     class IceConfig(TypedDict):
         iceServers: List[IceServer]
