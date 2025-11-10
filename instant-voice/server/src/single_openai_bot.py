@@ -128,6 +128,7 @@ async def main():
     async def on_client_ready(rtvi):
         await rtvi.set_bot_ready()
         # Kick off the conversation
+        # UNCOMMENT THIS TO MAKE IT WORK
         # await task.queue_frames([LLMRunFrame()])
 
     @daily_transport.event_handler("on_first_participant_joined")
