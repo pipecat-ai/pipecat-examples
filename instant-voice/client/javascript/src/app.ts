@@ -21,12 +21,12 @@ import {
   PipecatClient,
   PipecatClientOptions,
   RTVIEvent,
-} from '@pipecat-ai/client-js';
+} from "@pipecat-ai/client-js";
 import {
   DailyEventCallbacks,
   DailyTransport,
-} from '@pipecat-ai/daily-transport';
-import SoundUtils from './util/soundUtils';
+} from "@pipecat-ai/daily-transport";
+import SoundUtils from "./util/soundUtils";
 
 /**
  * InstantVoiceClient handles the connection and media management for a real-time
@@ -43,7 +43,7 @@ class InstantVoiceClient {
   private declare startTime: number;
 
   constructor() {
-    this.botAudio = document.createElement('audio');
+    this.botAudio = document.createElement("audio");
     this.botAudio.autoplay = true;
     document.body.appendChild(this.botAudio);
     this.setupDOMElements();
@@ -56,43 +56,43 @@ class InstantVoiceClient {
    */
   private setupDOMElements(): void {
     this.connectBtn = document.getElementById(
-      'connect-btn'
+      "connect-btn"
     ) as HTMLButtonElement;
     this.disconnectBtn = document.getElementById(
-      'disconnect-btn'
+      "disconnect-btn"
     ) as HTMLButtonElement;
-    this.statusSpan = document.getElementById('connection-status');
-    this.bufferingAudioSpan = document.getElementById('buffering-status');
-    this.debugLog = document.getElementById('debug-log');
+    this.statusSpan = document.getElementById("connection-status");
+    this.bufferingAudioSpan = document.getElementById("buffering-status");
+    this.debugLog = document.getElementById("debug-log");
   }
 
   /**
    * Set up event listeners for connect/disconnect buttons
    */
   private setupEventListeners(): void {
-    this.connectBtn?.addEventListener('click', () => this.connect());
-    this.disconnectBtn?.addEventListener('click', () => this.disconnect());
+    this.connectBtn?.addEventListener("click", () => this.connect());
+    this.disconnectBtn?.addEventListener("click", () => this.disconnect());
   }
 
   private initializePipecatClient(): void {
     const PipecatConfig: PipecatClientOptions = {
       transport: new DailyTransport({
-        bufferLocalAudioUntilBotReady: true,
+        bufferLocalAudioUntilBotReady: false,
       }),
       enableMic: true,
       enableCam: false,
       callbacks: {
         onConnected: () => {
-          this.updateStatus('Connected');
+          this.updateStatus("Connected");
           if (this.connectBtn) this.connectBtn.disabled = true;
           if (this.disconnectBtn) this.disconnectBtn.disabled = false;
         },
         onDisconnected: () => {
-          this.updateStatus('Disconnected');
-          this.updateBufferingStatus('No');
+          this.updateStatus("Disconnected");
+          this.updateBufferingStatus("No");
           if (this.connectBtn) this.connectBtn.disabled = false;
           if (this.disconnectBtn) this.disconnectBtn.disabled = true;
-          this.log('Client disconnected');
+          this.log("Client disconnected");
         },
         onBotConnected: (participant: Participant) => {
           this.log(`onBotConnected, timeTaken: ${Date.now() - this.startTime}`);
@@ -108,17 +108,17 @@ class InstantVoiceClient {
           }
         },
         onBotTranscript: (data) => this.log(`Bot: ${data.text}`),
-        onMessageError: (error) => console.error('Message error:', error),
-        onError: (error) => console.error('Error:', error),
+        onMessageError: (error) => console.error("Message error:", error),
+        onError: (error) => console.error("Error:", error),
         onAudioBufferingStarted: () => {
           SoundUtils.beep();
-          this.updateBufferingStatus('Yes');
+          this.updateBufferingStatus("Yes");
           this.log(
             `onMicCaptureStarted, timeTaken: ${Date.now() - this.startTime}`
           );
         },
         onAudioBufferingStopped: () => {
-          this.updateBufferingStatus('No');
+          this.updateBufferingStatus("No");
           this.log(
             `onMicCaptureStopped, timeTaken: ${Date.now() - this.startTime}`
           );
@@ -135,12 +135,12 @@ class InstantVoiceClient {
    */
   private log(message: string): void {
     if (!this.debugLog) return;
-    const entry = document.createElement('div');
+    const entry = document.createElement("div");
     entry.textContent = `${new Date().toISOString()} - ${message}`;
-    if (message.startsWith('User: ')) {
-      entry.style.color = '#2196F3';
-    } else if (message.startsWith('Bot: ')) {
-      entry.style.color = '#4CAF50';
+    if (message.startsWith("User: ")) {
+      entry.style.color = "#2196F3";
+    } else if (message.startsWith("Bot: ")) {
+      entry.style.color = "#4CAF50";
     }
     this.debugLog.appendChild(entry);
     this.debugLog.scrollTop = this.debugLog.scrollHeight;
@@ -189,7 +189,7 @@ class InstantVoiceClient {
     // Listen for new tracks starting
     this.pcClient.on(RTVIEvent.TrackStarted, (track, participant) => {
       // Only handle non-local (bot) tracks
-      if (!participant?.local && track.kind === 'audio') {
+      if (!participant?.local && track.kind === "audio") {
         this.setupAudioTrack(track);
       }
     });
@@ -197,7 +197,7 @@ class InstantVoiceClient {
     // Listen for tracks stopping
     this.pcClient.on(RTVIEvent.TrackStopped, (track, participant) => {
       this.log(
-        `Track stopped: ${track.kind} from ${participant?.name || 'unknown'}`
+        `Track stopped: ${track.kind} from ${participant?.name || "unknown"}`
       );
     });
   }
@@ -207,10 +207,10 @@ class InstantVoiceClient {
    * Handles both initial setup and track updates
    */
   private setupAudioTrack(track: MediaStreamTrack): void {
-    this.log('Setting up audio track');
+    this.log("Setting up audio track");
     if (
       this.botAudio.srcObject &&
-      'getAudioTracks' in this.botAudio.srcObject
+      "getAudioTracks" in this.botAudio.srcObject
     ) {
       const oldTrack = this.botAudio.srcObject.getAudioTracks()[0];
       if (oldTrack?.id === track.id) return;
@@ -225,15 +225,15 @@ class InstantVoiceClient {
   public async connect(): Promise<void> {
     try {
       this.startTime = Date.now();
-      this.log('Connecting to bot...');
+      this.log("Connecting to bot...");
       await this.pcClient.startBotAndConnect({
         // The baseURL and endpoint of your bot server that the client will connect to
-        endpoint: 'http://localhost:7860/connect',
+        endpoint: "http://localhost:7860/connect",
       });
     } catch (error) {
       this.log(`Error connecting: ${(error as Error).message}`);
-      this.updateStatus('Error');
-      this.updateBufferingStatus('No');
+      this.updateStatus("Error");
+      this.updateBufferingStatus("No");
 
       // Clean up if there's an error
       if (this.pcClient) {
@@ -254,7 +254,7 @@ class InstantVoiceClient {
       await this.pcClient.disconnect();
       if (
         this.botAudio.srcObject &&
-        'getAudioTracks' in this.botAudio.srcObject
+        "getAudioTracks" in this.botAudio.srcObject
       ) {
         this.botAudio.srcObject
           .getAudioTracks()
@@ -273,7 +273,7 @@ declare global {
   }
 }
 
-window.addEventListener('DOMContentLoaded', () => {
+window.addEventListener("DOMContentLoaded", () => {
   window.InstantVoiceClient = InstantVoiceClient;
   new InstantVoiceClient();
 });

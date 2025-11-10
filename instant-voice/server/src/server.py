@@ -88,7 +88,7 @@ class BotManager:
         self.room_mappings: Dict[int, str] = {}  # Maps process ID to room URL
 
     async def start_bot(self, room_url: str, token: str) -> int:
-        bot_file = "single_bot"
+        bot_file = "single_openai_bot"
         command = f"python3 -m {bot_file} -u {room_url} -t {token}"
 
         try:
