@@ -1,21 +1,23 @@
-import { Card, CardInner } from "@/components/Card";
-import { WordWrangler } from "@/components/Game/WordWrangler";
-import { StartGameButton } from "@/components/StartButton";
-import { GAME_TEXT } from "@/constants/gameConstants";
-import { useConfigurationSettings } from "@/contexts/Configuration";
-import { PERSONALITY_PRESETS, PersonalityType } from "@/types/personality";
+'use client';
+
+import { Card, CardInner } from '@/components/Card';
+import { WordWrangler } from '@/components/Game/WordWrangler';
+import { StartGameButton } from '@/components/StartButton';
+import { GAME_TEXT } from '@/constants/gameConstants';
+import { useConfigurationSettings } from '@/contexts/Configuration';
+import { PERSONALITY_PRESETS, PersonalityType } from '@/types/personality';
 import {
   IconArrowForwardUp,
   IconCheck,
   IconCode,
   IconX,
-} from "@tabler/icons-react";
-import JSConfetti from "js-confetti";
-import Image from "next/image";
-import Link from "next/link";
-import { useEffect, useState } from "react";
-import Logo from "../assets/logo.png";
-import Star from "../assets/star.png";
+} from '@tabler/icons-react';
+import JSConfetti from 'js-confetti';
+import Image from 'next/image';
+import Link from 'next/link';
+import { useEffect, useState } from 'react';
+import Logo from '../assets/logo.png';
+import Star from '../assets/star.png';
 
 export default function Home() {
   const [hasStarted, setHasStarted] = useState(false);
@@ -28,7 +30,7 @@ export default function Home() {
     if (gameEnded) {
       const confetti = new JSConfetti();
       confetti.addConfetti({
-        emojis: ["⭐", "⚡️", "👑", "✨", "💫", "🏆", "💯"],
+        emojis: ['⭐', '⚡️', '👑', '✨', '💫', '🏆', '💯'],
       });
     }
   }, [gameEnded]);
@@ -47,7 +49,7 @@ export default function Home() {
                 {score}
               </p>
               <p className="font-medium text-slate-500">
-                {GAME_TEXT.finalScoreMessage}{" "}
+                {GAME_TEXT.finalScoreMessage}{' '}
                 <span className="text-slate-700 font-extrabold">
                   {bestScore}
                 </span>
@@ -58,8 +60,7 @@ export default function Home() {
                   href="https://github.com/daily-co/word-wrangler-gemini-live"
                   className="button ghost w-full lg:w-auto"
                   target="_blank"
-                  rel="noopener noreferrer"
-                >
+                  rel="noopener noreferrer">
                   <IconCode size={24} />
                   View project source code
                 </Link>
@@ -134,8 +135,7 @@ export default function Home() {
                     value={config.personality}
                     onChange={(e) =>
                       config.setPersonality(e.target.value as PersonalityType)
-                    }
-                  >
+                    }>
                     {Object.entries(PERSONALITY_PRESETS).map(
                       ([value, label]) => (
                         <option key={value} value={value}>

@@ -18,7 +18,8 @@ from pipecat.pipeline.parallel_pipeline import ParallelPipeline
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineParams, PipelineTask
-from pipecat.processors.aggregators.openai_llm_context import OpenAILLMContext
+from pipecat.processors.aggregators.llm_context import LLMContext
+from pipecat.processors.aggregators.llm_response_universal import LLMContextAggregatorPair
 from pipecat.services.cartesia.tts import CartesiaTTSService
 from pipecat.services.deepgram.stt import DeepgramSTTService
 from pipecat.services.openai.llm import OpenAILLMService
@@ -102,14 +103,14 @@ async def main():
         llm_french = OpenAILLMService(api_key=os.getenv("OPENAI_API_KEY"))
         llm_german = OpenAILLMService(api_key=os.getenv("OPENAI_API_KEY"))
 
-        context_spanish = OpenAILLMContext(messages_spanish)
-        context_aggregator_spanish = llm_spanish.create_context_aggregator(context_spanish)
+        context_spanish = LLMContext(messages_spanish)
+        context_aggregator_spanish = LLMContextAggregatorPair(context_spanish)
 
-        context_french = OpenAILLMContext(messages_french)
-        context_aggregator_french = llm_french.create_context_aggregator(context_french)
+        context_french = LLMContext(messages_french)
+        context_aggregator_french = LLMContextAggregatorPair(context_french)
 
-        context_german = OpenAILLMContext(messages_german)
-        context_aggregator_german = llm_german.create_context_aggregator(context_german)
+        context_german = LLMContext(messages_german)
+        context_aggregator_german = LLMContextAggregatorPair(context_german)
 
         pipeline = Pipeline(
             [

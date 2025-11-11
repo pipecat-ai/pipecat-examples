@@ -13,11 +13,12 @@ import aiohttp
 from dotenv import load_dotenv
 from loguru import logger
 from pipecat.audio.vad.silero import SileroVADAnalyzer
-from pipecat.frames.frames import OutputAudioRawFrame
+from pipecat.frames.frames import LLMContextFrame, LLMRunFrame, OutputAudioRawFrame
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineParams, PipelineTask
-from pipecat.processors.aggregators.openai_llm_context import OpenAILLMContextFrame
+from pipecat.processors.aggregators.llm_context import LLMContext
+from pipecat.processors.aggregators.llm_response_universal import LLMContextAggregatorPair
 from pipecat.processors.frame_processor import FrameDirection
 from pipecat.processors.logger import FrameLogger
 from pipecat.services.cartesia.tts import CartesiaTTSService
@@ -179,9 +180,7 @@ class IntakeProcessor:
             }
         )
         print(f"!!! about to await llm process frame in start prescrpitions")
-        await params.llm.queue_frame(
-            OpenAILLMContextFrame(params.context), FrameDirection.DOWNSTREAM
-        )
+        await params.llm.queue_frame(LLMContextFrame(params.context), FrameDirection.DOWNSTREAM)
         print(f"!!! past await process frame in start prescriptions")
         await self.save_data(params.arguments, params.result_callback)
 
@@ -222,9 +221,7 @@ class IntakeProcessor:
                 "content": "Now ask the user if they have any medical conditions the doctor should know about. Once they've answered the question, call the list_conditions function.",
             }
         )
-        await params.llm.queue_frame(
-            OpenAILLMContextFrame(params.context), FrameDirection.DOWNSTREAM
-        )
+        await params.llm.queue_frame(LLMContextFrame(params.context), FrameDirection.DOWNSTREAM)
         await self.save_data(params.arguments, params.result_callback)
 
     async def list_conditions(self, params: FunctionCallParams):
@@ -264,9 +261,7 @@ class IntakeProcessor:
                 "content": "Finally, ask the user the reason for their doctor visit today. Once they answer, call the list_visit_reasons function.",
             }
         )
-        await params.llm.queue_frame(
-            OpenAILLMContextFrame(params.context), FrameDirection.DOWNSTREAM
-        )
+        await params.llm.queue_frame(LLMContextFrame(params.context), FrameDirection.DOWNSTREAM)
         await self.save_data(params.arguments, params.result_callback)
 
     async def list_visit_reasons(self, params: FunctionCallParams):
@@ -276,9 +271,7 @@ class IntakeProcessor:
         params.context.add_message(
             {"role": "system", "content": "Now, thank the user and end the conversation."}
         )
-        await params.llm.queue_frame(
-            OpenAILLMContextFrame(params.context), FrameDirection.DOWNSTREAM
-        )
+        await params.llm.queue_frame(LLMContextFrame(params.context), FrameDirection.DOWNSTREAM)
         await self.save_data(params.arguments, params.result_callback)
 
     async def save_data(self, args, result_callback):
@@ -325,8 +318,8 @@ async def main():
         llm = OpenAILLMService(api_key=os.getenv("OPENAI_API_KEY"))
 
         messages = []
-        context = OpenAILLMContext(messages=messages)
-        context_aggregator = llm.create_context_aggregator(context)
+        context = LLMContext(messages=messages)
+        context_aggregator = LLMContextAggregatorPair(context)
 
         intake = IntakeProcessor(context)
         llm.register_function("verify_birthday", intake.verify_birthday)
@@ -361,7 +354,7 @@ async def main():
         async def on_first_participant_joined(transport, participant):
             await transport.capture_participant_transcription(participant["id"])
             print(f"Context is: {context}")
-            await task.queue_frames([OpenAILLMContextFrame(context)])
+            await task.queue_frames([LLMRunFrame()])
 
         runner = PipelineRunner()
 

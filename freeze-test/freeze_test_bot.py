@@ -25,6 +25,7 @@ from pipecat.frames.frames import (
     Frame,
     InterimTranscriptionFrame,
     InterruptionFrame,
+    LLMContextFrame,
     LLMFullResponseEndFrame,
     LLMMessagesAppendFrame,
     StartFrame,
@@ -39,10 +40,8 @@ from pipecat.pipeline.parallel_pipeline import ParallelPipeline
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineParams, PipelineTask
-from pipecat.processors.aggregators.openai_llm_context import (
-    OpenAILLMContext,
-    OpenAILLMContextFrame,
-)
+from pipecat.processors.aggregators.llm_context import LLMContext
+from pipecat.processors.aggregators.llm_response_universal import LLMContextAggregatorPair
 from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
 from pipecat.processors.frameworks.rtvi import RTVIConfig, RTVIProcessor
 from pipecat.processors.metrics.sentry import SentryMetrics
@@ -240,8 +239,8 @@ async def run_example(websocket_client):
         },
     ]
 
-    context = OpenAILLMContext(messages)
-    context_aggregator = llm.create_context_aggregator(context)
+    context = LLMContext(messages)
+    context_aggregator = LLMContextAggregatorPair(context)
 
     pipeline = Pipeline(
         [
@@ -282,7 +281,7 @@ async def run_example(websocket_client):
                     TranscriptionFrame: None,
                     # TTSTextFrame: None,
                     # LLMTextFrame: None,
-                    OpenAILLMContextFrame: None,
+                    LLMContextFrame: None,
                     LLMFullResponseEndFrame: None,
                     UserStartedSpeakingFrame: None,
                     UserStoppedSpeakingFrame: None,
