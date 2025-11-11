@@ -60,8 +60,6 @@ export const VoiceClientProvider: React.FC<VoiceClientProviderProps> = ({ childr
   const [localVideoTrack, setLocalVideoTrack] = useState<MediaStreamTrack | undefined>()
   const [remoteVideoTrack, setRemoteVideoTrack] = useState<MediaStreamTrack | undefined>()
   const [localAudioLevel, setLocalAudioLevel] = useState<number>(0)
-  // For controlling mock audio timer:
-  const mockAudioTimer = useRef<NodeJS.Timeout | null>(null)
   const botSpeakingRef = useRef(false)
   // Live messages to the chat
   const [messages, setMessages] = useState<LiveMessage[]>([])
@@ -73,23 +71,6 @@ export const VoiceClientProvider: React.FC<VoiceClientProviderProps> = ({ childr
       type: 'error',
       text1: errorMessage,
     })
-  }, [])
-
-  // --- mock audio logic while SmallWebRTC does not support audio level ---
-  const startMockAudioLevel = useCallback(() => {
-    if (mockAudioTimer.current) return;
-    mockAudioTimer.current = setInterval(() => {
-      // Simulate value between 0.1 and 1.0 (e.g. for "speaking" user)
-      setLocalAudioLevel(Math.random() * 0.8 + 0.2)
-    }, 100)
-  }, [])
-
-  const stopMockAudioLevel = useCallback(() => {
-    if (mockAudioTimer.current) {
-      clearInterval(mockAudioTimer.current)
-      mockAudioTimer.current = null
-    }
-    setLocalAudioLevel(0)
   }, [])
 
   const createVoiceClient = useCallback((): PipecatClient => {
@@ -118,17 +99,14 @@ export const VoiceClientProvider: React.FC<VoiceClientProviderProps> = ({ childr
           setIsMicEnabled(false)
           setIsCamEnabled(false)
         },
-        // TODO: SmallWebRTC doesn't support this event yet.
-        /*onLocalAudioLevel: (level: number) => {
+        onLocalAudioLevel: (level: number) => {
           setLocalAudioLevel(level)
-        },*/
+        },
         onUserStartedSpeaking:() => {
           createLiveMessage("User started speaking", "system")
-          startMockAudioLevel()
         },
         onUserStoppedSpeaking:() => {
           createLiveMessage("User stopped speaking", "system")
-          stopMockAudioLevel()
         },
         onUserTranscript:(data) => {
           createLiveMessage(data.text, "user")
@@ -173,7 +151,7 @@ export const VoiceClientProvider: React.FC<VoiceClientProviderProps> = ({ childr
       },
     })
     return client
-  }, [handleError, startMockAudioLevel, stopMockAudioLevel])
+  }, [handleError])
 
   const start = useCallback(async (url: string, authorizationToken:string): Promise<void> => {
     resetLiveMessages()
@@ -271,13 +249,6 @@ export const VoiceClientProvider: React.FC<VoiceClientProviderProps> = ({ childr
       }
     }
   }, [voiceClient])
-
-  // Cleanup interval when unmounting
-  useEffect(() => {
-    return () => {
-      if (mockAudioTimer.current) clearInterval(mockAudioTimer.current)
-    }
-  }, [])
 
   const contextValue = useMemo(() => ({
     voiceClient,
