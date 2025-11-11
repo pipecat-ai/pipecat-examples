@@ -1,33 +1,63 @@
-import asyncio
+#
+# Copyright (c) 2024–2025, Daily
+#
+# SPDX-License-Identifier: BSD 2-Clause License
+#
+
+
 import io
 import os
-import sys
 
 import aiohttp
 import tiktoken
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
 from loguru import logger
+from pipecat.audio.turn.smart_turn.base_smart_turn import SmartTurnParams
+from pipecat.audio.turn.smart_turn.local_smart_turn_v3 import LocalSmartTurnAnalyzerV3
 from pipecat.audio.vad.silero import SileroVADAnalyzer
+from pipecat.audio.vad.vad_analyzer import VADParams
 from pipecat.frames.frames import LLMRunFrame
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineParams, PipelineTask
-from pipecat.processors.aggregators.openai_llm_context import OpenAILLMContext
+from pipecat.processors.aggregators.llm_context import LLMContext
+from pipecat.processors.aggregators.llm_response_universal import LLMContextAggregatorPair
+from pipecat.runner.types import RunnerArguments
+from pipecat.runner.utils import create_transport
 from pipecat.services.cartesia.tts import CartesiaTTSService
+from pipecat.services.deepgram.stt import DeepgramSTTService
 from pipecat.services.openai.llm import OpenAILLMService
-from pipecat.transports.daily.transport import DailyParams, DailyTransport
+from pipecat.transports.base_transport import BaseTransport, TransportParams
+from pipecat.transports.daily.transport import DailyParams
+from pipecat.transports.websocket.fastapi import FastAPIWebsocketParams
 from pypdf import PdfReader
-from runner import configure
 
 load_dotenv(override=True)
 
-# Run this script directly from your command line.
-# This project was adapted from
-# https://github.com/pipecat-ai/pipecat/blob/main/examples/foundational/07d-interruptible-cartesia.py
-
-logger.remove(0)
-logger.add(sys.stderr, level="DEBUG")
+# We store functions so objects (e.g. SileroVADAnalyzer) don't get
+# instantiated. The function will be called when the desired transport gets
+# selected.
+transport_params = {
+    "daily": lambda: DailyParams(
+        audio_in_enabled=True,
+        audio_out_enabled=True,
+        vad_analyzer=SileroVADAnalyzer(params=VADParams(stop_secs=0.2)),
+        turn_analyzer=LocalSmartTurnAnalyzerV3(params=SmartTurnParams()),
+    ),
+    "twilio": lambda: FastAPIWebsocketParams(
+        audio_in_enabled=True,
+        audio_out_enabled=True,
+        vad_analyzer=SileroVADAnalyzer(params=VADParams(stop_secs=0.2)),
+        turn_analyzer=LocalSmartTurnAnalyzerV3(params=SmartTurnParams()),
+    ),
+    "webrtc": lambda: TransportParams(
+        audio_in_enabled=True,
+        audio_out_enabled=True,
+        vad_analyzer=SileroVADAnalyzer(params=VADParams(stop_secs=0.2)),
+        turn_analyzer=LocalSmartTurnAnalyzerV3(params=SmartTurnParams()),
+    ),
+}
 
 
 # Count number of tokens used in model and truncate the content
@@ -95,29 +125,16 @@ async def get_arxiv_content(url: str, aiohttp_session: aiohttp.ClientSession):
         return text
 
 
-# This is the main function that handles STT -> LLM -> TTS
+async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
+    logger.info(f"Starting bot")
 
-
-async def main():
     url = input("Enter the URL of the article you would like to talk about: ")
 
     async with aiohttp.ClientSession() as session:
         article_content = await get_article_content(url, session)
         article_content = truncate_content(article_content, model_name="gpt-4o-mini")
 
-        (room_url, token) = await configure(session)
-
-        transport = DailyTransport(
-            room_url,
-            token,
-            "studypal",
-            DailyParams(
-                audio_in_enabled=True,
-                audio_out_enabled=True,
-                transcription_enabled=True,
-                vad_analyzer=SileroVADAnalyzer(),
-            ),
-        )
+        stt = DeepgramSTTService(api_key=os.getenv("DEEPGRAM_API_KEY"))
 
         tts = CartesiaTTSService(
             api_key=os.getenv("CARTESIA_API_KEY"),
@@ -132,24 +149,25 @@ async def main():
                 "role": "system",
                 "content": f"""You are an AI study partner. You have been given the following article content:
 
-{article_content}
+    {article_content}
 
-Your task is to help the user understand and learn from this article in 2 sentences. THESE RESPONSES SHOULD BE ONLY MAX 2 SENTENCES. THIS INSTRUCTION IS VERY IMPORTANT. RESPONSES SHOULDN'T BE LONG.
-""",
+    Your task is to help the user understand and learn from this article in 2 sentences. THESE RESPONSES SHOULD BE ONLY MAX 2 SENTENCES. THIS INSTRUCTION IS VERY IMPORTANT. RESPONSES SHOULDN'T BE LONG.
+    """,
             },
         ]
 
-        context = OpenAILLMContext(messages)
-        context_aggregator = llm.create_context_aggregator(context)
+        context = LLMContext(messages)
+        context_aggregator = LLMContextAggregatorPair(context)
 
         pipeline = Pipeline(
             [
-                transport.input(),
-                context_aggregator.user(),
-                llm,
-                tts,
-                transport.output(),
-                context_aggregator.assistant(),
+                transport.input(),  # Transport user input
+                stt,
+                context_aggregator.user(),  # User responses
+                llm,  # LLM
+                tts,  # TTS
+                transport.output(),  # Transport bot output
+                context_aggregator.assistant(),  # Assistant spoken responses
             ]
         )
 
@@ -160,11 +178,13 @@ Your task is to help the user understand and learn from this article in 2 senten
                 enable_metrics=True,
                 enable_usage_metrics=True,
             ),
+            idle_timeout_secs=runner_args.pipeline_idle_timeout_secs,
         )
 
-        @transport.event_handler("on_first_participant_joined")
-        async def on_first_participant_joined(transport, participant):
-            await transport.capture_participant_transcription(participant["id"])
+        @transport.event_handler("on_client_connected")
+        async def on_client_connected(transport, client):
+            logger.info(f"Client connected")
+            # Kick off the conversation.
             messages.append(
                 {
                     "role": "system",
@@ -173,14 +193,23 @@ Your task is to help the user understand and learn from this article in 2 senten
             )
             await task.queue_frames([LLMRunFrame()])
 
-        @transport.event_handler("on_participant_left")
-        async def on_participant_left(transport, participant, reason):
+        @transport.event_handler("on_client_disconnected")
+        async def on_client_disconnected(transport, client):
+            logger.info(f"Client disconnected")
             await task.cancel()
 
-        runner = PipelineRunner()
+        runner = PipelineRunner(handle_sigint=runner_args.handle_sigint)
 
         await runner.run(task)
 
 
+async def bot(runner_args: RunnerArguments):
+    """Main bot entry point compatible with Pipecat Cloud."""
+    transport = await create_transport(runner_args, transport_params)
+    await run_bot(transport, runner_args)
+
+
 if __name__ == "__main__":
-    asyncio.run(main())
+    from pipecat.runner.run import main
+
+    main()

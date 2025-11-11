@@ -4,15 +4,15 @@
 # SPDX-License-Identifier: BSD 2-Clause License
 #
 
-import asyncio
 import os
-import sys
 from typing import List
 
-import aiohttp
 from dotenv import load_dotenv
 from loguru import logger
+from pipecat.audio.turn.smart_turn.base_smart_turn import SmartTurnParams
+from pipecat.audio.turn.smart_turn.local_smart_turn_v3 import LocalSmartTurnAnalyzerV3
 from pipecat.audio.vad.silero import SileroVADAnalyzer
+from pipecat.audio.vad.vad_analyzer import VADParams
 from pipecat.frames.frames import (
     Frame,
     LLMMessagesUpdateFrame,
@@ -23,22 +23,22 @@ from pipecat.frames.frames import (
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineParams, PipelineTask
-from pipecat.processors.aggregators.openai_llm_context import OpenAILLMContext
+from pipecat.processors.aggregators.llm_context import LLMContext
+from pipecat.processors.aggregators.llm_response_universal import LLMContextAggregatorPair
 from pipecat.processors.filters.stt_mute_filter import STTMuteConfig, STTMuteFilter, STTMuteStrategy
 from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
 from pipecat.processors.frameworks.rtvi import RTVIObserver, RTVIProcessor
 from pipecat.processors.transcript_processor import TranscriptProcessor
+from pipecat.runner.types import RunnerArguments
+from pipecat.runner.utils import create_transport
 from pipecat.services.cartesia.tts import CartesiaTTSService
 from pipecat.services.deepgram.stt import DeepgramSTTService
 from pipecat.services.openai.llm import OpenAILLMService
-from pipecat.transports.daily.transport import DailyParams, DailyTransport
-from runner import configure
+from pipecat.transports.base_transport import BaseTransport, TransportParams
+from pipecat.transports.daily.transport import DailyParams
+from pipecat.transports.websocket.fastapi import FastAPIWebsocketParams
 
 load_dotenv(override=True)
-
-logger.remove(0)
-logger.add(sys.stderr, level="DEBUG")
-
 
 """
 This example looks a bit different than the chatbot example, because it isn't waiting on the user to stop talking to start translating.
@@ -122,94 +122,114 @@ class TranscriptHandler:
             logger.info(f"{timestamp}{msg.role}: {msg.content}")
 
 
-async def main():
-    """Main function to set up and run the translation chatbot pipeline."""
-    async with aiohttp.ClientSession() as session:
-        (room_url, token) = await configure(session)
+# We store functions so objects (e.g. SileroVADAnalyzer) don't get
+# instantiated. The function will be called when the desired transport gets
+# selected.
+transport_params = {
+    "daily": lambda: DailyParams(
+        audio_in_enabled=True,
+        audio_out_enabled=True,
+        vad_analyzer=SileroVADAnalyzer(params=VADParams(stop_secs=0.2)),
+        turn_analyzer=LocalSmartTurnAnalyzerV3(params=SmartTurnParams()),
+    ),
+    "twilio": lambda: FastAPIWebsocketParams(
+        audio_in_enabled=True,
+        audio_out_enabled=True,
+        vad_analyzer=SileroVADAnalyzer(params=VADParams(stop_secs=0.2)),
+        turn_analyzer=LocalSmartTurnAnalyzerV3(params=SmartTurnParams()),
+    ),
+    "webrtc": lambda: TransportParams(
+        audio_in_enabled=True,
+        audio_out_enabled=True,
+        vad_analyzer=SileroVADAnalyzer(params=VADParams(stop_secs=0.2)),
+        turn_analyzer=LocalSmartTurnAnalyzerV3(params=SmartTurnParams()),
+    ),
+}
 
-        transport = DailyTransport(
-            room_url,
-            token,
-            "Translator",
-            DailyParams(
-                audio_in_enabled=True,
-                audio_out_enabled=True,
-                vad_analyzer=SileroVADAnalyzer(),
-            ),
-        )
 
-        stt = DeepgramSTTService(api_key=os.getenv("DEEPGRAM_API_KEY"))
+async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
+    logger.info(f"Starting bot")
 
-        stt_mute_processor = STTMuteFilter(
-            config=STTMuteConfig(
-                strategies={
-                    STTMuteStrategy.ALWAYS,
-                }
-            ),
-        )
+    stt = DeepgramSTTService(api_key=os.getenv("DEEPGRAM_API_KEY"))
 
-        tts = CartesiaTTSService(
-            api_key=os.getenv("CARTESIA_API_KEY"),
-            voice_id="34dbb662-8e98-413c-a1ef-1a3407675fe7",  # Spanish Narrator Man
-            model="sonic-2",
-        )
+    stt_mute_processor = STTMuteFilter(
+        config=STTMuteConfig(
+            strategies={
+                STTMuteStrategy.ALWAYS,
+            }
+        ),
+    )
 
-        in_language = "English"
-        out_language = "Spanish"
+    tts = CartesiaTTSService(
+        api_key=os.getenv("CARTESIA_API_KEY"),
+        voice_id="34dbb662-8e98-413c-a1ef-1a3407675fe7",  # Spanish Narrator Man
+        model="sonic-2",
+    )
 
-        llm = OpenAILLMService(api_key=os.getenv("OPENAI_API_KEY"))
-        context = OpenAILLMContext()
-        context_aggregator = llm.create_context_aggregator(context)
+    in_language = "English"
+    out_language = "Spanish"
 
-        tp = TranslationProcessor(in_language=in_language, out_language=out_language)
+    llm = OpenAILLMService(api_key=os.getenv("OPENAI_API_KEY"))
+    context = LLMContext()
+    context_aggregator = LLMContextAggregatorPair(context)
 
-        transcript = TranscriptProcessor()
-        transcript_handler = TranscriptHandler(in_language=in_language, out_language=out_language)
+    tp = TranslationProcessor(in_language=in_language, out_language=out_language)
 
-        # Register event handler for transcript updates
-        @transcript.event_handler("on_transcript_update")
-        async def on_transcript_update(processor, frame):
-            await transcript_handler.on_transcript_update(processor, frame)
+    transcript = TranscriptProcessor()
+    transcript_handler = TranscriptHandler(in_language=in_language, out_language=out_language)
 
-        rtvi = RTVIProcessor()
+    rtvi = RTVIProcessor()
 
-        pipeline = Pipeline(
-            [
-                transport.input(),
-                rtvi,
-                stt_mute_processor,  # We don't want to interrupt the translator bot
-                stt,
-                transcript.user(),  # User transcripts
-                tp,
-                llm,
-                tts,
-                transport.output(),
-                transcript.assistant(),
-                context_aggregator.assistant(),
-            ]
-        )
+    pipeline = Pipeline(
+        [
+            transport.input(),
+            rtvi,
+            stt_mute_processor,  # We don't want to interrupt the translator bot
+            stt,
+            transcript.user(),  # User transcripts
+            tp,
+            llm,
+            tts,
+            transport.output(),
+            transcript.assistant(),
+            context_aggregator.assistant(),
+        ]
+    )
 
-        task = PipelineTask(
-            pipeline,
-            params=PipelineParams(
-                enable_metrics=True,
-                enable_usage_metrics=True,
-            ),
-            observers=[RTVIObserver(rtvi)],
-        )
+    task = PipelineTask(
+        pipeline,
+        params=PipelineParams(
+            enable_metrics=True,
+            enable_usage_metrics=True,
+        ),
+        observers=[RTVIObserver(rtvi)],
+    )
 
-        @transport.event_handler("on_first_participant_joined")
-        async def on_first_participant_joined(transport, participant):
-            logger.info("First participant joined")
+    @transport.event_handler("on_first_participant_joined")
+    async def on_first_participant_joined(transport, participant):
+        logger.info("First participant joined")
 
-        @transport.event_handler("on_participant_left")
-        async def on_participant_left(transport, participant, reason):
-            await task.cancel()
+    @transport.event_handler("on_participant_left")
+    async def on_participant_left(transport, participant, reason):
+        await task.cancel()
 
-        runner = PipelineRunner()
+    # Register event handler for transcript updates
+    @transcript.event_handler("on_transcript_update")
+    async def on_transcript_update(processor, frame):
+        await transcript_handler.on_transcript_update(processor, frame)
 
-        await runner.run(task)
+    runner = PipelineRunner()
+
+    await runner.run(task)
+
+
+async def bot(runner_args: RunnerArguments):
+    """Main bot entry point compatible with Pipecat Cloud."""
+    transport = await create_transport(runner_args, transport_params)
+    await run_bot(transport, runner_args)
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    from pipecat.runner.run import main
+
+    main()

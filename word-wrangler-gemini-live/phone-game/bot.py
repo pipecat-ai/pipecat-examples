@@ -30,7 +30,9 @@ from pipecat.frames.frames import (
     EndFrame,
     Frame,
     InputAudioRawFrame,
+    LLMContextFrame,
     LLMFullResponseEndFrame,
+    LLMRunFrame,
     LLMTextFrame,
     StartFrame,
     TTSAudioRawFrame,
@@ -40,10 +42,8 @@ from pipecat.pipeline.parallel_pipeline import ParallelPipeline
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineParams, PipelineTask
-from pipecat.processors.aggregators.openai_llm_context import (
-    OpenAILLMContext,
-    OpenAILLMContextFrame,
-)
+from pipecat.processors.aggregators.llm_context import LLMContext
+from pipecat.processors.aggregators.llm_response_universal import LLMContextAggregatorPair
 from pipecat.processors.consumer_processor import ConsumerProcessor
 from pipecat.processors.filters.stt_mute_filter import STTMuteConfig, STTMuteFilter, STTMuteStrategy
 from pipecat.processors.frame_processor import FrameDirection, FrameProcessor, FrameProcessorSetup
@@ -215,7 +215,7 @@ class BotStoppedSpeakingNotifier(FrameProcessor):
 class StartGate(FrameProcessor):
     """A gate that blocks the inital context message to prevent the player from responding first.
 
-    Blocks OpenAILLMContextFrame until the gate opens. This frame is dropped
+    Blocks LLMContextFrame until the gate opens. This frame is dropped
     (not stored) to ignore the initial message. Once opened, all frames pass through normally.
     Note that we don't need to block User input frames or speaking frames because the STTMuteFilter
     will handle that.
@@ -249,7 +249,7 @@ class StartGate(FrameProcessor):
         if self._gate_opened:
             # Once the gate is open, let everything through
             await self.push_frame(frame, direction)
-        elif isinstance(frame, OpenAILLMContextFrame):
+        elif isinstance(frame, LLMContextFrame):
             # Drop these frames until the gate opens - we want to ignore this audio
             logger.trace(f"{self}: Dropping {type(frame).__name__} until host bot stops speaking")
 
@@ -646,13 +646,14 @@ Important guidelines:
     # While there are no context aggregators in the Pipeline, we need to create
     # one here to be able to push the context frame to the PipelineTask. This is
     # what initiates the conversation.
-    context = OpenAILLMContext(messages)
-    context_aggregator = host_llm.create_context_aggregator(context)
+    context = LLMContext(messages)
+    context_aggregator = LLMContextAggregatorPair(context)
 
     pipeline = Pipeline(
         [
             transport.input(),  # Receive audio/video from Daily call
             stt_mute_filter,  # Filter out speech during the bot's initial turn
+            context_aggregator.user(),
             ParallelPipeline(
                 # Host branch: manages the game and provides words
                 [
@@ -670,6 +671,7 @@ Important guidelines:
                 ],
             ),
             transport.output(),  # Send audio/video back to Daily call
+            context_aggregator.assistant(),
         ]
     )
 
@@ -691,7 +693,7 @@ Important guidelines:
         # Kick off the conversation by getting the context frame and pushing it.
         # There is no aggegrator in the Pipeline, so we need to rely on the
         # PipelineTask to push the frame.
-        await task.queue_frames([context_aggregator.user().get_context_frame()])
+        await task.queue_frames([LLMRunFrame()])
         # Start the game timer
         game_timer.start()
 

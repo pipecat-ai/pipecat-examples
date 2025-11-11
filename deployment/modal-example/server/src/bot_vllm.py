@@ -19,11 +19,9 @@ the conversation flow.
 
 import os
 import sys
-from typing import List
 
 from dotenv import load_dotenv
 from loguru import logger
-from openai.types.chat import ChatCompletionMessageParam
 from PIL import Image
 from pipecat.audio.vad.silero import SileroVADAnalyzer
 from pipecat.frames.frames import (
@@ -37,7 +35,8 @@ from pipecat.frames.frames import (
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineParams, PipelineTask
-from pipecat.processors.aggregators.openai_llm_context import OpenAILLMContext
+from pipecat.processors.aggregators.llm_context import LLMContext
+from pipecat.processors.aggregators.llm_response_universal import LLMContextAggregatorPair
 from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
 from pipecat.processors.frameworks.rtvi import RTVIConfig, RTVIObserver, RTVIProcessor
 from pipecat.services.elevenlabs.tts import ElevenLabsTTSService
@@ -185,8 +184,8 @@ async def run_bot(room_url: str, token: str):
 
     # Set up conversation context and management
     # The context_aggregator will automatically collect conversation context
-    context = OpenAILLMContext(messages)
-    context_aggregator = llm.create_context_aggregator(context)
+    context = LLMContext(messages)
+    context_aggregator = LLMContextAggregatorPair(context)
 
     ta = TalkingAnimation()
 

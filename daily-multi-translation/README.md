@@ -4,19 +4,24 @@ This example shows how to use Daily to stream multiple simultaneous translations
 
 ## Get started
 
-```python
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-
-cp env.example .env # and add your credentials
-
-```
-
-## Run the server
+Create your virtual environment and install dependencies:
 
 ```bash
-python server.py
+uv sync
+```
+
+Set up environment variables:
+
+```bash
+cp env.example .env # and add your credentials
+```
+
+## Run the bot
+
+Start your bot using the DailyTransport:
+
+```bash
+uv run bot.py -t daily
 ```
 
 Then, visit `http://localhost:7860/` in your browser. This will open a Daily Prebuilt room where you will speak in English (make sure you are not muted).

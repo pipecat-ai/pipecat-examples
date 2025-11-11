@@ -1,0 +1,13 @@
+[project]
+name = "studypal"
+version = "0.1.0"
+description = "Studypal example for Pipecat"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "pipecat-ai[daily,webrtc,websocket,cartesia,openai,silero,deepgram,runner,local-smart-turn-v3]>=0.0.91",
+  "pipecatcloud>=0.2.7",
+  "beautifulsoup4==4.12.3",
+  "pypdf==4.3.1",
+  "tiktoken==0.7.0"
+]
