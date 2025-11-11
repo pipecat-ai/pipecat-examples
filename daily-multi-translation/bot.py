@@ -4,11 +4,8 @@
 # SPDX-License-Identifier: BSD 2-Clause License
 #
 
-import asyncio
 import os
-import sys
 
-import aiohttp
 from dotenv import load_dotenv
 from loguru import logger
 from pipecat.audio.mixers.soundfile_mixer import SoundfileMixer
@@ -20,144 +17,153 @@ from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineParams, PipelineTask
 from pipecat.processors.aggregators.llm_context import LLMContext
 from pipecat.processors.aggregators.llm_response_universal import LLMContextAggregatorPair
+from pipecat.runner.types import RunnerArguments
 from pipecat.services.cartesia.tts import CartesiaTTSService
 from pipecat.services.deepgram.stt import DeepgramSTTService
 from pipecat.services.openai.llm import OpenAILLMService
+from pipecat.transports.base_transport import BaseTransport
 from pipecat.transports.daily.transport import DailyParams, DailyTransport
-from runner import configure
 
 load_dotenv(override=True)
-
-logger.remove(0)
-logger.add(sys.stderr, level="DEBUG")
 
 BACKGROUND_SOUND_FILE = "office-ambience-mono-16000.mp3"
 
 
-async def main():
-    async with aiohttp.ClientSession() as session:
-        (room_url, token) = await configure(session)
+async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
+    logger.info(f"Starting bot")
 
-        transport = DailyTransport(
-            room_url,
-            token,
-            "Multi translation bot",
-            DailyParams(
-                audio_in_enabled=True,
-                audio_out_enabled=True,
-                audio_out_mixer={
-                    "spanish": SoundfileMixer(
-                        sound_files={"office": BACKGROUND_SOUND_FILE}, default_sound="office"
-                    ),
-                    "french": SoundfileMixer(
-                        sound_files={"office": BACKGROUND_SOUND_FILE}, default_sound="office"
-                    ),
-                    "german": SoundfileMixer(
-                        sound_files={"office": BACKGROUND_SOUND_FILE}, default_sound="office"
-                    ),
-                },
-                audio_out_destinations=["spanish", "french", "german"],
-                microphone_out_enabled=False,  # Disable since we just use custom tracks
-                vad_analyzer=SileroVADAnalyzer(),
+    stt = DeepgramSTTService(api_key=os.getenv("DEEPGRAM_API_KEY"))
+
+    tts_spanish = CartesiaTTSService(
+        api_key=os.getenv("CARTESIA_API_KEY"),
+        voice_id="cefcb124-080b-4655-b31f-932f3ee743de",
+        transport_destination="spanish",
+    )
+    tts_french = CartesiaTTSService(
+        api_key=os.getenv("CARTESIA_API_KEY"),
+        voice_id="8832a0b5-47b2-4751-bb22-6a8e2149303d",
+        transport_destination="french",
+    )
+    tts_german = CartesiaTTSService(
+        api_key=os.getenv("CARTESIA_API_KEY"),
+        voice_id="38aabb6a-f52b-4fb0-a3d1-988518f4dc06",
+        transport_destination="german",
+    )
+
+    messages_spanish = [
+        {
+            "role": "system",
+            "content": "You will be provided with a sentence in English, and your task is to only translate it into Spanish.",
+        },
+    ]
+    messages_french = [
+        {
+            "role": "system",
+            "content": "You will be provided with a sentence in English, and your task is to only translate it into French.",
+        },
+    ]
+    messages_german = [
+        {
+            "role": "system",
+            "content": "You will be provided with a sentence in English, and your task is to only translate it into German.",
+        },
+    ]
+
+    llm_spanish = OpenAILLMService(api_key=os.getenv("OPENAI_API_KEY"))
+    llm_french = OpenAILLMService(api_key=os.getenv("OPENAI_API_KEY"))
+    llm_german = OpenAILLMService(api_key=os.getenv("OPENAI_API_KEY"))
+
+    context_spanish = LLMContext(messages_spanish)
+    context_aggregator_spanish = LLMContextAggregatorPair(context_spanish)
+
+    context_french = LLMContext(messages_french)
+    context_aggregator_french = LLMContextAggregatorPair(context_french)
+
+    context_german = LLMContext(messages_german)
+    context_aggregator_german = LLMContextAggregatorPair(context_german)
+
+    pipeline = Pipeline(
+        [
+            transport.input(),  # Transport user input
+            stt,
+            ParallelPipeline(
+                # Spanish pipeline.
+                [
+                    context_aggregator_spanish.user(),
+                    llm_spanish,
+                    tts_spanish,
+                    context_aggregator_spanish.assistant(),
+                ],
+                # French pipeline.
+                [
+                    context_aggregator_french.user(),
+                    llm_french,
+                    tts_french,
+                    context_aggregator_french.assistant(),
+                ],
+                # German pipeline.
+                [
+                    context_aggregator_german.user(),
+                    llm_german,
+                    tts_german,
+                    context_aggregator_german.assistant(),
+                ],
             ),
-        )
-
-        stt = DeepgramSTTService(api_key=os.getenv("DEEPGRAM_API_KEY"))
-
-        tts_spanish = CartesiaTTSService(
-            api_key=os.getenv("CARTESIA_API_KEY"),
-            voice_id="cefcb124-080b-4655-b31f-932f3ee743de",
-            transport_destination="spanish",
-        )
-        tts_french = CartesiaTTSService(
-            api_key=os.getenv("CARTESIA_API_KEY"),
-            voice_id="8832a0b5-47b2-4751-bb22-6a8e2149303d",
-            transport_destination="french",
-        )
-        tts_german = CartesiaTTSService(
-            api_key=os.getenv("CARTESIA_API_KEY"),
-            voice_id="38aabb6a-f52b-4fb0-a3d1-988518f4dc06",
-            transport_destination="german",
-        )
-
-        messages_spanish = [
-            {
-                "role": "system",
-                "content": "You will be provided with a sentence in English, and your task is to only translate it into Spanish.",
-            },
+            transport.output(),  # Transport bot output
         ]
-        messages_french = [
-            {
-                "role": "system",
-                "content": "You will be provided with a sentence in English, and your task is to only translate it into French.",
-            },
-        ]
-        messages_german = [
-            {
-                "role": "system",
-                "content": "You will be provided with a sentence in English, and your task is to only translate it into German.",
-            },
-        ]
+    )
 
-        llm_spanish = OpenAILLMService(api_key=os.getenv("OPENAI_API_KEY"))
-        llm_french = OpenAILLMService(api_key=os.getenv("OPENAI_API_KEY"))
-        llm_german = OpenAILLMService(api_key=os.getenv("OPENAI_API_KEY"))
+    task = PipelineTask(
+        pipeline,
+        params=PipelineParams(
+            audio_in_sample_rate=16000,
+            audio_out_sample_rate=16000,
+            enable_metrics=True,
+            enable_usage_metrics=True,
+        ),
+        observers=[TranscriptionLogObserver()],
+    )
 
-        context_spanish = LLMContext(messages_spanish)
-        context_aggregator_spanish = LLMContextAggregatorPair(context_spanish)
+    @transport.event_handler("on_client_disconnected")
+    async def on_client_disconnected(transport, client):
+        logger.info(f"Client disconnected")
+        await task.cancel()
 
-        context_french = LLMContext(messages_french)
-        context_aggregator_french = LLMContextAggregatorPair(context_french)
+    runner = PipelineRunner(handle_sigint=runner_args.handle_sigint)
 
-        context_german = LLMContext(messages_german)
-        context_aggregator_german = LLMContextAggregatorPair(context_german)
+    await runner.run(task)
 
-        pipeline = Pipeline(
-            [
-                transport.input(),  # Transport user input
-                stt,
-                ParallelPipeline(
-                    # Spanish pipeline.
-                    [
-                        context_aggregator_spanish.user(),
-                        llm_spanish,
-                        tts_spanish,
-                        context_aggregator_spanish.assistant(),
-                    ],
-                    # French pipeline.
-                    [
-                        context_aggregator_french.user(),
-                        llm_french,
-                        tts_french,
-                        context_aggregator_french.assistant(),
-                    ],
-                    # German pipeline.
-                    [
-                        context_aggregator_german.user(),
-                        llm_german,
-                        tts_german,
-                        context_aggregator_german.assistant(),
-                    ],
+
+async def bot(runner_args: RunnerArguments):
+    """Main bot entry point compatible with Pipecat Cloud."""
+    transport = DailyTransport(
+        runner_args.room_url,
+        runner_args.token,
+        "Multi translation bot",
+        DailyParams(
+            audio_in_enabled=True,
+            audio_out_enabled=True,
+            audio_out_mixer={
+                "spanish": SoundfileMixer(
+                    sound_files={"office": BACKGROUND_SOUND_FILE}, default_sound="office"
                 ),
-                transport.output(),  # Transport bot output
-            ]
-        )
+                "french": SoundfileMixer(
+                    sound_files={"office": BACKGROUND_SOUND_FILE}, default_sound="office"
+                ),
+                "german": SoundfileMixer(
+                    sound_files={"office": BACKGROUND_SOUND_FILE}, default_sound="office"
+                ),
+            },
+            audio_out_destinations=["spanish", "french", "german"],
+            microphone_out_enabled=False,  # Disable since we just use custom tracks
+            vad_analyzer=SileroVADAnalyzer(),
+        ),
+    )
 
-        task = PipelineTask(
-            pipeline,
-            params=PipelineParams(
-                audio_in_sample_rate=16000,
-                audio_out_sample_rate=16000,
-                enable_metrics=True,
-                enable_usage_metrics=True,
-            ),
-            observers=[TranscriptionLogObserver()],
-        )
-
-        runner = PipelineRunner()
-
-        await runner.run(task)
+    await run_bot(transport, runner_args)
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    from pipecat.runner.run import main
+
+    main()
