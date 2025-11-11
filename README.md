@@ -70,7 +70,6 @@ Ready to explore more? These are two of the most useful examples for common use 
 
 ### **Support, Educational & Specialized**
 
-- **[patient-intake](patient-intake/)** - Healthcare intake automation via phone
 - **[studypal](studypal/)** - AI-powered study companion
 
 ### **Advanced Features**

@@ -1,7 +1,7 @@
 [project]
-name = "twilio-chatbot-dial-in"
+name = "studypal"
 version = "0.1.0"
-description = "Twilio dial-in example for Pipecat"
+description = "Studypal example for Pipecat"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
