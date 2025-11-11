@@ -1,12 +1,16 @@
-FROM python:3.10-bullseye
+FROM dailyco/pipecat-base:latest
 
-RUN mkdir /app
-COPY *.py /app/
-COPY requirements.txt /app/
+# Enable bytecode compilation
+ENV UV_COMPILE_BYTECODE=1
 
-WORKDIR /app
-RUN pip3 install -r requirements.txt
+# Copy from the cache instead of linking since it's a mounted volume
+ENV UV_LINK_MODE=copy
 
-EXPOSE 7860
+# Install the project's dependencies using the lockfile and settings
+RUN --mount=type=cache,target=/root/.cache/uv \
+    --mount=type=bind,source=uv.lock,target=uv.lock \
+    --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
+    uv sync --locked --no-install-project --no-dev
 
-CMD ["python3", "server.py"]
+# Copy the application code
+COPY ./bot.py bot.py
