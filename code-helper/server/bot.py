@@ -24,6 +24,8 @@ import os
 
 from dotenv import load_dotenv
 from loguru import logger
+from pipecat.adapters.schemas.function_schema import FunctionSchema
+from pipecat.adapters.schemas.tools_schema import ToolsSchema
 from pipecat.audio.turn.smart_turn.local_smart_turn_v3 import LocalSmartTurnAnalyzerV3
 from pipecat.audio.vad.silero import SileroVADAnalyzer
 from pipecat.audio.vad.vad_analyzer import VADParams
@@ -32,14 +34,15 @@ from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineParams, PipelineTask
 from pipecat.processors.aggregators.llm_context import LLMContext
-from pipecat.processors.aggregators.llm_response import LLMAssistantAggregatorParams
 from pipecat.processors.aggregators.llm_response_universal import LLMContextAggregatorPair
+from pipecat.processors.aggregators.llm_text_processor import LLMTextProcessor
 from pipecat.processors.frameworks.rtvi import RTVIObserver, RTVIProcessor
 from pipecat.processors.transcript_processor import TranscriptProcessor
 from pipecat.runner.types import RunnerArguments
 from pipecat.runner.utils import create_transport
+from pipecat.services.cartesia.tts import CartesiaTTSService
 from pipecat.services.deepgram.stt import DeepgramSTTService
-from pipecat.services.elevenlabs.tts import ElevenLabsTTSService
+from pipecat.services.llm_service import FunctionCallParams
 from pipecat.services.openai.llm import OpenAILLMService
 from pipecat.transports.base_transport import BaseTransport, TransportParams
 from pipecat.utils.text.pattern_pair_aggregator import MatchAction, PatternPairAggregator
@@ -49,68 +52,109 @@ from pipecat_whisker import WhiskerObserver
 load_dotenv(override=True)
 
 
+async def fetch_credit_card_info(params: FunctionCallParams):
+    await params.result_callback(
+        {"card_number": "1234-5678-9012-3456", "expiration_date": "12/24", "cvv": "123"}
+    )
+
+
 async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     """Main bot logic."""
     logger.info("Starting bot")
 
+    system_prompt = "You are a friendly AI assistant. All code snippets should be wrapped in <code></code> blocks. All credit card numbers should be wrapped in <card></card> blocks. All urls should be wrapped in <link></link> blocks."
+
+    # LLM text processor to identify code blocks, credit cards, and urls
+    llm_text_aggregator = PatternPairAggregator()
+    llm_text_aggregator.add_pattern_pair(
+        type="code",
+        start_pattern="<code>",
+        end_pattern="</code>",
+        action=MatchAction.AGGREGATE,
+    )
+    llm_text_aggregator.add_pattern_pair(
+        type="credit_card",
+        start_pattern="<card>",
+        end_pattern="</card>",
+        action=MatchAction.AGGREGATE,
+    )
+    llm_text_aggregator.add_pattern_pair(
+        type="link",
+        start_pattern="<link>",
+        end_pattern="</link>",
+        action=MatchAction.AGGREGATE,
+    )
+    llm_text_processor = LLMTextProcessor(text_aggregator=llm_text_aggregator)
+
     # Speech-to-Text service
     stt = DeepgramSTTService(api_key=os.getenv("DEEPGRAM_API_KEY"))
 
-    # Text-to-Speech service
-    # Text aggregator to handle code snippets
-    tts_aggregator = PatternPairAggregator()
-    tts_aggregator.add_pattern_pair(
-        type="code",
-        start_pattern="<code>",
-        end_pattern="</code>",
-        action=MatchAction.AGGREGATE,
-    )
-    tts = ElevenLabsTTSService(
-        api_key=os.getenv("ELEVENLABS_API_KEY"),
-        voice_id=os.getenv("ELEVENLABS_VOICE_ID"),
-        text_aggregator=tts_aggregator,
+    tts = CartesiaTTSService(
+        api_key=os.getenv("CARTESIA_API_KEY"),
+        voice_id="71a7ad14-091c-4e8e-a314-022ece01c121",  # British Reading Lady
         skip_aggregator_types=["code"],
     )
 
+    async def spell_out_text(text: str, type: str) -> str:
+        return CartesiaTTSService.SPELL(text)
+
+    async def strip_url_protocol(text: str, type: str) -> str:
+        if text.startswith("http://"):
+            text = text[len("http://") :]
+        elif text.startswith("https://"):
+            text = text[len("https://") :]
+        if text.startswith("www."):
+            text = text[len("www.") :]
+        return text
+
+    tts.transform_aggregation_type("link", strip_url_protocol)
+    tts.transform_aggregation_type("credit_card", spell_out_text)
+
     # LLM service
     llm = OpenAILLMService(api_key=os.getenv("OPENAI_API_KEY"))
+    llm.register_function("get_credit_card_info", fetch_credit_card_info)
 
+    # LLM aggregator context
     messages = [
         {
             "role": "system",
-            "content": "You are a friendly AI assistant. Respond naturally and keep your answers conversational. Your output will be converted to audio so don't include special characters in your answers, unless it's part of a code snippet the user has requested. If the user makes a request that results in a code snippet, then wrap the entire snippet in <code></code> blocks.",
+            "content": system_prompt,
         },
     ]
 
-    # LLM aggregator context
-    # Text aggregator to handle code snippets when the tts is skipped
-    llm_aggregator = PatternPairAggregator()
-    llm_aggregator.add_pattern_pair(
-        type="code",
-        start_pattern="<code>",
-        end_pattern="</code>",
-        action=MatchAction.AGGREGATE,
+    credit_card_function = FunctionSchema(
+        name="get_credit_card_info",
+        description="Get credit card information for the user.",
+        properties={},
+        required=[],
     )
-    context = LLMContext(messages)
+    tools = ToolsSchema(standard_tools=[credit_card_function])
+    context = LLMContext(messages, tools)
     context_aggregator = LLMContextAggregatorPair(
         context=context,
-        assistant_params=LLMAssistantAggregatorParams(llm_text_aggregator=llm_aggregator),
     )
 
     # Transcription processor
     transcript_processor = TranscriptProcessor()
 
-    rtvi = RTVIProcessor()
+    # RTVI processor
+    async def obfuscate_credit_card(text: str, type: str) -> str:
+        return "XXXX-XXXX-XXXX-" + text[-4:]
+
+    rtviIn = RTVIProcessor()
+    rtviOut = RTVIObserver(rtviIn)
+    rtviOut.transform_aggregation_type("credit_card", obfuscate_credit_card)
 
     # Pipeline
     pipeline = Pipeline(
         [
             transport.input(),
-            rtvi,
+            rtviIn,
             stt,
             transcript_processor.user(),
             context_aggregator.user(),
             llm,
+            llm_text_processor,
             tts,
             transport.output(),
             transcript_processor.assistant(),
@@ -125,9 +169,9 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
             enable_usage_metrics=True,
         ),
         observers=[
-            RTVIObserver(rtvi),
-            WhiskerObserver(pipeline),
-            TailObserver(),
+            rtviOut,
+            # WhiskerObserver(pipeline),
+            # TailObserver(),
         ],
     )
 
@@ -151,7 +195,7 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
                 line = f"{timestamp}{msg.role}: {msg.content}"
                 logger.info(f"Transcript: {line}")
 
-    @rtvi.event_handler("on_client_message")
+    @rtviIn.event_handler("on_client_message")
     async def on_message(rtvi, msg):
         print("RTVI junk message:", msg.type, msg.data)
         if msg.type == "get_context":
