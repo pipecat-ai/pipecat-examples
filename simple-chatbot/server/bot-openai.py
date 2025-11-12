@@ -185,8 +185,6 @@ async def run_bot(transport: BaseTransport):
 async def bot(runner_args: RunnerArguments):
     """Main bot entry point compatible with Pipecat Cloud."""
 
-    logger.debug(f"runner_args: {runner_args}")
-
     transport = DailyTransport(
         runner_args.room_url,
         runner_args.token,

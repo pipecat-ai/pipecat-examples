@@ -48,20 +48,14 @@ Select your preferred bot by running the corresponding bot.py file:
 
    ```bash
    cd server
-   python -m venv .venv
-   source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-   pip install -r requirements.txt
+   uv sync
    ```
-
-   > Using `uv`? Create your venv using: `uv sync`
 
 3. Run the bot:
 
    ```bash
-   python bot-openai.py --transport daily
+   uv run bot-openai.py --transport daily
    ```
-
-   > Using `uv`? Run your bot using: `uv run bot-openai.py --transport daily`
 
 ## Troubleshooting
 
