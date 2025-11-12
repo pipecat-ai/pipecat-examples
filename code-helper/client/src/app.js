@@ -7,6 +7,7 @@ import {
 } from './config';
 
 import hljs from 'highlight.js/lib/core';
+import 'highlight.js/styles/dark.css';
 import javascript from 'highlight.js/lib/languages/javascript';
 import python from 'highlight.js/lib/languages/python';
 hljs.registerLanguage('javascript', javascript);
@@ -33,6 +34,7 @@ class VoiceChatClient {
     this.lastConversationBubble = null;
     this.botBubbles = [];
     this.curBotBubble = -1;
+    this.curSpanIndex = -1;
     this.sendBtn = document.getElementById('send-btn');
 
     // Populate transport selector with available transports
@@ -139,9 +141,9 @@ class VoiceChatClient {
           },
           onBotOutput: (data) => {
             if (data.aggregated_by === 'word') {
-              this.emboldenBotWord(data.text);
+              // this.emboldenBotWord(data.text);
+              return;
             } else {
-              console.log('! Bot output:', data);
               this.addConversationMessage(data.text, 'bot', data.aggregated_by);
             }
           },
@@ -214,89 +216,119 @@ class VoiceChatClient {
     this.micBtn.style.backgroundColor = enabled ? '#10b981' : '#1f2937';
   }
 
-  emboldenBotWord(word) {
-    if (this.curBotBubble < 0) return;
-    const textDiv =
-      this.botBubbles[this.curBotBubble].querySelector('div:last-child');
-    const textContent = textDiv.textContent;
-    const alreadyEmboldened = textContent.slice(0, this.lastBotWordIndex);
-    const yetToEmbolden = textContent.slice(this.lastBotWordIndex || 0);
+  // emboldenBotWord(word) {
+  //   if (this.curBotBubble < 0) return;
+  //   const textDiv =
+  //     this.botBubbles[this.curBotBubble].querySelector('div:last-child');
+  //   const textContent = textDiv.textContent;
+  //   const alreadyEmboldened = textContent.slice(0, this.lastBotWordIndex);
+  //   const yetToEmbolden = textContent.slice(this.lastBotWordIndex || 0);
 
-    const wordIndex = yetToEmbolden.indexOf(word);
-    if (wordIndex === -1) {
-      if (this.botBubbles.length > this.curBotBubble + 1) {
-        const unboldenedText = textContent.replace(/<\/?strong>/g, '');
-        textDiv.innerHTML = unboldenedText;
-        // Move to next bubble
-        this.curBotBubble += 1;
-        this.lastBotWordIndex = 0;
-        this.emboldenBotWord(word);
-        return;
-      }
-      console.log('! Word not found for emboldening:', word, yetToEmbolden);
-      return;
-    } else {
-      console.log('! Emboldening word:', word);
+  //   const wordIndex = yetToEmbolden.indexOf(word);
+  //   if (wordIndex === -1) {
+  //     if (this.botBubbles.length > this.curBotBubble + 1) {
+  //       const unboldenedText = textContent.replace(/<\/?strong>/g, '');
+  //       textDiv.innerHTML = unboldenedText;
+  //       // Move to next bubble
+  //       this.curBotBubble += 1;
+  //       this.lastBotWordIndex = 0;
+  //       this.emboldenBotWord(word);
+  //       return;
+  //     }
+  //     console.log('! Word not found for emboldening:', word, yetToEmbolden);
+  //     return;
+  //   } else {
+  //     console.log('! Emboldening word:', word);
+  //   }
+  //   // Replace the first occurrence of the word with <strong>word</strong>
+  //   // Use word boundaries to match the whole word
+  //   const replaced = yetToEmbolden.replace(word, `<strong>${word}</strong>`);
+
+  //   textDiv.innerHTML = alreadyEmboldened + replaced;
+  //   this.conversationLog.scrollTop = this.conversationLog.scrollHeight;
+
+  //   // Update lastBotWordIndex
+  //   this.lastBotWordIndex =
+  //     (this.lastBotWordIndex || 0) + wordIndex + word.length;
+  // }
+
+  createBotBubbleElement(text, type) {
+    let newElement;
+    switch (type) {
+      case 'code':
+        {
+          newElement = document.createElement('pre');
+          const codeDiv = document.createElement('code');
+          codeDiv.textContent = text;
+          hljs.highlightElement(codeDiv);
+          newElement.appendChild(codeDiv);
+        }
+        break;
+      case 'link':
+        {
+          newElement = document.createElement('div');
+          const link = document.createElement('a');
+          link.href = text;
+          link.textContent = text;
+          link.target = '_blank';
+          newElement.appendChild(link);
+        }
+        break;
+      default:
+        {
+          newElement = document.createElement('span');
+          text = text.trim();
+          newElement.innerHTML = text.replace(/\n/g, ' <br> ');
+        }
+        break;
     }
-    // Replace the first occurrence of the word with <strong>word</strong>
-    // Use word boundaries to match the whole word
-    const replaced = yetToEmbolden.replace(word, `<strong>${word}</strong>`);
+    newElement.type = type;
+    return newElement;
+  }
 
-    textDiv.innerHTML = alreadyEmboldened + replaced;
-    this.conversationLog.scrollTop = this.conversationLog.scrollHeight;
+  addToLastBubble(text, role, type) {
+    const appendText = (element, text) => {
+      text = text.trim();
+      element.innerHTML += ' ' + text.replace(/\n/g, ' <br> ');
+    };
+    const typeIsText = (t) => {
+      return !['code', 'link'].includes(t);
+    };
 
-    // Update lastBotWordIndex
-    this.lastBotWordIndex =
-      (this.lastBotWordIndex || 0) + wordIndex + word.length;
+    if (role === 'user') {
+      appendText(this.lastConversationBubble, text);
+      return;
+    }
+
+    const lastChild = this.lastConversationBubble.lastChild;
+    if (lastChild && typeIsText(lastChild.type) && typeIsText(type)) {
+      appendText(lastChild, text);
+      return;
+    }
+    this.lastConversationBubble.appendChild(
+      this.createBotBubbleElement(text, type)
+    );
   }
 
   addConversationMessage(text, role, type = 'sentence') {
-    if (
-      this.lastConversationBubble &&
-      this.lastConversationBubble.role === role &&
-      this.lastConversationBubble.type === type
-    ) {
-      this.lastConversationBubble.querySelector('div:last-child').textContent +=
-        ' ' + text;
-      this.conversationLog.scrollTop = this.conversationLog.scrollHeight;
-      return;
+    // Only start a new bubble if the role changes
+    if (this.lastConversationBubble?.role === role) {
+      this.addToLastBubble(text, role, type);
+    } else {
+      this.createConversationBubble(text, role, type);
     }
+  }
 
+  createConversationBubble(text, role, type) {
     const messageDiv = document.createElement('div');
     messageDiv.className = `conversation-message ${role} ${type}`;
     this.lastConversationBubble = messageDiv;
     this.lastConversationBubble.role = role;
-    this.lastConversationBubble.type = type;
-    if (role === 'bot' && type === 'sentence') {
-      this.botBubbles.push(this.lastConversationBubble);
-      if (this.curBotBubble === -1) {
-        this.curBotBubble = 0;
-        this.lastBotWordIndex = 0;
-      }
-    }
 
     if (role === 'placeholder') {
       messageDiv.textContent = text;
     } else {
-      const roleSpan = document.createElement('div');
-      roleSpan.className = 'role';
-      roleSpan.textContent = role === 'user' ? 'You' : 'Bot';
-
-      let textDiv;
-      if (type !== 'code') {
-        textDiv = document.createElement('div');
-        textDiv.textContent = text;
-      } else {
-        textDiv = document.createElement('pre');
-        let codeDiv = document.createElement('code');
-        codeDiv.textContent = text;
-        textDiv.appendChild(codeDiv);
-        textDiv.className = 'language-html';
-        hljs.highlightElement(textDiv);
-      }
-
-      messageDiv.appendChild(roleSpan);
-      messageDiv.appendChild(textDiv);
+      this.addToLastBubble(text, role, type);
     }
 
     this.conversationLog.appendChild(messageDiv);

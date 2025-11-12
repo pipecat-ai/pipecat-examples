@@ -148,11 +148,12 @@ body {
   color: #d1fae5;
 }
 
-.conversation-message.code {
-  /* font-family: 'Courier New', monospace; */
-  background-color: #374151;
-  padding: 0.5rem;
-  border-radius: 0.25rem;
+span.spoken {
+  font-weight: bold;
+}
+
+.conversation-message pre {
+  border-radius: 0.4rem;
   overflow-x: auto;
 }
 
