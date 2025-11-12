@@ -1,0 +1,8 @@
+[project]
+name = "simple-chatbot-server"
+version = "0.1.0"
+description = "Simple chatbot server using Pipecat"
+requires-python = ">=3.10"
+dependencies = [
+    "pipecat-ai[daily,elevenlabs,openai,silero,google,runner]>=0.0.94",
+]
