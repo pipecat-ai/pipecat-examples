@@ -20,6 +20,9 @@ export function ConnectButton() {
       } else {
         await client.startBotAndConnect({
           endpoint: "http://localhost:7860/start",
+          requestData: {
+            createDailyRoom: true,
+          },
         });
       }
     } catch (error) {
