@@ -32,9 +32,8 @@ class VoiceChatClient {
     this.conversationLog = document.getElementById('conversation-log');
     this.eventsLog = document.getElementById('events-log');
     this.lastConversationBubble = null;
-    this.botBubbles = [];
-    this.curBotBubble = -1;
-    this.curSpanIndex = -1;
+    this.botSpans = [];
+    this.curBotSpan = -1;
     this.sendBtn = document.getElementById('send-btn');
 
     // Populate transport selector with available transports
@@ -141,7 +140,7 @@ class VoiceChatClient {
           },
           onBotOutput: (data) => {
             if (data.aggregated_by === 'word') {
-              // this.emboldenBotWord(data.text);
+              this.emboldenBotWord(data.text);
               return;
             } else {
               this.addConversationMessage(data.text, 'bot', data.aggregated_by);
@@ -152,7 +151,7 @@ class VoiceChatClient {
           },
         },
       });
-      window.client = this.client; // For debugging
+      window.client = this; // For debugging
 
       // Setup audio
       this.setupAudio();
@@ -216,41 +215,42 @@ class VoiceChatClient {
     this.micBtn.style.backgroundColor = enabled ? '#10b981' : '#1f2937';
   }
 
-  // emboldenBotWord(word) {
-  //   if (this.curBotBubble < 0) return;
-  //   const textDiv =
-  //     this.botBubbles[this.curBotBubble].querySelector('div:last-child');
-  //   const textContent = textDiv.textContent;
-  //   const alreadyEmboldened = textContent.slice(0, this.lastBotWordIndex);
-  //   const yetToEmbolden = textContent.slice(this.lastBotWordIndex || 0);
+  emboldenBotWord(word) {
+    if (this.curBotSpan < 0) return;
+    const curSpan = this.botSpans[this.curBotSpan];
+    if (!curSpan) return;
+    const spanInnards = curSpan.innerHTML.replace(/<\/?strong>/g, '');
+    const alreadyEmboldened = spanInnards.slice(0, this.lastBotWordIndex);
+    const yetToEmbolden = spanInnards.slice(this.lastBotWordIndex || 0);
 
-  //   const wordIndex = yetToEmbolden.indexOf(word);
-  //   if (wordIndex === -1) {
-  //     if (this.botBubbles.length > this.curBotBubble + 1) {
-  //       const unboldenedText = textContent.replace(/<\/?strong>/g, '');
-  //       textDiv.innerHTML = unboldenedText;
-  //       // Move to next bubble
-  //       this.curBotBubble += 1;
-  //       this.lastBotWordIndex = 0;
-  //       this.emboldenBotWord(word);
-  //       return;
-  //     }
-  //     console.log('! Word not found for emboldening:', word, yetToEmbolden);
-  //     return;
-  //   } else {
-  //     console.log('! Emboldening word:', word);
-  //   }
-  //   // Replace the first occurrence of the word with <strong>word</strong>
-  //   // Use word boundaries to match the whole word
-  //   const replaced = yetToEmbolden.replace(word, `<strong>${word}</strong>`);
+    const wordIndex = yetToEmbolden.indexOf(word);
+    if (wordIndex === -1) {
+      if (this.botSpans.length > this.curBotSpan + 1) {
+        curSpan.innerHTML = spanInnards;
+        curSpan.classList.add('spoken');
 
-  //   textDiv.innerHTML = alreadyEmboldened + replaced;
-  //   this.conversationLog.scrollTop = this.conversationLog.scrollHeight;
+        // Move to next bubble
+        this.curBotSpan = this.curBotSpan + 1;
+        this.lastBotWordIndex = 0;
+        this.emboldenBotWord(word);
+        return;
+      }
+      console.log('! Word not found for emboldening:', word, yetToEmbolden);
+      return;
+    } else {
+      console.log('! Emboldening word:', word);
+    }
+    // Replace the first occurrence of the word with <strong>word</strong>
+    // Use word boundaries to match the whole word
+    const replaced = yetToEmbolden.replace(word, `${word}</strong>`);
 
-  //   // Update lastBotWordIndex
-  //   this.lastBotWordIndex =
-  //     (this.lastBotWordIndex || 0) + wordIndex + word.length;
-  // }
+    curSpan.innerHTML = '<strong>' + alreadyEmboldened + replaced;
+    this.conversationLog.scrollTop = this.conversationLog.scrollHeight;
+
+    // Update lastBotWordIndex
+    this.lastBotWordIndex =
+      (this.lastBotWordIndex || 0) + wordIndex + word.length;
+  }
 
   createBotBubbleElement(text, type) {
     let newElement;
@@ -279,6 +279,10 @@ class VoiceChatClient {
           newElement = document.createElement('span');
           text = text.trim();
           newElement.innerHTML = text.replace(/\n/g, ' <br> ');
+          this.botSpans.push(newElement);
+          if (this.curBotSpan === -1) {
+            this.curBotSpan = 0;
+          }
         }
         break;
     }
