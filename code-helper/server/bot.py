@@ -66,19 +66,19 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
 
     # LLM text processor to identify code blocks, credit cards, and urls
     llm_text_aggregator = PatternPairAggregator()
-    llm_text_aggregator.add_pattern_pair(
+    llm_text_aggregator.add_pattern(
         type="code",
         start_pattern="<code>",
         end_pattern="</code>",
         action=MatchAction.AGGREGATE,
     )
-    llm_text_aggregator.add_pattern_pair(
+    llm_text_aggregator.add_pattern(
         type="credit_card",
         start_pattern="<card>",
         end_pattern="</card>",
         action=MatchAction.AGGREGATE,
     )
-    llm_text_aggregator.add_pattern_pair(
+    llm_text_aggregator.add_pattern(
         type="link",
         start_pattern="<link>",
         end_pattern="</link>",
@@ -107,8 +107,8 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
             text = text[len("www.") :]
         return text
 
-    tts.transform_aggregation_type("link", strip_url_protocol)
-    tts.transform_aggregation_type("credit_card", spell_out_text)
+    tts.add_text_transformer(strip_url_protocol, "link")
+    tts.add_text_transformer(spell_out_text, "credit_card")
 
     # LLM service
     llm = OpenAILLMService(api_key=os.getenv("OPENAI_API_KEY"))
@@ -143,7 +143,7 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
 
     rtviIn = RTVIProcessor()
     rtviOut = RTVIObserver(rtviIn)
-    rtviOut.transform_aggregation_type("credit_card", obfuscate_credit_card)
+    rtviOut.add_bot_output_transformer(obfuscate_credit_card, "credit_card")
 
     # Pipeline
     pipeline = Pipeline(

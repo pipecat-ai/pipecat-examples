@@ -235,10 +235,7 @@ class VoiceChatClient {
         this.emboldenBotWord(word);
         return;
       }
-      console.log('! Word not found for emboldening:', word, yetToEmbolden);
       return;
-    } else {
-      console.log('! Emboldening word:', word);
     }
     // Replace the first occurrence of the word with <strong>word</strong>
     // Use word boundaries to match the whole word
