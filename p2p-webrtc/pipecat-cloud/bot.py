@@ -39,6 +39,8 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
         transport (BaseTransport): The transport to use for communication.
         runner_args: runner session arguments
     """
+    logger.info(f"RunnerArguments custom data: {runner_args.body}")
+
     # Configure your STT, LLM, and TTS services here
     # Swap out different processors or properties to customize your bot
     stt = DeepgramSTTService(api_key=os.getenv("DEEPGRAM_API_KEY"))

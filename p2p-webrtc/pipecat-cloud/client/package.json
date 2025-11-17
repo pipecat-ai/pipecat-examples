@@ -19,6 +19,6 @@
   },
   "dependencies": {
     "@pipecat-ai/client-js": "^1.4.1",
-    "@pipecat-ai/small-webrtc-transport": "^1.7.0"
+    "@pipecat-ai/small-webrtc-transport": "^1.7.1"
   }
 }
