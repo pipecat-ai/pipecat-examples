@@ -13,7 +13,7 @@
     "@daily-co/react-native-daily-js": "^0.82.0",
     "@daily-co/react-native-webrtc": "^124.0.6-daily.1",
     "@pipecat-ai/react-native-daily-media-manager": "^0.0.1",
-    "@pipecat-ai/react-native-small-webrtc-transport": "^1.4.0",
+    "@pipecat-ai/react-native-small-webrtc-transport": "^1.4.1",
     "@react-native-async-storage/async-storage": "1.24.0",
     "@react-navigation/native": "^7.1.19",
     "@react-navigation/stack": "^7.6.1",
