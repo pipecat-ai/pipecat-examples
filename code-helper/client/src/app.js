@@ -1,4 +1,8 @@
-import { PipecatClient, RTVIEvent } from '@pipecat-ai/client-js';
+import {
+  AggregationType,
+  PipecatClient,
+  RTVIEvent,
+} from '@pipecat-ai/client-js';
 import {
   AVAILABLE_TRANSPORTS,
   DEFAULT_TRANSPORT,
@@ -139,7 +143,7 @@ class VoiceChatClient {
             }
           },
           onBotOutput: (data) => {
-            if (data.aggregated_by === 'word') {
+            if (data.aggregated_by === AggregationType.WORD) {
               this.emboldenBotWord(data.text);
               return;
             } else {
@@ -220,7 +224,7 @@ class VoiceChatClient {
     const curSpan = this.botSpans[this.curBotSpan];
     if (!curSpan) return;
     const spanInnards = curSpan.innerHTML.replace(/<\/?strong>/g, '');
-    const alreadyEmboldened = spanInnards.slice(0, this.lastBotWordIndex);
+    const alreadyEmboldened = spanInnards.slice(0, this.lastBotWordIndex || 0);
     const yetToEmbolden = spanInnards.slice(this.lastBotWordIndex || 0);
 
     const wordIndex = yetToEmbolden.indexOf(word);
@@ -311,7 +315,7 @@ class VoiceChatClient {
     );
   }
 
-  addConversationMessage(text, role, type = 'sentence') {
+  addConversationMessage(text, role, type = AggregationType.SENTENCE) {
     // Only start a new bubble if the role changes
     if (this.lastConversationBubble?.role === role) {
       this.addToLastBubble(text, role, type);
