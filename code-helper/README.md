@@ -1,6 +1,31 @@
 # code-helper
 
-A Pipecat AI voice agent built with a cascade pipeline (STT → LLM → TTS).
+This example demonstrates using `LLMTextProcessor` to categorize the LLM's
+output text so that the client can easily render different types of output
+accordingly, while the TTS speaks these same types in separate but also
+custom ways, spelling out credit card numbers, while skipping trying to
+read out code snippets or not saying the 'https' part of a url.
+
+This example also includes a text entry box in the client to show how the
+bot handles text input and can respond either with audio or not and the
+categorization and "bot output" continues seemlessly.
+
+The client in this example will render the user and bot transcripts using
+simply the `user-transcript` and `bot-output` messages. The bot output will
+render each sentence and then highlight each word as it is said. All code
+provided by the bot will be highlighted as such and links will be formatted.
+
+Concepts this example is meant to demonstrate:
+- Custom handling of LLM text output for different purposes:
+  - For the purpose of having the TTS skip certain outputs or speak certain
+    outputs differently
+  - For the purpose of supporting a client UI for easier rendering of
+    different types of text or for altering for filtering out text before
+    sending it to the client.
+- Client <-> Bot Communication with RTVI
+- Tool calling for sensitive information and custom handling of that
+  information for TTS and RTVI purposes.
+- Client->Server Text input
 
 ## Configuration
 
@@ -10,10 +35,6 @@ A Pipecat AI voice agent built with a cascade pipeline (STT → LLM → TTS).
   - **STT**: Deepgram
   - **LLM**: OpenAI
   - **TTS**: ElevenLabs
-- **Features**:
-  - Transcription
-  - smart-turn v3
-  - Observability (Whisker + Tail)
 
 ## Setup
 
@@ -86,53 +107,6 @@ code-helper/
 ## Observability
 
 This project includes observability tools to help you debug and monitor your bot:
-
-### Whisker - Live Pipeline Debugger
-
-**Whisker** is a live graphical debugger that lets you visualize pipelines and debug frames in real time.
-
-With Whisker you can:
-
-- 🗺️ View a live graph of your pipeline
-- ⚡ Watch frame processors flash in real time as frames pass through them
-- 📌 Select a processor to inspect the frames it has handled
-- 🔍 Filter frames by name to quickly find the ones you care about
-- 🧵 Select a frame to trace its full path through the pipeline
-- 💾 Save and load previous sessions for review and troubleshooting
-
-**To use Whisker:**
-
-1. Run an ngrok tunnel to expose your bot:
-
-   ```bash
-   ngrok http 9090
-   ```
-
-   > Tip: Use `--subdomain` for a repeatable ngrok URL
-
-2. Navigate to [https://whisker.pipecat.ai/](https://whisker.pipecat.ai/) and enter your ngrok URL (e.g., `your-subdomain.ngrok.io`)
-
-3. Once your bot is running, press connect
-
-### Tail - Terminal Dashboard
-
-**Tail** is a terminal dashboard that lets you monitor your Pipecat sessions in real time.
-
-With Tail you can:
-
-- 📜 Follow system logs in real time
-- 💬 Track conversations as they happen
-- 🔊 Monitor user and agent audio levels
-- 📈 Keep an eye on service metrics and usage
-
-**To use Tail:**
-
-1. Run your bot (in one terminal)
-
-2. Launch Tail in another terminal:
-   ```bash
-   pipecat tail
-   ```
 
 ## Learn More
 
