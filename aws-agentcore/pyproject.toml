@@ -11,7 +11,7 @@ dependencies = [
 dev = [
     "strands-agents",
     "strands-agents-tools",
-    "bedrock-agentcore-starter-toolkit",
+    "bedrock-agentcore-starter-toolkit>=0.1.25",
     "pyright>=1.1.404,<2",
     "ruff>=0.12.11,<1",
 ]
