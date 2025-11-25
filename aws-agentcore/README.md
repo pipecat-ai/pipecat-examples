@@ -9,8 +9,7 @@ Note that unlike an LLM service found in a traditional Pipecat bot pipeline, the
 ## Prerequisites
 
 - Accounts with:
-  - AWS
-  - OpenAI
+  - AWS (with access to Bedrock AgentCore and Claude 3.7 Sonnet model)
   - Deepgram
   - Cartesia
   - Daily (optional)
@@ -27,6 +26,13 @@ Install dependencies needed to run the Pipecat bot as well as the AgentCore CLI.
 uv sync
 ```
 
+This installs:
+
+- **Pipecat** - The voice AI pipeline framework
+- **Strands** - AWS's agentic framework (used in the code agent)
+- **Bedrock AgentCore Starter Toolkit** - CLI tools for deploying agents
+- **Strands Tools** - Pre-built tools like the Code Interpreter
+
 ### Set Environment Variables
 
 Copy `env.example` to `.env` and fill in the values in `.env`.
@@ -41,8 +47,17 @@ cp env.example .env
 
 Before you can run the Pipecat bot file, you need to deploy an agent to AgentCore Runtime. This example includes two agents:
 
-- A dummy agent that reports progress while pretending to carry out a relatively long-running task
-- An algorithmic-problem-solving agent that can write code to answer questions
+- **Dummy agent** (`dummy_agent.py`) - Reports progress while pretending to carry out a relatively long-running task
+- **Code agent** (`code_agent.py`) - An algorithmic-problem-solving agent built with Strands that can write and execute Python code to answer questions
+
+### About the Code Agent
+
+The code agent demonstrates how to use **Strands** (AWS's agentic framework) within AgentCore:
+
+- Uses the **Strands Agent** with Claude 3.7 Sonnet model
+- Includes the **AgentCore Code Interpreter** tool for executing Python code
+- Streams responses in real-time for a conversational experience
+- Designed for voice interaction with TTS-friendly output
 
 Below we'll do a barebones walkthrough of deploying an agent to AgentCore Runtime. For a comprehensive guide to getting started with Amazon Bedrock AgentCore, including detailed setup instructions, see the [Amazon Bedrock AgentCore Developer Guide](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/what-is-bedrock-agentcore.html).
 
