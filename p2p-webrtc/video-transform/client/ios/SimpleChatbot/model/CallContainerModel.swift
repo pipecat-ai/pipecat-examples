@@ -53,7 +53,7 @@ class CallContainerModel: ObservableObject {
         let pipecatClientOptions = PipecatClientOptions.init(
             transport: SmallWebRTCTransport.init(),
             enableMic: currentSettings.enableMic,
-            enableCam: currentSettings.enableCam,
+            enableCam: false,
         )
         self.pipecatClientIOS = PipecatClient.init(
             options: pipecatClientOptions
