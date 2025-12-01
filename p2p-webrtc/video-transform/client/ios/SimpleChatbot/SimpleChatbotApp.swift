@@ -4,13 +4,14 @@ import SwiftUI
 struct SimpleChatbotApp: App {
 
     @StateObject var callContainerModel = CallContainerModel()
+    @StateObject var audioRecorder = AudioRecorder()
 
     var body: some Scene {
         WindowGroup {
             if (!callContainerModel.isInCall) {
-                PreJoinView().environmentObject(callContainerModel)
+                PreJoinView().environmentObject(callContainerModel).environmentObject(audioRecorder)
             } else {
-                MeetingView().environmentObject(callContainerModel)
+                MeetingView().environmentObject(callContainerModel).environmentObject(audioRecorder)
             }
         }
     }

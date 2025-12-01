@@ -3,7 +3,7 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 56;
+	objectVersion = 60;
 	objects = {
 
 /* Begin PBXBuildFile section */
@@ -19,7 +19,9 @@
 		90383A932D9C35B300D0DDA3 /* ChatView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90383A922D9C35B300D0DDA3 /* ChatView.swift */; };
 		90383A962D9C35BD00D0DDA3 /* LiveMessage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90383A942D9C35BD00D0DDA3 /* LiveMessage.swift */; };
 		90383A982D9D85E700D0DDA3 /* CameraButtonView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90383A972D9D85E700D0DDA3 /* CameraButtonView.swift */; };
-		9050F9A72EA976AA0041369E /* PipecatClientIOSSmallWebrtc in Frameworks */ = {isa = PBXBuildFile; productRef = 9050F9A62EA976AA0041369E /* PipecatClientIOSSmallWebrtc */; };
+		908D9FD42ED0D2E00058F00E /* PipecatClientIOSSmallWebrtc in Frameworks */ = {isa = PBXBuildFile; productRef = 908D9FD32ED0D2E00058F00E /* PipecatClientIOSSmallWebrtc */; };
+		908DA02F2ED508A70058F00E /* AudioRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 908DA02E2ED508A70058F00E /* AudioRecorder.swift */; };
+		908DA0322ED508B80058F00E /* RecorderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 908DA0302ED508B80058F00E /* RecorderView.swift */; };
 		90ABB98E2C735ED6000D9CC7 /* MeetingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90ABB98D2C735ED6000D9CC7 /* MeetingView.swift */; };
 		90ABB9932C73820D000D9CC7 /* MicrophoneView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90ABB9922C73820D000D9CC7 /* MicrophoneView.swift */; };
 		90ABB9982C738356000D9CC7 /* CustomColors.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90ABB9972C738356000D9CC7 /* CustomColors.swift */; };
@@ -64,6 +66,8 @@
 		90383A922D9C35B300D0DDA3 /* ChatView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ChatView.swift; sourceTree = "<group>"; };
 		90383A942D9C35BD00D0DDA3 /* LiveMessage.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = LiveMessage.swift; sourceTree = "<group>"; };
 		90383A972D9D85E700D0DDA3 /* CameraButtonView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = CameraButtonView.swift; sourceTree = "<group>"; };
+		908DA02E2ED508A70058F00E /* AudioRecorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioRecorder.swift; sourceTree = "<group>"; };
+		908DA0302ED508B80058F00E /* RecorderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecorderView.swift; sourceTree = "<group>"; };
 		90ABB98D2C735ED6000D9CC7 /* MeetingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeetingView.swift; sourceTree = "<group>"; };
 		90ABB9922C73820D000D9CC7 /* MicrophoneView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MicrophoneView.swift; sourceTree = "<group>"; };
 		90ABB9972C738356000D9CC7 /* CustomColors.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomColors.swift; sourceTree = "<group>"; };
@@ -79,7 +83,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				9050F9A72EA976AA0041369E /* PipecatClientIOSSmallWebrtc in Frameworks */,
+				908D9FD42ED0D2E00058F00E /* PipecatClientIOSSmallWebrtc in Frameworks */,
 				90383A912D9C357F00D0DDA3 /* PipecatClientIOSSmallWebrtc in Frameworks */,
 				90C5CDCE2EA18A66000DD785 /* PipecatClientIOSSmallWebrtc in Frameworks */,
 			);
@@ -164,6 +168,7 @@
 		90031FDD2C6D61E000408370 /* views */ = {
 			isa = PBXGroup;
 			children = (
+				908DA0312ED508B80058F00E /* recorder */,
 				90ABB99E2C73C3A9000D9CC7 /* components */,
 				90ABB9962C738346000D9CC7 /* extensions */,
 				90ABB9A42C74EA52000D9CC7 /* settings */,
@@ -181,6 +186,14 @@
 			path = types;
 			sourceTree = "<group>";
 		};
+		908DA0312ED508B80058F00E /* recorder */ = {
+			isa = PBXGroup;
+			children = (
+				908DA0302ED508B80058F00E /* RecorderView.swift */,
+			);
+			path = recorder;
+			sourceTree = "<group>";
+		};
 		90ABB9962C738346000D9CC7 /* extensions */ = {
 			isa = PBXGroup;
 			children = (
@@ -192,6 +205,7 @@
 		90ABB99B2C73C2C5000D9CC7 /* model */ = {
 			isa = PBXGroup;
 			children = (
+				908DA02E2ED508A70058F00E /* AudioRecorder.swift */,
 				90ABB9992C73A6A9000D9CC7 /* MockCallContainerModel.swift */,
 				90ABB99C2C73C2D1000D9CC7 /* CallContainerModel.swift */,
 			);
@@ -238,7 +252,7 @@
 			packageProductDependencies = (
 				90383A902D9C357F00D0DDA3 /* PipecatClientIOSSmallWebrtc */,
 				90C5CDCD2EA18A66000DD785 /* PipecatClientIOSSmallWebrtc */,
-				9050F9A62EA976AA0041369E /* PipecatClientIOSSmallWebrtc */,
+				908D9FD32ED0D2E00058F00E /* PipecatClientIOSSmallWebrtc */,
 			);
 			productName = SimpleChatbot;
 			productReference = 90031FA32C616EE700408370 /* SimpleChatbot.app */;
@@ -313,7 +327,7 @@
 			);
 			mainGroup = 90031F9A2C616EE700408370;
 			packageReferences = (
-				9050F9A52EA976AA0041369E /* XCRemoteSwiftPackageReference "pipecat-client-ios-small-webrtc" */,
+				908D9FD22ED0D2E00058F00E /* XCLocalSwiftPackageReference "../../../../../ios-public-repos/pipecat-client-ios-small-webrtc" */,
 			);
 			productRefGroup = 90031FA42C616EE700408370 /* Products */;
 			projectDirPath = "";
@@ -366,10 +380,12 @@
 				90383A932D9C35B300D0DDA3 /* ChatView.swift in Sources */,
 				90ABB9982C738356000D9CC7 /* CustomColors.swift in Sources */,
 				90ABB98E2C735ED6000D9CC7 /* MeetingView.swift in Sources */,
+				908DA02F2ED508A70058F00E /* AudioRecorder.swift in Sources */,
 				90ABB9A32C74E1CE000D9CC7 /* SettingsView.swift in Sources */,
 				90ABB9932C73820D000D9CC7 /* MicrophoneView.swift in Sources */,
 				90ABB9A82C74EAB1000D9CC7 /* SettingsManager.swift in Sources */,
 				90031FDC2C6D5DD700408370 /* ToastModifier.swift in Sources */,
+				908DA0322ED508B80058F00E /* RecorderView.swift in Sources */,
 				90031FA72C616EE700408370 /* SimpleChatbotApp.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -703,25 +719,20 @@
 		};
 /* End XCConfigurationList section */
 
-/* Begin XCRemoteSwiftPackageReference section */
-		9050F9A52EA976AA0041369E /* XCRemoteSwiftPackageReference "pipecat-client-ios-small-webrtc" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/pipecat-ai/pipecat-client-ios-small-webrtc";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 1.1.1;
-			};
+/* Begin XCLocalSwiftPackageReference section */
+		908D9FD22ED0D2E00058F00E /* XCLocalSwiftPackageReference "../../../../../ios-public-repos/pipecat-client-ios-small-webrtc" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = "../../../../../ios-public-repos/pipecat-client-ios-small-webrtc";
 		};
-/* End XCRemoteSwiftPackageReference section */
+/* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
 		90383A902D9C357F00D0DDA3 /* PipecatClientIOSSmallWebrtc */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = PipecatClientIOSSmallWebrtc;
 		};
-		9050F9A62EA976AA0041369E /* PipecatClientIOSSmallWebrtc */ = {
+		908D9FD32ED0D2E00058F00E /* PipecatClientIOSSmallWebrtc */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 9050F9A52EA976AA0041369E /* XCRemoteSwiftPackageReference "pipecat-client-ios-small-webrtc" */;
 			productName = PipecatClientIOSSmallWebrtc;
 		};
 		90C5CDCD2EA18A66000DD785 /* PipecatClientIOSSmallWebrtc */ = {

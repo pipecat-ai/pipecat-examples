@@ -149,7 +149,10 @@ class WebsocketClientApp {
 
       //const transport = new DailyTransport();
       const PipecatConfig: PipecatClientOptions = {
-        transport: new WebSocketTransport(),
+        transport: new WebSocketTransport({
+          recorderSampleRate: 48000,
+          playerSampleRate: 48000
+        }),
         enableMic: true,
         enableCam: false,
         callbacks: {
@@ -189,7 +192,7 @@ class WebsocketClientApp {
       this.log('Connecting to bot...');
       await this.pcClient.startBotAndConnect({
         // The baseURL and endpoint of your bot server that the client will connect to
-        endpoint: 'http://localhost:7860/connect',
+        endpoint: '/connect',
       });
 
       const timeTaken = Date.now() - startTime;

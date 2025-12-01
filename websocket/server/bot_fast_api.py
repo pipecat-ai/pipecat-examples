@@ -3,83 +3,62 @@
 #
 # SPDX-License-Identifier: BSD 2-Clause License
 #
-import os
-import sys
-
-from dotenv import load_dotenv
-from loguru import logger
 from pipecat.audio.vad.silero import SileroVADAnalyzer
-from pipecat.frames.frames import LLMRunFrame
-from pipecat.pipeline.pipeline import Pipeline
-from pipecat.pipeline.runner import PipelineRunner
-from pipecat.pipeline.task import PipelineParams, PipelineTask
-from pipecat.processors.aggregators.llm_context import LLMContext
-from pipecat.processors.aggregators.llm_response_universal import LLMContextAggregatorPair
-from pipecat.processors.frameworks.rtvi import RTVIConfig, RTVIObserver, RTVIProcessor
 from pipecat.serializers.protobuf import ProtobufFrameSerializer
-from pipecat.services.google.gemini_live.llm import GeminiLiveLLMService
 from pipecat.transports.websocket.fastapi import (
     FastAPIWebsocketParams,
     FastAPIWebsocketTransport,
 )
 
+import datetime
+import io
+import os
+import wave
+
+import aiofiles
+from dotenv import load_dotenv
+from loguru import logger
+
+from pipecat.pipeline.pipeline import Pipeline
+from pipecat.pipeline.runner import PipelineRunner
+from pipecat.pipeline.task import PipelineParams, PipelineTask
+from pipecat.processors.audio.audio_buffer_processor import AudioBufferProcessor
+
 load_dotenv(override=True)
 
-logger.remove(0)
-logger.add(sys.stderr, level="DEBUG")
 
-
-SYSTEM_INSTRUCTION = f"""
-"You are Gemini Chatbot, a friendly, helpful robot.
-
-Your goal is to demonstrate your capabilities in a succinct way.
-
-Your output will be converted to audio so don't include special characters in your answers.
-
-Respond to what the user said in a creative and helpful way. Keep your responses brief. One or two sentences at most.
-"""
+async def save_audio_file(audio: bytes, filename: str, sample_rate: int, num_channels: int):
+    """Save audio data to a WAV file."""
+    if len(audio) > 0:
+        with io.BytesIO() as buffer:
+            with wave.open(buffer, "wb") as wf:
+                wf.setsampwidth(2)
+                wf.setnchannels(num_channels)
+                wf.setframerate(sample_rate)
+                wf.writeframes(audio)
+            async with aiofiles.open(filename, "wb") as file:
+                await file.write(buffer.getvalue())
+        logger.info(f"Audio saved to {filename}")
 
 
 async def run_bot(websocket_client):
-    ws_transport = FastAPIWebsocketTransport(
+    transport = FastAPIWebsocketTransport(
         websocket=websocket_client,
         params=FastAPIWebsocketParams(
             audio_in_enabled=True,
             audio_out_enabled=True,
             add_wav_header=False,
-            vad_analyzer=SileroVADAnalyzer(),
             serializer=ProtobufFrameSerializer(),
         ),
     )
 
-    llm = GeminiLiveLLMService(
-        api_key=os.getenv("GOOGLE_API_KEY"),
-        voice_id="Puck",  # Aoede, Charon, Fenrir, Kore, Puck
-        transcribe_model_audio=True,
-        system_instruction=SYSTEM_INSTRUCTION,
-    )
-
-    context = LLMContext(
-        [
-            {
-                "role": "user",
-                "content": "Start by greeting the user warmly and introducing yourself.",
-            }
-        ],
-    )
-    context_aggregator = LLMContextAggregatorPair(context)
-
-    # RTVI events for Pipecat client UI
-    rtvi = RTVIProcessor(config=RTVIConfig(config=[]))
+    # Create audio buffer processor
+    audiobuffer = AudioBufferProcessor()
 
     pipeline = Pipeline(
         [
-            ws_transport.input(),
-            context_aggregator.user(),
-            rtvi,
-            llm,  # LLM
-            ws_transport.output(),
-            context_aggregator.assistant(),
+            transport.input(),
+            audiobuffer,  # Add audio buffer to pipeline
         ]
     )
 
@@ -88,26 +67,45 @@ async def run_bot(websocket_client):
         params=PipelineParams(
             enable_metrics=True,
             enable_usage_metrics=True,
+            audio_in_sample_rate=48000,
+            audio_out_sample_rate=48000,
         ),
-        observers=[RTVIObserver(rtvi)],
     )
 
-    @rtvi.event_handler("on_client_ready")
-    async def on_client_ready(rtvi):
-        logger.info("Pipecat client ready.")
-        await rtvi.set_bot_ready()
-        # Kick off the conversation.
-        await task.queue_frames([LLMRunFrame()])
-
-    @ws_transport.event_handler("on_client_connected")
+    @transport.event_handler("on_client_connected")
     async def on_client_connected(transport, client):
-        logger.info("Pipecat Client connected")
+        logger.info(f"Client connected")
+        # Start recording audio
+        await audiobuffer.start_recording()
+        # Start conversation - empty prompt to let LLM follow system instructions
+        # await task.queue_frames([LLMRunFrame()])
 
-    @ws_transport.event_handler("on_client_disconnected")
+    @transport.event_handler("on_client_disconnected")
     async def on_client_disconnected(transport, client):
-        logger.info("Pipecat Client disconnected")
+        logger.info(f"Client disconnected")
         await task.cancel()
 
-    runner = PipelineRunner(handle_sigint=False)
+    # Handler for merged audio
+    @audiobuffer.event_handler("on_audio_data")
+    async def on_audio_data(buffer, audio, sample_rate, num_channels):
+        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"recordings/merged_{timestamp}.wav"
+        os.makedirs("recordings", exist_ok=True)
+        await save_audio_file(audio, filename, sample_rate, num_channels)
 
+    # Handler for separate tracks
+    @audiobuffer.event_handler("on_track_audio_data")
+    async def on_track_audio_data(buffer, user_audio, bot_audio, sample_rate, num_channels):
+        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        os.makedirs("recordings", exist_ok=True)
+
+        # Save user audio
+        user_filename = f"recordings/user_{timestamp}.wav"
+        await save_audio_file(user_audio, user_filename, sample_rate, 1)
+
+        # Save bot audio
+        bot_filename = f"recordings/bot_{timestamp}.wav"
+        await save_audio_file(bot_audio, bot_filename, sample_rate, 1)
+
+    runner = PipelineRunner(handle_sigint=False)
     await runner.run(task)

@@ -6,6 +6,7 @@ struct PreJoinView: View {
     @State var apiKey: String
 
     @EnvironmentObject private var model: CallContainerModel
+    @EnvironmentObject var recorder: AudioRecorder
 
     init() {
         let currentSettings = SettingsManager.getSettings()
@@ -15,6 +16,7 @@ struct PreJoinView: View {
 
     var body: some View {
         VStack(spacing: 20) {
+            RecorderView()
             Image("pipecat")
                 .resizable()
                 .frame(width: 80, height: 80)
