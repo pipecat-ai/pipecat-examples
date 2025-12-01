@@ -164,16 +164,16 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     async def obfuscate_credit_card(text: str, type: str) -> str:
         return "XXXX-XXXX-XXXX-" + text[-4:]
 
-    rtviIn = RTVIProcessor()
-    rtviOut = RTVIObserver(rtviIn)
-    rtviOut.add_bot_output_transformer(obfuscate_credit_card, "credit_card")
+    rtvi = RTVIProcessor()
+    rtvi_observer = RTVIObserver(rtvi)
+    rtvi_observer.add_bot_output_transformer(obfuscate_credit_card, "credit_card")
 
     # Pipeline - The following pipeline is typical for a STT->LLM->TTS bot + RTVI
     #            with the addition of the LLMTextProcessor to handle special text segments.
     pipeline = Pipeline(
         [
             transport.input(),
-            rtviIn,
+            rtvi,
             stt,
             transcript_processor.user(),
             context_aggregator.user(),
@@ -192,7 +192,7 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
             enable_metrics=True,
             enable_usage_metrics=True,
         ),
-        observers=[rtviOut],
+        observers=[rtvi_observer],
     )
 
     @transport.event_handler("on_client_connected")
@@ -215,7 +215,7 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
                 line = f"{timestamp}{msg.role}: {msg.content}"
                 logger.info(f"Transcript: {line}")
 
-    @rtviIn.event_handler("on_client_message")
+    @rtvi.event_handler("on_client_message")
     async def on_message(rtvi, msg):
         logger.info(f"Received unknown message from client: {msg.type} | {msg.data}")
 

@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Voice AI bot built with Pipecat"
 requires-python = ">=3.10"
 dependencies = [
-    "pipecat-ai[deepgram,cartesia, elevenlabs,local-smart-turn-v3,openai,runner,silero,webrtc]",
+    "pipecat-ai[deepgram,cartesia, elevenlabs,local-smart-turn-v3,openai,runner,silero,webrtc]>=0.0.96",
 ]
 
 [dependency-groups]
@@ -17,6 +17,3 @@ dev = [
 line-length = 100
 [tool.ruff.lint]
 select = ["I"]
-
-[tool.uv.sources]
-pipecat-ai = { path = "../../../pipecat", editable = true }
