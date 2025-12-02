@@ -1,0 +1,20 @@
+{
+  "name": "code-helper",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@pipecat-ai/client-js": "^1.5.0",
+    "@pipecat-ai/daily-transport": "^1.5.0",
+    "@pipecat-ai/small-webrtc-transport": "^1.8.0",
+    "highlight.js": "^11.11.1"
+  },
+  "devDependencies": {
+    "vite": "^7.1.7"
+  }
+}
