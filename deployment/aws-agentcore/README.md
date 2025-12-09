@@ -6,7 +6,6 @@ This example demonstrates how to deploy a Pipecat bot to **Amazon Bedrock AgentC
 
 - Accounts with:
   - AWS
-  - OpenAI
   - Deepgram
   - Cartesia
 - Python 3.10 or higher
@@ -54,7 +53,6 @@ Create and activate a virtual environment:
    cp env.example .env
    ```
    Add your API keys:
-   - `OPENAI_API_KEY`: Your OpenAI API key
    - `DEEPGRAM_API_KEY`: Your Deepgram API key
    - `CARTESIA_API_KEY`: Your Cartesia API key
    - `ICE_SERVER_URLS`: Your TCP TURN server urls
