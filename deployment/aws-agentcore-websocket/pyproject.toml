@@ -1,0 +1,21 @@
+[project]
+name = "agentcore-pipecat-websocket"
+version = "0.1.0"
+description = "Example for building Pipecat bots deployable to Amazon Bedrock AgentCore using WebSockets for communication"
+requires-python = ">=3.10"
+dependencies = [
+]
+
+[dependency-groups]
+dev = [
+    "bedrock-agentcore-starter-toolkit",
+    "bedrock-agentcore",
+    "pipecat-ai[aws,cartesia,daily,deepgram,openai,runner,silero,websocket,local-smart-turn-v3]",
+    "pyright>=1.1.404,<2",
+    "ruff>=0.12.11,<1",
+]
+
+[tool.ruff]
+line-length = 100
+[tool.ruff.lint]
+select = ["I"]
