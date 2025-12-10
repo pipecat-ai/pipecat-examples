@@ -168,7 +168,8 @@ class WebRTCApp {
           headers: headers,
           requestData: {
             createDailyRoom: false,
-            enableDefaultIceServers: true
+            enableDefaultIceServers: true,
+            transport: "webrtc"
           }
       });
     } catch (e) {
