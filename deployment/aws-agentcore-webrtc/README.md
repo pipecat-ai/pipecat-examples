@@ -1,4 +1,4 @@
-# Amazon Bedrock AgentCore Runtime Example
+# Amazon Bedrock AgentCore Runtime WebRTC Example
 
 This example demonstrates how to deploy a Pipecat bot to **Amazon Bedrock AgentCore Runtime** using SmallWebRTC for communication.
 
@@ -25,6 +25,7 @@ You can also choose to specify more granular permissions; see [Amazon Bedrock Ag
 To authenticate with AWS, you have two options:
 
 1. Export environment variables:
+
    ```bash
    export AWS_SECRET_ACCESS_KEY=your_secret_key
    export AWS_ACCESS_KEY_ID=your_access_key
@@ -41,18 +42,22 @@ To authenticate with AWS, you have two options:
 ### Virtual Environment Setup
 
 Create and activate a virtual environment:
-   ```bash
-   uv sync
-   ```
+
+```bash
+uv sync
+```
 
 ### Environment Variables Configuration
 
 1. For the agent:
+
    ```bash
    cd agent
    cp env.example .env
    ```
+
    Add your API keys:
+
    - `DEEPGRAM_API_KEY`: Your Deepgram API key
    - `CARTESIA_API_KEY`: Your Cartesia API key
    - `ICE_SERVER_URLS`: Your TCP TURN server urls
@@ -60,6 +65,7 @@ Create and activate a virtual environment:
    - `ICE_SERVER_CREDENTIAL`: Your TURN server credential
 
    > Important Notes about TURN Server Configuration:
+   >
    > - You must use TURN servers that support TCP connections
    > - UDP connections are not supported within AgentCore runtime environment
    > - If your TURN server only supports UDP, your WebRTC connection will fail
@@ -82,6 +88,7 @@ cd agent
 ```
 
 This script:
+
 1. Configures deployment type as "Container" (required by Pipecat)
 2. Applies necessary patches to the Dockerfile
 3. Adds dependencies required by SmallWebRTC (`libgl1` and `libglib2.0-0`)
@@ -101,6 +108,7 @@ cd agent
 ```
 
 This script:
+
 1. Reads environment variables from `agent/.env`
 2. Deploys to AgentCore
 3. Updates the server's configuration with the agent ARN
@@ -109,6 +117,7 @@ This script:
 ## Running on AgentCore Runtime
 
 1. Start the server:
+
    ```bash
    cd server
    uv run python server.py
@@ -121,6 +130,7 @@ This script:
 ## Monitoring and Troubleshooting
 
 ### View Agent Logs
+
 Use the log-tailing command provided during deployment:
 
 ```bash
@@ -129,12 +139,13 @@ aws logs tail /aws/bedrock-agentcore/runtimes/bot1-0uJkkT7QHC-DEFAULT --log-stre
 ```
 
 ## Test Agent Manually
+
 Test the agent using the AWS CLI:
 
 ```bash
 uv run agentcore invoke \
   --session-id user-123456-conversation-12345679 \
-  '{                                             
+  '{
   "sdp": "YOUR_OFFER",
   "type": "offer"
 }'
@@ -154,9 +165,10 @@ cd agent
 ## Local Development
 
 Run your bot locally for testing:
-   ```bash
-   PIPECAT_LOCAL_DEV=1 uv run python pipecat-agent.py
-   ```
+
+```bash
+PIPECAT_LOCAL_DEV=1 uv run python pipecat-agent.py
+```
 
 ## Additional Resources
 
