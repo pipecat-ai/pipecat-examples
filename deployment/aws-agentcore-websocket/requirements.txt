@@ -1,2 +1,0 @@
-bedrock-agentcore
-pipecat-ai[aws,cartesia,daily,deepgram,openai,runner,silero,websocket,local-smart-turn-v3]

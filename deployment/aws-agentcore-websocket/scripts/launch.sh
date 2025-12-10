@@ -1,6 +1,7 @@
 #!/bin/bash
 
 # Script to dynamically read all variables from .env file and launch agentcore
+AGENT_ENV_FILE="./agent/.env"
 SERVER_ENV_FILE="./server/.env"
 
 ###############################################
@@ -8,9 +9,9 @@ SERVER_ENV_FILE="./server/.env"
 ###############################################
 
 # Check if the local .env file exists
-if [ ! -f ".env" ]; then
-    echo "Error: .env file not found in current directory"
-    echo "Please create a .env file with your environment variables"
+if [ ! -f "$AGENT_ENV_FILE" ]; then
+    echo "Error: $AGENT_ENV_FILE file not found in current directory"
+    echo "Please create a $AGENT_ENV_FILE file with your environment variables"
     exit 1
 fi
 
@@ -18,9 +19,9 @@ fi
 LAUNCH_CMD="uv run agentcore launch --auto-update-on-conflict"
 FOUND_ENV_VARS=false
 
-echo "Loading environment variables from .env file..."
+echo "Loading environment variables from agent .env file..."
 
-# Read each line from .env file and process it
+# Read each line from agent .env file and process it
 while IFS= read -r line || [ -n "$line" ]; do
     # Skip empty lines & comments
     [[ -z "$line" || "$line" =~ ^[[:space:]]*# ]] && continue
@@ -48,12 +49,12 @@ while IFS= read -r line || [ -n "$line" ]; do
             echo "  Added: $VAR_NAME"
         fi
     fi
-done < ".env"
+done < "$AGENT_ENV_FILE"
 
 # Check if any environment variables were added
 if ! $FOUND_ENV_VARS; then
-    echo "Warning: No valid environment variables found in .env file"
-    echo "Make sure your .env file contains variables in the format: KEY=value"
+    echo "Warning: No valid environment variables found in agent .env file"
+    echo "Make sure your agent .env file contains variables in the format: KEY=value"
     exit 1
 fi
 
@@ -68,8 +69,8 @@ eval "$LAUNCH_CMD"
 ###############################################
 echo "Reading Agent ARN from agentcore status..."
 
-# Extract Agent ARN from status output (removing box formatting characters)
-AGENT_ARN=$(uv run agentcore status | grep "Agent ARN:" | sed 's/.*Agent ARN: //' | tr -d '│ ')
+# Extract Agent ARN from status output (removing box formatting characters and spaces)
+AGENT_ARN=$(uv run agentcore status | grep "Agent ARN:" | sed 's/.*Agent ARN: //' | sed 's/│//g' | xargs)
 
 echo "Agent ARN: $AGENT_ARN"
 

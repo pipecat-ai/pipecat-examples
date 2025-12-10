@@ -9,8 +9,6 @@ dependencies = [
 [dependency-groups]
 dev = [
     "bedrock-agentcore-starter-toolkit",
-    "bedrock-agentcore",
-    "pipecat-ai[aws,cartesia,daily,deepgram,openai,runner,silero,websocket,local-smart-turn-v3]",
     "pyright>=1.1.404,<2",
     "ruff>=0.12.11,<1",
 ]

@@ -24,7 +24,7 @@ You can also choose to specify more granular permissions; see [Amazon Bedrock Ag
 
 ### Environment Variable Setup
 
-1. For managing (configuring, deploying, etc.) the bot:
+1. For agent management (configuring, deploying, etc.):
 
    Either export your AWS credentials and configuration as environment variables:
 
@@ -40,9 +40,10 @@ You can also choose to specify more granular permissions; see [Amazon Bedrock Ag
    aws configure
    ```
 
-2. For the bot itself:
+2. For the agent itself:
 
    ```bash
+   cd agent
    cp env.example .env
    ```
 
@@ -67,7 +68,7 @@ You can also choose to specify more granular permissions; see [Amazon Bedrock Ag
 
 ### Virtual Environment Setup
 
-Create and activate a virtual environment:
+Create and activate a virtual environment for managing the agent:
 
 ```bash
 uv sync
@@ -75,10 +76,10 @@ uv sync
 
 ## Agent Configuration
 
-Configure your bot as an AgentCore agent:
+Configure your Pipecat agent as an AgentCore agent:
 
 ```bash
-uv run agentcore configure -e bot.py
+uv run agentcore configure -e agent/agent.py
 ```
 
 Follow the prompts to complete the configuration. It's fine to just accept all defaults.
@@ -98,7 +99,7 @@ The following steps act on `agentcore`'s default agent.
 
 ## Deploying to AgentCore
 
-Deploy your configured bot to Amazon Bedrock AgentCore Runtime for production hosting.
+Deploy your configured agent to Amazon Bedrock AgentCore Runtime for production hosting.
 
 ```bash
 ./scripts/launch.sh
@@ -106,7 +107,7 @@ Deploy your configured bot to Amazon Bedrock AgentCore Runtime for production ho
 
 You should see commands related to tailing logs printed to the console. Copy and save them for later use.
 
-This is also the command you need to run after you've updated your bot code.
+This is also the command you need to run after you've updated your agent code.
 
 ## Running the Server
 
@@ -116,17 +117,17 @@ See [the server README](./server/README.md) for setup and run instructions.
 
 ## Running the Client
 
-Once the server is running, you can run the client to connect to your AgentCore-hosted bot.
+Once the server is running, you can run the client to connect to your AgentCore-hosted agent.
 
 See [the client README](./client/README.md) for setup and run instructions.
 
 ## Observation
 
-Paste one of the log tailing commands you received when deploying your bot to AgentCore Runtime. It should look something like:
+Paste one of the log tailing commands you received when deploying your agent to AgentCore Runtime. It should look something like:
 
 ```bash
 # Replace with your actual command
-aws logs tail /aws/bedrock-agentcore/runtimes/bot1-0uJkkT7QHC-DEFAULT --log-stream-name-prefix "2025/11/19/[runtime-logs]" --follow
+aws logs tail /aws/bedrock-agentcore/runtimes/foo-0uJkkT7QHC-DEFAULT --log-stream-name-prefix "2025/11/19/[runtime-logs]" --follow
 ```
 
 If you don't have that command handy, no worries. Just run:
@@ -137,7 +138,7 @@ uv run agentcore status
 
 ## Agent Deletion
 
-Delete your bot from AgentCore:
+Delete your agent from AgentCore:
 
 ```bash
 uv run agentcore destroy
