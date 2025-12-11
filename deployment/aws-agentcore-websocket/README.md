@@ -49,6 +49,9 @@ You can also choose to specify more granular permissions; see [Amazon Bedrock Ag
 
    Add your API keys:
 
+   - `AWS_ACCESS_KEY_ID`: Your AWS access key ID for the Amazon Bedrock LLM used by the agent
+   - `AWS_SECRET_ACCESS_KEY`: Your AWS secret access key for the Amazon Bedrock LLM used by the agent
+   - `AWS_REGION`: The AWS region for the Amazon Bedrock LLM used by the agent
    - `OPENAI_API_KEY`: Your OpenAI API key
    - `DEEPGRAM_API_KEY`: Your Deepgram API key
    - `CARTESIA_API_KEY`: Your Cartesia API key
@@ -60,7 +63,7 @@ You can also choose to specify more granular permissions; see [Amazon Bedrock Ag
    cp env.example .env
    ```
 
-   Add your AWS credentials and configuration:
+   Add your AWS credentials and configuration, for generating the signed WebSocket URL in the `/start` endpoint:
 
    - `AWS_ACCESS_KEY_ID`
    - `AWS_SECRET_ACCESS_KEY`

@@ -21,13 +21,12 @@ from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineParams, PipelineTask
 from pipecat.processors.aggregators.llm_context import LLMContext
 from pipecat.processors.aggregators.llm_response_universal import LLMContextAggregatorPair
-from pipecat.runner.types import DailyRunnerArguments, RunnerArguments
-from pipecat.runner.utils import create_transport
+from pipecat.runner.types import RunnerArguments
 from pipecat.serializers.protobuf import ProtobufFrameSerializer
+from pipecat.services.aws.llm import AWSBedrockLLMService
 from pipecat.services.cartesia.tts import CartesiaTTSService
 from pipecat.services.deepgram.stt import DeepgramSTTService
 from pipecat.services.llm_service import FunctionCallParams
-from pipecat.services.openai.llm import OpenAILLMService
 from pipecat.transports.base_transport import BaseTransport, TransportParams
 from pipecat.transports.daily.transport import DailyParams
 from pipecat.transports.websocket.fastapi import FastAPIWebsocketParams, FastAPIWebsocketTransport
@@ -74,7 +73,11 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
         voice_id="71a7ad14-091c-4e8e-a314-022ece01c121",  # British Reading Lady
     )
 
-    llm = OpenAILLMService(api_key=os.getenv("OPENAI_API_KEY"))
+    # Automatically uses AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, and AWS_REGION env vars.
+    llm = AWSBedrockLLMService(
+        model="us.amazon.nova-2-lite-v1:0",
+        params=AWSBedrockLLMService.InputParams(temperature=0.8),
+    )
 
     # You can also register a function_name of None to get all functions
     # sent to the same callback with an additional function_name parameter.
@@ -117,8 +120,9 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     messages = [
         {
             "role": "system",
-            "content": "You are a helpful LLM in a WebRTC call. Your goal is to demonstrate your capabilities in a succinct way. Your output will be spoken aloud, so avoid special characters that can't easily be spoken, such as emojis or bullet points. Respond to what the user said in a creative and helpful way.",
+            "content": "You are a helpful LLM in a voice call. Your goal is to demonstrate your capabilities in a succinct way. Your output will be spoken aloud, so avoid special characters that can't easily be spoken, such as emojis or bullet points. Respond to what the user said in a creative and helpful way.",
         },
+        {"role": "user", "content": "Say hello and briefly introduce yourself."},
     ]
 
     context = LLMContext(messages, tools)
