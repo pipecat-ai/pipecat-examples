@@ -5,9 +5,11 @@ struct MeetingView: View {
     
     @State private var showingSettings = false
     @EnvironmentObject private var model: CallContainerModel
+    @EnvironmentObject var recorder: AudioRecorder
     
     var body: some View {
         VStack {
+            RecorderView()
             ZStack {
                 SmallWebRTCVideoViewSwiftUI(videoTrack: self.model.botCamId, videoScaleMode: .fill)
                     .edgesIgnoringSafeArea(.all)
