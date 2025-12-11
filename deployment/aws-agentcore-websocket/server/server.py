@@ -47,6 +47,10 @@ async def start_bot(request: Request) -> Dict[Any, Any]:
     Returns:
         Dict[Any, Any]: Contains the signed WebSocket URL for the client to connect
     """
+    # Check if LOCAL_AGENT mode is enabled
+    if os.getenv("LOCAL_AGENT") == "1":
+        return {"ws_url": "ws://localhost:8080/ws"}
+
     # Get required environment variables
     access_key_id = os.getenv("AWS_ACCESS_KEY_ID")
     secret_access_key = os.getenv("AWS_SECRET_ACCESS_KEY")

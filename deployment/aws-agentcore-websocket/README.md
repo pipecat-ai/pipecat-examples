@@ -62,7 +62,7 @@ You can also choose to specify more granular permissions; see [Amazon Bedrock Ag
    cp env.example .env
    ```
 
-   Add your AWS credentials and configuration, for generating the signed WebSocket URL in the `/start` endpoint:
+   Add your AWS credentials and configuration, for generating a signed WebSocket URL in the `/start` endpoint:
 
    - `AWS_ACCESS_KEY_ID`
    - `AWS_SECRET_ACCESS_KEY`
@@ -113,7 +113,7 @@ This is also the command you need to run after you've updated your agent code.
 
 ## Running the Server
 
-The server provides a `/start` endpoint that generates signed WebSocket URLs for the client.
+The server provides a `/start` endpoint that generates WebSocket URLs for the client to connect to the agent.
 
 See [the server README](./server/README.md) for setup and run instructions.
 
@@ -122,6 +122,27 @@ See [the server README](./server/README.md) for setup and run instructions.
 Once the server is running, you can run the client to connect to your AgentCore-hosted agent.
 
 See [the client README](./client/README.md) for setup and run instructions.
+
+## Testing Locally
+
+To test agent logic locally before deploying to AgentCore Runtime, do the following.
+
+First, run the agent locally:
+
+```bash
+cd agent
+uv run python agent.py
+```
+
+This will make the agent reachable at "ws://localhost:8080/ws".
+
+Then, run the server as usual, but with the `LOCAL_AGENT=1` environment variable:
+
+```bash
+LOCAL_AGENT=1 uv run python server.py
+```
+
+You can then [run your client as usual](#running-the-client).
 
 ## Observation
 

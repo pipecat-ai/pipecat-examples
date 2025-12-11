@@ -1,6 +1,6 @@
 # Server
 
-This server provides a `/start` endpoint that generates signed WebSocket URLs for connecting to the agent running on Amazon Bedrock AgentCore.
+This server provides a `/start` endpoint that generates WebSocket URLs for connecting to the agent running on Amazon Bedrock AgentCore.
 
 ## Prerequisites
 
@@ -35,11 +35,19 @@ uv run python server.py
 
 The server will be available at `http://localhost:7860`.
 
+## Running the Server in Local Agent Mode
+
+If you want to test a locally-running agent (reachable at "ws://localhost:8080/ws"), start the server like this:
+
+```bash
+LOCAL_AGENT=1 uv run python server.py
+```
+
 ## Endpoint
 
 ### POST /start
 
-Returns a signed WebSocket URL for the client to connect to the agent running on Amazon Bedrock AgentCore.
+Returns a WebSocket URL for the client to connect to the agent running on Amazon Bedrock AgentCore.
 
 **Response:**
 
