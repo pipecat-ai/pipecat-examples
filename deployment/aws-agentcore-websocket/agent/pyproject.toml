@@ -1,0 +1,9 @@
+[project]
+name = "agentcore-pipecat-websocket-agent"
+version = "0.1.0"
+description = "Pipecat bot agent for Amazon Bedrock AgentCore"
+requires-python = ">=3.10"
+dependencies = [
+    "bedrock-agentcore",
+    "pipecat-ai[aws,cartesia,daily,deepgram,runner,silero,websocket,local-smart-turn-v3]",
+]
