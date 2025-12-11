@@ -19,8 +19,8 @@
     "vite": "^6.3.5"
   },
   "dependencies": {
-    "@pipecat-ai/client-js": "^1.2.0",
-    "@pipecat-ai/websocket-transport": "^1.2.0",
+    "@pipecat-ai/client-js": "^1.5.0",
+    "@pipecat-ai/websocket-transport": "^1.5.0",
     "protobufjs": "^7.4.0"
   }
 }
