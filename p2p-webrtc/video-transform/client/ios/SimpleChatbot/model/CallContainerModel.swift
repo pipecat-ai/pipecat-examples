@@ -67,7 +67,8 @@ class CallContainerModel: ObservableObject {
             endpoint: URL(string: baseUrl + "/start")!,
             headers: headers,
             requestData: Value.object([
-                "enableDefaultIceServers": .boolean(true)
+                "enableDefaultIceServers": .boolean(true),
+                "transport": .string("webrtc")
             ])
         )
         self.pipecatClientIOS?.startBotAndConnect(startBotParams: startParams) { (result: Result<SmallWebRTCStartBotResult, AsyncExecutionError>) in
