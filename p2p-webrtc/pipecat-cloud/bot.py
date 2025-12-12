@@ -23,13 +23,8 @@ from pipecat.services.openai.llm import OpenAILLMService
 from pipecat.transports.base_transport import BaseTransport, TransportParams
 from pipecat.transports.smallwebrtc.connection import SmallWebRTCConnection
 from pipecat.transports.smallwebrtc.transport import SmallWebRTCTransport
-from pipecatcloud import PipecatSessionArguments, SmallWebRTCSessionManager
-from pipecatcloud.agent import SmallWebRTCSessionArguments
 
 load_dotenv(override=True)
-
-# Create a global session manager instance
-session_manager = SmallWebRTCSessionManager(timeout_seconds=120)
 
 
 async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
@@ -117,20 +112,7 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
 
 async def bot(runner_args: RunnerArguments):
     """Main bot entry point compatible with Pipecat Cloud."""
-
-    if isinstance(runner_args, PipecatSessionArguments):
-        logger.info("Starting the bot, but still waiting for the webrtc_connection to be set")
-        try:
-            await session_manager.wait_for_webrtc()
-        except TimeoutError as e:
-            logger.error(f"Timeout waiting for WebRTC connection: {e}")
-            raise
-        return
-
-    elif isinstance(runner_args, SmallWebRTCSessionArguments):
-        logger.info("Received the webrtc_connection from Pipecat Cloud, will start the pipeline")
-        session_manager.cancel_timeout()
-
+    logger.info(f"Starting the bot, received body: {runner_args.body}")
     webrtc_connection: SmallWebRTCConnection = runner_args.webrtc_connection
     try:
         if os.environ.get("ENV") != "local":
@@ -159,9 +141,6 @@ async def bot(runner_args: RunnerArguments):
     except Exception as e:
         logger.exception(f"Error in bot process: {str(e)}")
         raise
-    finally:
-        logger.info("Cleaning up SmallWebRTC resources")
-        session_manager.complete_session()
 
 
 if __name__ == "__main__":
