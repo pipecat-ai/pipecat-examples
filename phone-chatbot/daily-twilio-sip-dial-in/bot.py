@@ -25,9 +25,8 @@ from pipecat.services.deepgram.stt import DeepgramSTTService
 from pipecat.services.openai.llm import OpenAILLMService
 from pipecat.transports.base_transport import BaseTransport
 from pipecat.transports.daily.transport import DailyParams, DailyTransport
-from twilio.rest import Client
-
 from server_utils import AgentRequest
+from twilio.rest import Client
 
 load_dotenv(override=True)
 
@@ -93,7 +92,11 @@ async def run_bot(transport: BaseTransport, request: AgentRequest, handle_sigint
         logger.info(f"Forwarding call {request.call_sid} to {request.sip_uri}")
 
         try:
-            twilio_client = Client(os.getenv("TWILIO_ACCOUNT_SID"), os.getenv("TWILIO_AUTH_TOKEN"))
+            twilio_client = Client(
+                os.getenv("TWILIO_ACCOUNT_SID"),
+                os.getenv("TWILIO_AUTH_TOKEN"),
+                region="ie1",  # Use Ireland region for EU numbers
+            )
 
             # Update the Twilio call with TwiML to forward to the Daily SIP endpoint
             twilio_client.calls(request.call_sid).update(
