@@ -94,7 +94,7 @@ async def run_bot(transport: BaseTransport, request: AgentRequest, handle_sigint
         try:
             twilio_client = Client(
                 os.getenv("TWILIO_ACCOUNT_SID"),
-                os.getenv("TWILIO_AUTH_TOKEN"),
+                os.getenv("TWILIO_AUTH_TOKEN"),  # MAKE SURE YOU USE THE EU TOKEN
                 region="ie1",  # Use Ireland region for EU numbers
             )
 
