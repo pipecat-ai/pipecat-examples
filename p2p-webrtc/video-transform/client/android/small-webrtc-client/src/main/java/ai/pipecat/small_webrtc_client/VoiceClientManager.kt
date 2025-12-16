@@ -58,7 +58,7 @@ class VoiceClientManager(private val context: Context) {
         errors.add(Error(it.description))
     }
 
-    fun start(baseUrl: String) {
+    fun start(baseUrl: String, apiKey: String) {
 
         if (client.value != null) {
             return
@@ -159,6 +159,9 @@ class VoiceClientManager(private val context: Context) {
         client.startBotAndConnect(APIRequest(
             endpoint = baseUrl,
             requestData = Value.Object(),
+            headers = listOfNotNull(
+                apiKey.trim().takeIf { it.isNotEmpty() }?.let {"Authorization" to "Bearer $it"}
+            ).toMap()
         )).displayErrors().withErrorCallback {
             callbacks.onDisconnected()
         }

@@ -11,13 +11,14 @@ private val JSON_INSTANCE = Json { ignoreUnknownKeys = true }
 object Preferences {
 
     private const val PREF_BACKEND_URL = "backend_url"
+    private const val PREF_API_KEY = "api_key"
 
     private lateinit var prefs: SharedPreferences
 
     fun initAppStart(context: Context) {
         prefs = context.applicationContext.getSharedPreferences("prefs", Context.MODE_PRIVATE)
 
-        listOf(backendUrl).forEach { it.init() }
+        listOf(backendUrl, apiKey).forEach { it.init() }
     }
 
     private fun getString(key: String): String? = prefs.getString(key, null)
@@ -72,4 +73,5 @@ object Preferences {
     }
 
     val backendUrl = StringPref(PREF_BACKEND_URL)
+    val apiKey = StringPref(PREF_API_KEY)
 }

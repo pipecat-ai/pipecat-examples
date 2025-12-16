@@ -32,7 +32,6 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -123,7 +122,6 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ConnectSettings(
     voiceClientManager: VoiceClientManager,
@@ -131,9 +129,13 @@ fun ConnectSettings(
     val scrollState = rememberScrollState()
 
     val start = {
-        val backendUrl = Preferences.backendUrl.value
+        val backendUrl = Preferences.backendUrl.value ?: ""
+        val apiKey = Preferences.apiKey.value ?: ""
 
-        voiceClientManager.start(baseUrl = backendUrl!!)
+        voiceClientManager.start(
+            baseUrl = backendUrl,
+            apiKey = apiKey
+        )
     }
 
     Box(
@@ -188,6 +190,31 @@ fun ConnectSettings(
                     onValueChange = { Preferences.backendUrl.value = it },
                     keyboardOptions = KeyboardOptions(
                         keyboardType = KeyboardType.Uri,
+                        imeAction = ImeAction.Next
+                    ),
+                    colors = textFieldColors(),
+                    shape = RoundedCornerShape(12.dp)
+                )
+
+                Spacer(modifier = Modifier.height(36.dp))
+
+                Text(
+                    text = "API key",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.W400,
+                    style = TextStyles.base
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                TextField(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .border(1.dp, Colors.textFieldBorder, RoundedCornerShape(12.dp)),
+                    value = Preferences.apiKey.value ?: "",
+                    onValueChange = { Preferences.apiKey.value = it },
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Unspecified,
                         imeAction = ImeAction.Next
                     ),
                     colors = textFieldColors(),
