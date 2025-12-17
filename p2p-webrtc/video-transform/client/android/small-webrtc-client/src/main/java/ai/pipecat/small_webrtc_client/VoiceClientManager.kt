@@ -7,8 +7,8 @@ import ai.pipecat.client.result.Future
 import ai.pipecat.client.result.RTVIError
 import ai.pipecat.client.small_webrtc_transport.PipecatClientSmallWebRTC
 import ai.pipecat.client.small_webrtc_transport.SmallWebRTCTransport
-import ai.pipecat.client.transport.MsgServerToClient
 import ai.pipecat.client.types.APIRequest
+import ai.pipecat.client.types.BotOutputData
 import ai.pipecat.client.types.BotReadyData
 import ai.pipecat.client.types.Participant
 import ai.pipecat.client.types.PipecatMetrics
@@ -88,16 +88,12 @@ class VoiceClientManager(private val context: Context) {
                 Log.i(TAG, "Pipecat metrics: $data")
             }
 
-            override fun onBotOutput(data: MsgServerToClient.Data.BotOutputData) {
+            override fun onBotOutput(data: BotOutputData) {
                 Log.i(TAG, "Bot output: $data")
             }
 
             override fun onUserTranscript(data: Transcript) {
                 Log.i(TAG, "User transcript: $data")
-            }
-
-            override fun onBotTranscript(text: String) {
-                Log.i(TAG, "Bot transcript: $text")
             }
 
             override fun onBotStartedSpeaking() {
