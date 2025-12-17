@@ -88,7 +88,7 @@ Follow the prompts to complete the configuration. It's fine to just accept all d
 
 ## ⚠️ Before Proceeding
 
-Just in case you've deployed multiple agents to AgentCore or deployed agents under multiple names, ensure that you have the desired agent selected as "default" in the `agentcore` tool:
+Just in case you've previously deployed other agents to AgentCore, ensure that you have the desired agent selected as "default" in the `agentcore` tool:
 
 ```
 # Check

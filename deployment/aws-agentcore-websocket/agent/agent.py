@@ -135,6 +135,7 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
 
     @rtvi.event_handler("on_client_ready")
     async def on_client_ready(rtvi):
+        logger.info(f"Client ready")
         await rtvi.set_bot_ready()
         # Kick off the conversation
         await task.queue_frames([LLMRunFrame()])

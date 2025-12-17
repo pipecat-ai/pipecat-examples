@@ -1,17 +1,17 @@
 #!/bin/bash
 
 # Script to dynamically read all variables from .env file and launch agentcore
-YAML_FILE=".bedrock_agentcore.yaml"
-SERVER_ENV_FILE="../server/.env"
+AGENT_ENV_FILE="./agent/.env"
+SERVER_ENV_FILE="./server/.env"
 
 ###############################################
 # STEP 1 — Launch the new agent
 ###############################################
 
 # Check if the local .env file exists
-if [ ! -f ".env" ]; then
-    echo "Error: .env file not found in current directory"
-    echo "Please create a .env file with your environment variables"
+if [ ! -f "$AGENT_ENV_FILE" ]; then
+    echo "Error: $AGENT_ENV_FILE file not found"
+    echo "Please create an agent .env file with your environment variables"
     exit 1
 fi
 
@@ -19,9 +19,9 @@ fi
 LAUNCH_CMD="uv run agentcore launch --auto-update-on-conflict"
 FOUND_ENV_VARS=false
 
-echo "Loading environment variables from .env file..."
+echo "Loading environment variables from agent .env file..."
 
-# Read each line from .env file and process it
+# Read each line from agent .env file and process it
 while IFS= read -r line || [ -n "$line" ]; do
     # Skip empty lines & comments
     [[ -z "$line" || "$line" =~ ^[[:space:]]*# ]] && continue
@@ -49,12 +49,12 @@ while IFS= read -r line || [ -n "$line" ]; do
             echo "  Added: $VAR_NAME"
         fi
     fi
-done < ".env"
+done < "$AGENT_ENV_FILE"
 
 # Check if any environment variables were added
 if ! $FOUND_ENV_VARS; then
-    echo "Warning: No valid environment variables found in .env file"
-    echo "Make sure your .env file contains variables in the format: KEY=value"
+    echo "Warning: No valid environment variables found in agent .env file"
+    echo "Make sure your agent .env file contains variables in the format: KEY=value"
     exit 1
 fi
 
@@ -65,23 +65,14 @@ eval "$LAUNCH_CMD"
 
 
 ###############################################
-# STEP 2 — Extract AGENT ARN from YAML
+# STEP 2 — Read AGENT ARN from agentcore status
 ###############################################
-if [ ! -f "$YAML_FILE" ]; then
-    echo "ERROR: $YAML_FILE not found!"
-    exit 1
-fi
+echo "Reading Agent ARN from agentcore status..."
 
-# Extracts: agent_arn: <value>
-AGENT_ARN=$(grep -E "^\s*agent_arn:" "$YAML_FILE" | awk '{print $2}')
+# Extract Agent ARN from status output (removing box formatting characters and spaces)
+AGENT_ARN=$(uv run agentcore status | grep "Agent ARN:" | sed 's/.*Agent ARN: //' | sed 's/│//g' | xargs)
 
-# Wait until it exists
-while [ -z "$AGENT_ARN" ]; do
-    sleep 0.2
-    AGENT_ARN=$(grep -E "^\s*agent_arn:" "$YAML_FILE" | awk '{print $2}')
-done
-
-echo "Extracted Agent ARN: $AGENT_ARN"
+echo "Agent ARN: $AGENT_ARN"
 
 ###############################################
 # STEP 3 — Update server .env
