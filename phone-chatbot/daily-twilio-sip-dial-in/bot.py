@@ -7,9 +7,16 @@
 """Twilio + Daily voice bot implementation."""
 
 import os
+import sys
+
+# Early logging to catch import errors
+print(f"[STARTUP] Bot module loading... Python {sys.version}", flush=True)
 
 from dotenv import load_dotenv
 from loguru import logger
+
+logger.info("[STARTUP] Basic imports successful")
+
 from pipecat.audio.turn.smart_turn.local_smart_turn_v3 import LocalSmartTurnAnalyzerV3
 from pipecat.audio.vad.silero import SileroVADAnalyzer
 from pipecat.audio.vad.vad_analyzer import VADParams
@@ -25,8 +32,14 @@ from pipecat.services.deepgram.stt import DeepgramSTTService
 from pipecat.services.openai.llm import OpenAILLMService
 from pipecat.transports.base_transport import BaseTransport
 from pipecat.transports.daily.transport import DailyParams, DailyTransport
-from server_utils import AgentRequest
+
+logger.info("[STARTUP] Pipecat imports successful")
+
 from twilio.rest import Client
+
+from server_utils import AgentRequest
+
+logger.info("[STARTUP] All imports successful")
 
 load_dotenv(override=True)
 
@@ -92,10 +105,23 @@ async def run_bot(transport: BaseTransport, request: AgentRequest, handle_sigint
         logger.info(f"Forwarding call {request.call_sid} to {request.sip_uri}")
 
         try:
+            # Select Twilio credentials based on the dialed phone number
+            # +1 numbers (US/Canada) use US credentials, others use EU credentials
+            if request.to_phone.startswith("+1"):
+                account_sid = os.getenv("TWILIO_ACCOUNT_SID")
+                auth_token = os.getenv("TWILIO_AUTH_TOKEN")
+                twilio_region = "us1"
+                logger.info(f"Using US Twilio credentials for {request.to_phone}")
+            else:
+                account_sid = os.getenv("TWILIO_ACCOUNT_SID_EU")
+                auth_token = os.getenv("TWILIO_AUTH_TOKEN_EU")
+                twilio_region = "ie1"
+                logger.info(f"Using EU Twilio credentials for {request.to_phone}")
+
             twilio_client = Client(
-                os.getenv("TWILIO_ACCOUNT_SID"),
-                os.getenv("TWILIO_AUTH_TOKEN"),  # MAKE SURE YOU USE THE EU TOKEN
-                region="ie1",  # Use Ireland region for EU numbers
+                account_sid,
+                auth_token,
+                region=twilio_region,
             )
 
             # Update the Twilio call with TwiML to forward to the Daily SIP endpoint

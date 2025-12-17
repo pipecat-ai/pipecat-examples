@@ -140,6 +140,82 @@ You'll need three terminal windows open:
 
 You can deploy your bot to Pipecat Cloud and server to your infrastructure to run this bot in a production environment.
 
+### Multi-Region Deployment (US and EU)
+
+This project supports deploying to both US and EU regions with separate Twilio accounts. The system automatically routes calls based on the dialed phone number:
+
+- **+1 numbers** (US/Canada) → US Pipecat Cloud agent with US Twilio credentials
+- **Other numbers** (EU, etc.) → EU Pipecat Cloud agent with EU Twilio credentials
+
+#### Required Environment Variables
+
+Your `.env` file should include credentials for both regions:
+
+```bash
+# US Twilio credentials
+TWILIO_ACCOUNT_SID=your_us_account_sid
+TWILIO_AUTH_TOKEN=your_us_auth_token
+
+# EU Twilio credentials (Ireland)
+TWILIO_ACCOUNT_SID_EU=your_eu_account_sid
+TWILIO_AUTH_TOKEN_EU=your_eu_auth_token
+```
+
+#### Deployment Configuration Files
+
+This project includes two deployment configuration files:
+
+- **`pcc-deploy.toml`** - US region deployment (agent: `daily-twilio-sip-dial-in`)
+- **`pcc-deploy-eu.toml`** - EU region deployment (agent: `daily-twilio-sip-dial-in-eu`)
+
+#### Deploy to US Region
+
+1. Create secrets for the US region:
+
+   ```bash
+   pipecat cloud secrets set daily-twilio-sip-secrets -f .env -r us-west
+   ```
+
+2. Build and push the Docker image:
+
+   ```bash
+   pipecat cloud docker build-push
+   ```
+
+3. Deploy to US region:
+
+   ```bash
+   pipecat cloud deploy
+   ```
+
+#### Deploy to EU Region
+
+1. Create secrets for the EU region:
+
+   ```bash
+   pipecat cloud secrets set daily-twilio-sip-secrets-eu -f .env -r eu-central
+   ```
+
+2. Build and push the EU Docker image (update the image name in `pcc-deploy-eu.toml` first):
+
+   ```bash
+   pipecat cloud docker build-push -c pcc-deploy-eu.toml
+   ```
+
+3. Deploy to EU region:
+
+   ```bash
+   pipecat cloud deploy -c pcc-deploy-eu.toml
+   ```
+
+#### How Region Detection Works
+
+The webhook server (`server.py`) and bot (`bot.py`) both detect the region based on the dialed phone number (`to_phone`):
+
+1. **Webhook server**: When a call comes in, `server_utils.py` checks if `to_phone` starts with `+1`. If so, it starts the US agent (`daily-twilio-sip-dial-in`); otherwise, it starts the EU agent (`daily-twilio-sip-dial-in-eu`).
+
+2. **Bot**: When forwarding the call via Twilio, `bot.py` selects the appropriate Twilio credentials based on the same phone number check.
+
 ### Deploy your Bot to Pipecat Cloud
 
 Follow the [quickstart instructions](https://docs.pipecat.ai/getting-started/quickstart#step-2%3A-deploy-to-production) for tips on how to create secrets, build and push a docker image, and deploy your agent to Pipecat Cloud.

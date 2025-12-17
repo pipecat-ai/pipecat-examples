@@ -89,12 +89,13 @@ async def handle_call(request: Request):
         token=sip_config.token,
         call_sid=call_data.call_sid,
         sip_uri=sip_config.sip_endpoint,
+        to_phone=call_data.to_phone,
     )
 
     # Start bot locally or in production.
     try:
         if os.getenv("ENV") == "production":
-            await start_bot_production(agent_request, request.app.state.http_session)
+            await start_bot_production(agent_request, call_data, request.app.state.http_session)
         else:
             await start_bot_local(agent_request, request.app.state.http_session)
     except Exception as e:

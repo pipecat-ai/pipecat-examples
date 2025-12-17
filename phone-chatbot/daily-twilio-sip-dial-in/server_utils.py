@@ -7,10 +7,15 @@
 import os
 
 import aiohttp
+from dotenv import load_dotenv
 from fastapi import HTTPException, Request
 from loguru import logger
 from pipecat.runner.daily import DailyRoomConfig, configure
+from pipecat.transports.daily.utils import DailyRoomProperties, DailyRoomSipParams
 from pydantic import BaseModel
+
+# Load .env file if present (safe to call multiple times)
+load_dotenv()
 
 
 class TwilioCallData(BaseModel):
@@ -20,11 +25,13 @@ class TwilioCallData(BaseModel):
         call_sid: Unique identifier for the call
         from_phone: The caller's phone number
         to_phone: The dialed phone number
+        account_sid: The Twilio Account SID (used to determine US vs EU region)
     """
 
     call_sid: str
     from_phone: str
     to_phone: str
+    account_sid: str
 
 
 class AgentRequest(BaseModel):
@@ -35,12 +42,14 @@ class AgentRequest(BaseModel):
         token: Authentication token for the Daily room
         call_sid: Unique identifier for the call
         sip_uri: SIP URI for the call
+        to_phone: The dialed phone number (used to determine US vs EU region)
     """
 
     room_url: str
     token: str
     call_sid: str
     sip_uri: str
+    to_phone: str
 
 
 async def twilio_call_data_from_request(request: Request):
@@ -63,7 +72,14 @@ async def twilio_call_data_from_request(request: Request):
     if not to_phone:
         raise HTTPException(status_code=400, detail="Missing To in request")
 
-    return TwilioCallData(call_sid=call_sid, from_phone=from_phone, to_phone=to_phone)
+    # Extract the Twilio Account SID (used to determine US vs EU region)
+    account_sid = data.get("AccountSid")
+    if not account_sid:
+        raise HTTPException(status_code=400, detail="Missing AccountSid in request")
+
+    return TwilioCallData(
+        call_sid=call_sid, from_phone=from_phone, to_phone=to_phone, account_sid=account_sid
+    )
 
 
 async def create_daily_room(
@@ -82,34 +98,63 @@ async def create_daily_room(
         HTTPException: If room creation fails
     """
     try:
-        return await configure(session, sip_caller_phone=call_data.from_phone)
+        # Create room properties without expiration (room does not expire)
+        room_properties = DailyRoomProperties(
+            exp=None,
+            eject_at_room_exp=False,
+            sip=DailyRoomSipParams(
+                display_name=call_data.from_phone,
+                video=False,
+                sip_mode="dial-in",
+                num_endpoints=1,
+            ),
+            enable_dialout=False,  # Disable outbound PSTN calls from the room
+            start_video_off=True,
+        )
+        return await configure(session, room_properties=room_properties)
     except Exception as e:
         logger.error(f"Error creating Daily room: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to create Daily room: {e!s}")
 
 
-async def start_bot_production(agent_request: AgentRequest, session: aiohttp.ClientSession):
+async def start_bot_production(
+    agent_request: AgentRequest, call_data: TwilioCallData, session: aiohttp.ClientSession
+):
     """Start the bot via Pipecat Cloud API for production deployment.
+
+    Automatically selects the correct agent (US or EU) based on the Twilio Account SID
+    from the incoming webhook request.
 
     Args:
         agent_request: Agent configuration with room_url, token, and call details
+        call_data: Twilio call data including account_sid for region detection
         session: Shared aiohttp session for making HTTP requests
 
     Raises:
         HTTPException: If required environment variables are missing or API call fails
     """
     pipecat_api_key = os.getenv("PIPECAT_API_KEY")
-    agent_name = os.getenv("PIPECAT_AGENT_NAME")
 
-    if not pipecat_api_key or not agent_name:
+    # Determine agent name based on the dialed phone number
+    # If the number starts with +1 (US/Canada), use US agent; otherwise use EU agent
+    if call_data.to_phone.startswith("+1"):
+        agent_name = "daily-twilio-sip-dial-in"
+        logger.info(f"Detected US/Canada number ({call_data.to_phone}), using agent: {agent_name}")
+    else:
+        agent_name = "daily-twilio-sip-dial-in-eu"
+        logger.info(f"Detected non-US number ({call_data.to_phone}), using agent: {agent_name}")
+
+    if not pipecat_api_key:
         raise HTTPException(
             status_code=500,
-            detail="PIPECAT_API_KEY and PIPECAT_AGENT_NAME required for production mode",
+            detail="PIPECAT_API_KEY required for production mode",
         )
 
     logger.debug(f"Starting bot via Pipecat Cloud for call {agent_request.call_sid}")
 
     body_data = agent_request.model_dump(exclude_none=True)
+
+    logger.debug(f"body_data: {body_data}")
 
     async with session.post(
         f"https://api.pipecat.daily.co/v1/public/{agent_name}/start",
@@ -147,6 +192,8 @@ async def start_bot_local(agent_request: AgentRequest, session: aiohttp.ClientSe
     logger.debug(f"Starting bot via local /start endpoint for call {agent_request.call_sid}")
 
     body_data = agent_request.model_dump(exclude_none=True)
+
+    logger.debug(f"body_data: {body_data}")
 
     async with session.post(
         f"{local_server_url}/start",

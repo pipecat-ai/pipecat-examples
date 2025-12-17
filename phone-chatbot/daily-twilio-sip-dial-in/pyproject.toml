@@ -7,6 +7,8 @@ dependencies = [
     "pipecat-ai[daily,deepgram,cartesia,openai,silero,local-smart-turn-v3,runner,webrtc]>=0.0.91",
     "pipecatcloud>=0.2.7",
     "twilio",
+    "aiohttp",
+    "fastapi",
 ]
 
 [dependency-groups]
