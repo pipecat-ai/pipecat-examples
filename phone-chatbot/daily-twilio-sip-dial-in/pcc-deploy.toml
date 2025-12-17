@@ -1,5 +1,5 @@
 agent_name = "daily-twilio-sip-dial-in-eu"
-image = "hushdaily/daily-twilio-sip-dial-in-eu:0.2"
+image = "hushdaily/daily-twilio-sip-dial-in-eu:0.3"
 image_credentials = "docker-creds"
 secret_set = "daily-twilio-sip-secrets-eu"
 agent_profile = "agent-1x"

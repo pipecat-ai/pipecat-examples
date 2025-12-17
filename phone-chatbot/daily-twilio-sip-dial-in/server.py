@@ -27,6 +27,8 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import PlainTextResponse
 from loguru import logger
+from twilio.twiml.voice_response import VoiceResponse
+
 from server_utils import (
     AgentRequest,
     create_daily_room,
@@ -34,7 +36,6 @@ from server_utils import (
     start_bot_production,
     twilio_call_data_from_request,
 )
-from twilio.twiml.voice_response import VoiceResponse
 
 load_dotenv()
 
@@ -73,10 +74,9 @@ async def handle_call(request: Request):
         TwiML response with hold music for the caller
 
     """
+    logger.debug("Received call webhook from Twilio")
 
     call_data = await twilio_call_data_from_request(request)
-
-    logger.debug(f"Received call webhook from Twilio {call_data}")
 
     sip_config = await create_daily_room(call_data, request.app.state.http_session)
 
@@ -90,9 +90,6 @@ async def handle_call(request: Request):
         call_sid=call_data.call_sid,
         sip_uri=sip_config.sip_endpoint,
     )
-
-    logger.debug(f"Prepared agent request: {agent_request}")
-    logger.debug(f"request.app.state.http_session: {request.app.state.http_session}")
 
     # Start bot locally or in production.
     try:
