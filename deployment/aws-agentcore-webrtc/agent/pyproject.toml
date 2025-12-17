@@ -1,0 +1,10 @@
+[project]
+name = "agentcore-pipecat-webrtc-agent"
+version = "0.1.0"
+description = "Pipecat bot agent for Amazon Bedrock AgentCore"
+requires-python = ">=3.10"
+dependencies = [
+    "aiohttp",
+    "bedrock-agentcore",
+    "pipecat-ai[aws,webrtc,daily,silero,deepgram,openai,cartesia,runner]",
+]

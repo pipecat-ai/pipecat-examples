@@ -22,7 +22,6 @@ from pipecat.runner.utils import create_transport
 from pipecat.services.aws import AWSBedrockLLMService
 from pipecat.services.cartesia.tts import CartesiaTTSService
 from pipecat.services.deepgram.stt import DeepgramSTTService
-from pipecat.services.openai.llm import OpenAILLMService
 from pipecat.transports.base_transport import BaseTransport, TransportParams
 from pipecat.transports.smallwebrtc.connection import IceServer, SmallWebRTCConnection
 from pipecat.transports.smallwebrtc.request_handler import (
@@ -64,9 +63,9 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
         voice_id="71a7ad14-091c-4e8e-a314-022ece01c121",  # British Reading Lady
     )
 
+    # Automatically uses AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, and AWS_REGION env vars.
     llm = AWSBedrockLLMService(
-        aws_region="us-west-2",
-        model="us.amazon.nova-pro-v1:0",
+        model="us.amazon.nova-2-lite-v1:0",
         params=AWSBedrockLLMService.InputParams(temperature=0.8),
     )
 
@@ -75,6 +74,7 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
             "role": "system",
             "content": "You are a helpful LLM in a WebRTC call. Your goal is to demonstrate your capabilities in a succinct way. Your output will be spoken aloud, so avoid special characters that can't easily be spoken, such as emojis or bullet points. Respond to what the user said in a creative and helpful way.",
         },
+        {"role": "user", "content": "Say hello and briefly introduce yourself."},
     ]
 
     context = LLMContext(messages)
@@ -109,13 +109,12 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     async def on_client_ready(rtvi):
         logger.info(f"Client ready")
         await rtvi.set_bot_ready()
+        # Kick off the conversation.
+        await task.queue_frames([LLMRunFrame()])
 
     @transport.event_handler("on_client_connected")
     async def on_client_connected(transport, client):
         logger.info(f"Client connected")
-        # Kick off the conversation.
-        messages.append({"role": "user", "content": "Please introduce yourself to the user."})
-        await task.queue_frames([LLMRunFrame()])
 
     @transport.event_handler("on_client_disconnected")
     async def on_client_disconnected(transport, client):

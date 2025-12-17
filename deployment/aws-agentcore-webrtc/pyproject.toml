@@ -1,7 +1,7 @@
 [project]
-name = "agentcore-pipecat"
+name = "agentcore-pipecat-webrtc"
 version = "0.1.0"
-description = "Example for building Pipecat bots deployable to Amazon Bedrock AgentCore"
+description = "Example for building Pipecat bots deployable to Amazon Bedrock AgentCore using WebRTC for communication"
 requires-python = ">=3.10"
 dependencies = [
     "aioice",

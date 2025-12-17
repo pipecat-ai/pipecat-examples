@@ -58,6 +58,9 @@ uv sync
 
    Add your API keys:
 
+   - `AWS_ACCESS_KEY_ID`: Your AWS access key ID for the Amazon Bedrock LLM used by the agent
+   - `AWS_SECRET_ACCESS_KEY`: Your AWS secret access key for the Amazon Bedrock LLM used by the agent
+   - `AWS_REGION`: The AWS region for the Amazon Bedrock LLM used by the agent
    - `DEEPGRAM_API_KEY`: Your Deepgram API key
    - `CARTESIA_API_KEY`: Your Cartesia API key
    - `ICE_SERVER_URLS`: Your TCP TURN server urls
@@ -83,7 +86,6 @@ uv sync
 Configure your bot as an AgentCore agent:
 
 ```bash
-cd agent
 ./scripts/configure.sh
 ```
 
@@ -98,12 +100,24 @@ Follow the prompts to complete the configuration.
 > Technical Note:
 > Direct Code Deploy isn't used because some dependencies (like `numba`) lack `aarch64_manylinux2014` wheels.
 
+## ⚠️ Before Proceeding
+
+Just in case you've previously deployed other agents to AgentCore, ensure that you have the desired agent selected as "default" in the `agentcore` tool:
+
+```
+# Check
+uv run agentcore configure list
+# Set
+uv run agentcore configure set-default <agent-name>
+```
+
+The following steps act on `agentcore`'s default agent.
+
 ## Deployment to AgentCore Runtime
 
 Deploy your bot:
 
 ```bash
-cd agent
 ./scripts/launch.sh
 ```
 
@@ -158,7 +172,6 @@ uv run agentcore invoke \
 Remove your agent:
 
 ```bash
-cd agent
 ./scripts/destroy.sh
 ```
 

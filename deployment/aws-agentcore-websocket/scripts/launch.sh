@@ -10,8 +10,8 @@ SERVER_ENV_FILE="./server/.env"
 
 # Check if the local .env file exists
 if [ ! -f "$AGENT_ENV_FILE" ]; then
-    echo "Error: $AGENT_ENV_FILE file not found in current directory"
-    echo "Please create a $AGENT_ENV_FILE file with your environment variables"
+    echo "Error: $AGENT_ENV_FILE file not found"
+    echo "Please create an agent .env file with your environment variables"
     exit 1
 fi
 

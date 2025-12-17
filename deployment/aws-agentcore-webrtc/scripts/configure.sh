@@ -3,7 +3,7 @@
 # Script to configure the bot, patch Dockerfile and sync AGENT_RUNTIME_ARN
 
 DOCKERFILE=".bedrock_agentcore/pipecat_agent/Dockerfile"
-TARGET_LINE="RUN uv pip install -r requirements.txt"
+TARGET_LINE="RUN cd . && uv pip install ."
 # Extra dependencies needed by SmallWebRTC
 INSERT_LINE="RUN apt update && apt install -y libgl1 libglib2.0-0 && apt clean"
 
@@ -12,7 +12,7 @@ INSERT_LINE="RUN apt update && apt install -y libgl1 libglib2.0-0 && apt clean"
 # Already configuring to use Docker as it is required by Pipecat
 # Disabling memory by default since it is not needed by this example
 ###############################################
-uv run agentcore configure -e pipecat-agent.py --name pipecat_agent --container-runtime docker --disable-memory
+uv run agentcore configure -e ./agent/pipecat-agent.py --name pipecat_agent --container-runtime docker --disable-memory
 
 ###############################################
 # STEP 2 — Wait until Dockerfile exists
