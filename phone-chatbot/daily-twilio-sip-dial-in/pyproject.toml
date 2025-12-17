@@ -9,6 +9,7 @@ dependencies = [
     "twilio",
     "aiohttp",
     "fastapi",
+    "python-dotenv",
 ]
 
 [dependency-groups]
