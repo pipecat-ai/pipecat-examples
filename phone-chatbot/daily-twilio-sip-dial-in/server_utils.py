@@ -111,6 +111,8 @@ async def start_bot_production(agent_request: AgentRequest, session: aiohttp.Cli
 
     body_data = agent_request.model_dump(exclude_none=True)
 
+    logger.debug(f"body_data: {body_data}")
+
     async with session.post(
         f"https://api.pipecat.daily.co/v1/public/{agent_name}/start",
         headers={

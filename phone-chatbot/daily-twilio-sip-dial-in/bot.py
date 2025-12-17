@@ -130,6 +130,7 @@ async def run_bot(transport: BaseTransport, request: AgentRequest, handle_sigint
 async def bot(runner_args: RunnerArguments):
     """Main bot entry point."""
     try:
+        logger.debug(f"runner_args.body: {runner_args.body}")
         request = AgentRequest.model_validate(runner_args.body)
 
         transport = DailyTransport(
