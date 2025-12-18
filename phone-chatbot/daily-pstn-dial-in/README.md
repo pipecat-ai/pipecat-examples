@@ -5,35 +5,23 @@ This project demonstrates how to create a voice bot that can receive phone calls
 ## How It Works
 
 1. Daily receives an incoming call to your phone number
-2. Daily calls your webhook server (`/daily-webhook` endpoint in `server.py`)
-3. The server creates a Daily room with dial-in capabilities
-4. The server starts the bot process with the room details (locally or via Pipecat Cloud)
+2. Daily calls your webhook server (`/daily-dialin-webhook` endpoint)
+3. The webhook creates a Daily room with SIP configuration
+4. The webhook starts your bot with the room details and caller information
 5. The caller is put on hold with music
 6. The bot joins the Daily room and signals readiness
 7. Daily forwards the call to the Daily room
-8. The caller and the bot are connected, and the bot handles the conversation
+8. The caller and bot are connected for the conversation
 
 ## Project Structure
 
-This example is organized to be production-ready and easy to customize:
-
-- **`server.py`** - FastAPI webhook server that handles incoming calls
-
-  - Receives Daily PSTN webhooks
-  - Creates Daily rooms
-  - Routes to local or production bot deployment
-  - Uses shared HTTP session for optimal performance
-
-- **`server_utils.py`** - Utility functions for Daily API interactions
-
-  - Data models for call data and agent requests
-  - Room creation logic
-  - Bot starting logic (production and local modes)
-  - Easy to extend with custom business logic
+This example uses Pipecat's development runner to handle the webhook and bot lifecycle:
 
 - **`bot.py`** - The voice bot implementation
   - Handles the conversation with the caller
+  - Uses `DailyDialinRequest` from the runner for type-safe dial-in data
   - Deployed to Pipecat Cloud in production or run locally for development
+  - The runner automatically provides webhook handling when using `--dialin` flag
 
 ## Prerequisites
 
@@ -64,161 +52,166 @@ This example is organized to be production-ready and easy to customize:
 
 2. Set up environment variables
 
-Copy the example file and fill in your API keys:
+   Copy the example file and fill in your API keys:
 
-    ```bash
-    cp .env.example .env
-    # Edit .env with your API keys
-    ```
+   ```bash
+   cp .env.example .env
+   # Edit .env with your API keys
+   ```
+
+   Required environment variables:
+
+   - `DAILY_API_KEY` - Your Daily API key
+   - `DEEPGRAM_API_KEY` - For speech-to-text
+   - `CARTESIA_API_KEY` - For text-to-speech
+   - `OPENAI_API_KEY` - For LLM inference
 
 3. Buy a phone number
 
-   Instructions on how to do that can be found at this [docs link:](https://docs.daily.co/reference/rest-api/phone-numbers/buy-phone-number)
+   Instructions on how to do that can be found at this [docs link](https://docs.daily.co/reference/rest-api/phone-numbers/buy-phone-number)
 
 4. Set up the dial-in config
 
-   Instructions on how to do that can be found at this [docs link:](https://docs.daily.co/reference/rest-api/domainDialinConfig).
+   Instructions on how to do that can be found at this [docs link](https://docs.daily.co/reference/rest-api/domainDialinConfig).
 
-   Note that the `room_creation_api` is the address and route of your server that will handle the webhook that fires when a call is received. For local testing this will be your `ngrok` tunnel URL and the route should match your server's endpoint. In testing your demo, this will be `https://your-ngrok-url.ngrok.io/daily-webhook`.
+   The `room_creation_api` should point to your webhook endpoint. For local testing with ngrok, this will be:
+
+   ```
+   https://your-ngrok-url.ngrok.io/daily-dialin-webhook
+   ```
 
    > Tip: If you're using Pipecat Cloud, you can purchase a number using the Pipecat Cloud dashboard (Settings > Telephony).
 
-## Environment Configuration
-
-The bot supports two deployment modes controlled by the `ENV` variable:
-
-### Local Development (`ENV=local`)
-
-- Uses your local server or ngrok URL for handling the dial-in webhook and starting the bot
-- Default configuration for development and testing
-
-### Production (`ENV=production`)
-
-- Bot is deployed to Pipecat Cloud; requires `PIPECAT_API_KEY` and `PIPECAT_AGENT_NAME`
-- Set these when deploying to production environments
-- Your FastAPI server runs either locally or deployed to your infrastructure
-
 ## Run the Bot Locally
 
-You'll need three terminal windows open:
-
-1. Terminal 1: Start the webhook server:
+1. **Run your bot with dial-in support**
 
    ```bash
-   uv run server.py
+   uv run bot.py -t daily --dialin
    ```
 
-2. Terminal 2: Start an ngrok tunnel to expose the FastAPI server running on server.py
+   This starts a FastAPI server on port 7860 with the `/daily-dialin-webhook` endpoint.
+
+2. **Expose your bot to the internet**
 
    ```bash
-   ngrok http 8080
+   ngrok http 7860
    ```
 
-   Important: Make sure that this URL matches the `room_creation_api` URL for your phone number.
+   Copy the ngrok URL (e.g., `https://abc123.ngrok.io`).
 
-   > Tip: Use the `--subdomain` for a reusable ngrok link.
+   > Tip: Use `ngrok http 7860 --subdomain your-subdomain` for a reusable URL.
 
-3. Terminal 3: Run your bot:
+3. **Configure your Daily phone number**
 
-   ```bash
-   uv run bot.py -t daily
+   Set your phone number's `room_creation_api` webhook to:
+
+   ```
+   https://your-ngrok-url.ngrok.io/daily-dialin-webhook
    ```
 
-   > The bot.py file includes a FastAPI server. This emulates the Pipecat Cloud service, and is as if you're running with `min_agents=1`.
+   Instructions: [Daily Dial-in Config Docs](https://docs.daily.co/reference/rest-api/domainDialinConfig)
 
-4. Call your bot!
+4. **Call your bot!**
 
-   Call the number you configured to talk to your bot.
+   Call your configured phone number to talk to your bot.
 
-## Production Deployment
+## Deploy to Pipecat Cloud
 
-You can deploy your bot to Pipecat Cloud and server to your infrastructure to run this bot in a production environment.
+1. **Deploy your bot**
 
-### Deploy your Bot to Pipecat Cloud
+   Follow the [Pipecat Cloud quickstart](https://docs.pipecat.ai/getting-started/quickstart#step-2%3A-deploy-to-production) to deploy your `bot.py` file.
 
-Follow the [quickstart instructions](https://docs.pipecat.ai/getting-started/quickstart#step-2%3A-deploy-to-production) for tips on how to create secrets, build and push a docker image, and deploy your agent to Pipecat Cloud.
+   You only need to deploy `bot.py` - Pipecat Cloud automatically handles webhook endpoints and room creation.
 
-You'll only deploy your `bot.py` file.
+2. **Configure your phone number webhook**
 
-### Deploy the Server
+   Using the Pipecat Cloud dashboard, configure your phone number's webhook endpoint to point to your deployed agent.
 
-The `server.py` handles inbound call webhooks and should be deployed separately from your bot:
+   This will set the webhook URL to:
 
-- **Bot**: Runs on Pipecat Cloud (handles the conversation)
-- **Server**: Runs on your infrastructure (receives webhooks and starts the bot)
+   ```
+   https://api.pipecat.daily.co/v1/public/webhooks/{organization_id}/{agent_name}/dialin
+   ```
 
-### Environment Variables for Production
+   Pipecat Cloud will automatically:
 
-Add these to your production environment:
+   - Receive the webhook
+   - Create a Daily room with SIP configuration
+   - Start your bot with the dial-in settings
+   - Pass caller information via `DailyDialinRequest`
 
-```bash
-ENV=production
-PIPECAT_API_KEY=your_pipecat_cloud_api_key
-PIPECAT_AGENT_NAME=your-agent-name
-```
+## Customize Your Bot
 
-The server automatically detects the environment and routes bot starting requests accordingly.
-
-## Adding Custom Data to Agent Requests
-
-You can extend the `AgentRequest` model in `server_utils.py` to pass custom data to your bot:
+You can use the caller's phone number to personalize the conversation:
 
 ```python
-class AgentRequest(BaseModel):
-    room_url: str
-    token: str
-    call_id: str
-    call_domain: str
-    # Add your custom fields here
-    customer_name: str | None = None
-    account_id: str | None = None
-```
+from pipecat.runner.types import DailyDialinRequest, RunnerArguments
 
-Then populate this data in `server.py` before starting the bot:
+async def bot(runner_args: RunnerArguments):
+    # Parse dial-in request
+    request = DailyDialinRequest.model_validate(runner_args.body)
 
-```python
-# Example: Look up customer information
-customer_info = await get_customer_by_phone(call_data.from_phone)
+    # Get caller's phone number
+    caller_phone = request.dialin_settings.From
 
-agent_request = AgentRequest(
-    room_url=daily_room_config.room_url,
-    token=daily_room_config.token,
-    call_id=call_data.call_id,
-    call_domain=call_data.call_domain,
-    customer_name=customer_info.name,
-    account_id=customer_info.id,
-)
+    # Look up customer information from your database
+    customer = await get_customer_by_phone(caller_phone)
+
+    # Customize the system prompt
+    messages = [
+        {
+            "role": "system",
+            "content": f"You are a helpful assistant for {customer.name}. "
+                      f"Their account status is {customer.status}. "
+                      "Keep responses concise and conversational."
+        }
+    ]
+
+    # Use the customized context in your bot...
 ```
 
 ## Troubleshooting
 
 ### Call is not being answered
 
-- Check that your dial-in config is correctly configured to point towards your ngrok server and correct endpoint
-- Make sure the server.py file is running
-- Make sure ngrok is correctly setup and pointing to the correct port
+- Check that your dial-in config's `room_creation_api` points to your ngrok URL + `/daily-dialin-webhook`
+- Verify the bot is running with `uv run bot.py -t daily --dialin`
+- Make sure ngrok is running and pointing to port 7860
+- Check the bot logs for webhook reception
+- Ensure your `DAILY_API_KEY` has the phone number associated with it
 
 ### Call connects but no bot is heard
 
-- Ensure your Daily API key is correct and has SIP capabilities
-- Verify that the Cartesia API key and voice ID are correct
+- Ensure your `DAILY_API_KEY` environment variable is set and has SIP capabilities
+- Verify that the `CARTESIA_API_KEY` and voice ID are correct
+- Check that `DEEPGRAM_API_KEY` is set for speech-to-text
 
 ### Bot starts but disconnects immediately
 
-- Check the Daily logs for any error messages
+- Check the bot logs for error messages
+- Verify all required environment variables are set
 - Ensure your server has stable internet connectivity
+
+### Webhook test fails
+
+- The runner automatically handles Daily's webhook verification test
+- Check that the bot is running and accessible via your ngrok URL
 
 ## Daily SIP Configuration
 
-The bot configures Daily rooms with SIP capabilities using these settings:
+The runner automatically configures Daily rooms with SIP capabilities when using `--dialin`:
 
 ```python
-sip_params = DailyRoomSipParams(
-    display_name="phone-user",  # This will show up in the Daily UI; optional display the dialer's number
-    video=False,                # Audio-only call
-    sip_mode="dial-in",         # For receiving calls (vs. dial-out)
-    num_endpoints=1,            # Number of SIP endpoints to create
-)
+# The runner calls this for you:
+room_config = await configure(session, sip_caller_phone=data.get("From"))
 ```
 
-If you're using the Pipecat development runner's Daily util, these args are handled for you when calling `configure()`.
+This creates a room with these SIP settings:
+
+- `display_name`: Set to the caller's phone number (From field)
+- `video`: False (audio-only call)
+- `sip_mode`: "dial-in" (for receiving calls)
+- `num_endpoints`: 1 (one SIP endpoint for the incoming caller)
+
+The runner passes the caller's phone number and call details to your bot via `DailyDialinRequest` in `runner_args.body`.

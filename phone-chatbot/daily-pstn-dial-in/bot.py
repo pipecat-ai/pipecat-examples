@@ -23,14 +23,12 @@ from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineParams, PipelineTask
 from pipecat.processors.aggregators.llm_context import LLMContext
 from pipecat.processors.aggregators.llm_response_universal import LLMContextAggregatorPair
-from pipecat.runner.types import RunnerArguments
+from pipecat.runner.types import DailyDialinRequest, RunnerArguments
 from pipecat.services.cartesia.tts import CartesiaTTSService
 from pipecat.services.deepgram.stt import DeepgramSTTService
 from pipecat.services.openai.llm import OpenAILLMService
 from pipecat.transports.base_transport import BaseTransport
 from pipecat.transports.daily.transport import DailyDialinSettings, DailyParams, DailyTransport
-
-from server_utils import AgentRequest
 
 load_dotenv(override=True)
 
@@ -127,18 +125,22 @@ async def bot(runner_args: RunnerArguments):
     """
 
     try:
-        request = AgentRequest.model_validate(runner_args.body)
+        # Parse the dial-in request from the runner
+        request = DailyDialinRequest.model_validate(runner_args.body)
 
+        # Configure Daily transport with dial-in settings
         daily_dialin_settings = DailyDialinSettings(
-            call_id=request.call_id, call_domain=request.call_domain
+            call_id=request.dialin_settings.call_id,
+            call_domain=request.dialin_settings.call_domain,
         )
 
         transport = DailyTransport(
-            request.room_url,
-            request.token,
+            runner_args.room_url,
+            runner_args.token,
             "Daily PSTN Dial-in Bot",
             params=DailyParams(
-                api_key=os.getenv("DAILY_API_KEY"),
+                api_key=request.daily_api_key,
+                api_url=request.daily_api_url,
                 dialin_settings=daily_dialin_settings,
                 audio_in_enabled=True,
                 audio_out_enabled=True,
@@ -146,6 +148,11 @@ async def bot(runner_args: RunnerArguments):
                 turn_analyzer=LocalSmartTurnAnalyzerV3(),
             ),
         )
+
+        # Log caller information if available
+        # You can use this to look up customer information to personalize the conversation
+        if request.dialin_settings.From:
+            logger.info(f"Handling call from: {request.dialin_settings.From}")
 
         await run_bot(transport, runner_args.handle_sigint)
 
