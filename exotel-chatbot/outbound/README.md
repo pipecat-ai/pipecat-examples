@@ -64,21 +64,6 @@ cp env.example .env
 # Edit .env with your API keys
 ```
 
-## Environment Configuration
-
-The bot supports two deployment modes controlled by the `ENV` variable:
-
-### Local Development (`ENV=local`)
-
-- Uses your local server or ngrok URL for WebSocket connections
-- Default configuration for development and testing
-- WebSocket connections go directly to your running server
-
-### Production (`ENV=production`)
-
-- Uses Pipecat Cloud WebSocket URLs automatically
-- WebSocket connections route through Pipecat Cloud infrastructure
-
 ## Local Development
 
 ### Configure Your Bot Number in App Bazaar
@@ -176,27 +161,14 @@ Replace:
 
 Follow the [quickstart instructions](https://docs.pipecat.ai/getting-started/quickstart#step-2%3A-deploy-to-production) to deploy your bot to Pipecat Cloud.
 
-### 2. Configure Production Environment
-
-Update your production `.env` file with the Pipecat Cloud details:
-
-```bash
-# Set to production mode
-ENV=production
-
-# Keep your existing Exotel and AI service keys
-```
-
-### 3. Deploy the Server
+### 2. Deploy the Server
 
 The `server.py` handles outbound call initiation and should be deployed separately from your bot:
 
 - **Bot**: Runs on Pipecat Cloud (handles the conversation)
-- **Server**: Runs on your infrastructure (initiates calls, serves WebSocket connections)
+- **Server**: Runs on your infrastructure (initiates Exotel calls)
 
-When `ENV=production`, the server automatically routes WebSocket connections to your Pipecat Cloud bot.
-
-### 4. Update Your Bot Number's App Bazaar Configuration
+### 3. Update Your Bot Number's App Bazaar Configuration
 
 Update your bot number's Voicebot Applet configuration for production:
 
