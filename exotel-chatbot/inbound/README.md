@@ -59,23 +59,6 @@ The bot automatically receives the caller's and called phone numbers for persona
    cp env.example .env
    ```
 
-## Environment Configuration
-
-The bot supports two deployment modes controlled by the `ENV` variable:
-
-### Local Development (`ENV=local`)
-
-- Uses your local server or ngrok URL for WebSocket connections
-- Default configuration for development and testing
-- WebSocket connections go directly to your running server
-
-### Production (`ENV=production`)
-
-- Uses Pipecat Cloud WebSocket URLs automatically
-- Requires `AGENT_NAME` and `ORGANIZATION_NAME` from your Pipecat Cloud deployment
-- Set these when deploying to production environments
-- WebSocket connections route through Pipecat Cloud infrastructure
-
 ## Local Development
 
 ### Configure Exotel App Bazaar Application
@@ -155,31 +138,7 @@ Place a call to the number associated with your bot. The bot will answer and sta
 
 Follow the [quickstart instructions](https://docs.pipecat.ai/getting-started/quickstart#step-2%3A-deploy-to-production) to deploy your bot to Pipecat Cloud.
 
-### 2. Configure Production Environment
-
-Update your production `.env` file with the Pipecat Cloud details:
-
-```bash
-# Set to production mode
-ENV=production
-
-# Your Pipecat Cloud deployment details
-AGENT_NAME=your-agent-name
-ORGANIZATION_NAME=your-org-name
-
-# Keep your existing Exotel and AI service keys
-```
-
-### 3. Deploy the Server
-
-The `server.py` handles inbound call webhooks and should be deployed separately from your bot:
-
-- **Bot**: Runs on Pipecat Cloud (handles the conversation)
-- **Server**: Runs on your infrastructure (receives webhooks, serves responses)
-
-When `ENV=production`, the server automatically routes WebSocket connections to your Pipecat Cloud bot.
-
-### 4. Update Exotel App Bazaar Configuration
+### 2. Update Exotel App Bazaar Configuration
 
 Update your Voicebot Applet configuration to use your production server:
 
