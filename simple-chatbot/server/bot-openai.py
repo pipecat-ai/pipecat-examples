@@ -4,17 +4,25 @@
 # SPDX-License-Identifier: BSD 2-Clause License
 #
 
-"""OpenAI Bot Implementation.
+"""simple-chatbot - Pipecat Voice Agent
 
-This module implements a chatbot using OpenAI's GPT-4 model for natural language
+This module implements a chatbot using OpenAI for natural language
 processing. It includes:
 - Real-time audio/video interaction through Daily
 - Animated robot avatar
 - Text-to-speech using ElevenLabs
-- Support for both English and Spanish
 
 The bot runs as part of a pipeline that processes audio/video frames and manages
 the conversation flow.
+
+Required AI services:
+- Deepgram (Speech-to-Text)
+- Openai (LLM)
+- ElevenLabs (Text-to-Speech)
+
+Run the bot using::
+
+    uv run bot.py
 """
 
 import os
@@ -22,7 +30,9 @@ import os
 from dotenv import load_dotenv
 from loguru import logger
 from PIL import Image
+from pipecat.audio.turn.smart_turn.local_smart_turn_v3 import LocalSmartTurnAnalyzerV3
 from pipecat.audio.vad.silero import SileroVADAnalyzer
+from pipecat.audio.vad.vad_analyzer import VADParams
 from pipecat.frames.frames import (
     BotStartedSpeakingFrame,
     BotStoppedSpeakingFrame,
@@ -37,12 +47,15 @@ from pipecat.pipeline.task import PipelineParams, PipelineTask
 from pipecat.processors.aggregators.llm_context import LLMContext
 from pipecat.processors.aggregators.llm_response_universal import LLMContextAggregatorPair
 from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
-from pipecat.processors.frameworks.rtvi import RTVIConfig, RTVIObserver, RTVIProcessor
-from pipecat.runner.types import RunnerArguments
+from pipecat.processors.frameworks.rtvi import RTVIObserver, RTVIProcessor
+from pipecat.runner.types import DailyRunnerArguments, RunnerArguments, SmallWebRTCRunnerArguments
+from pipecat.services.deepgram.stt import DeepgramSTTService
 from pipecat.services.elevenlabs.tts import ElevenLabsTTSService
 from pipecat.services.openai.llm import OpenAILLMService
-from pipecat.transports.base_transport import BaseTransport
+from pipecat.transports.base_transport import BaseTransport, TransportParams
 from pipecat.transports.daily.transport import DailyParams, DailyTransport
+from pipecat.transports.smallwebrtc.connection import SmallWebRTCConnection
+from pipecat.transports.smallwebrtc.transport import SmallWebRTCTransport
 
 load_dotenv(override=True)
 
@@ -101,23 +114,19 @@ class TalkingAnimation(FrameProcessor):
 
 
 async def run_bot(transport: BaseTransport):
-    """Main bot execution function.
+    """Main bot logic."""
+    logger.info("Starting bot")
 
-    Sets up and runs the bot pipeline including:
-    - Speech-to-text and text-to-speech services
-    - Language model integration
-    - Animation processing
-    - RTVI event handling
-    """
+    # Speech-to-Text service
+    stt = DeepgramSTTService(api_key=os.getenv("DEEPGRAM_API_KEY"))
 
-    # Initialize text-to-speech service
+    # Text-to-Speech service
     tts = ElevenLabsTTSService(
-        api_key=os.getenv("ELEVENLABS_API_KEY", ""),
-        voice_id="pNInz6obpgDQGcFmaJgB",
+        api_key=os.getenv("ELEVENLABS_API_KEY"), voice_id="pNInz6obpgDQGcFmaJgB"
     )
 
-    # Initialize LLM service
-    llm = OpenAILLMService(api_key=os.getenv("OPENAI_API_KEY", ""))
+    # LLM service
+    llm = OpenAILLMService(api_key=os.getenv("OPENAI_API_KEY"))
 
     messages = [
         {
@@ -131,17 +140,16 @@ async def run_bot(transport: BaseTransport):
     context = LLMContext(messages)
     context_aggregator = LLMContextAggregatorPair(context)
 
+    rtvi = RTVIProcessor()
+
     ta = TalkingAnimation()
 
-    #
-    # RTVI events for Pipecat client UI
-    #
-    rtvi = RTVIProcessor(config=RTVIConfig(config=[]))
-
+    # Pipeline - assembled from reusable components
     pipeline = Pipeline(
         [
             transport.input(),
             rtvi,
+            stt,
             context_aggregator.user(),
             llm,
             tts,
@@ -157,8 +165,12 @@ async def run_bot(transport: BaseTransport):
             enable_metrics=True,
             enable_usage_metrics=True,
         ),
-        observers=[RTVIObserver(rtvi)],
+        observers=[
+            RTVIObserver(rtvi),
+        ],
     )
+
+    # Queue initial static frame so video starts immediately
     await task.queue_frame(quiet_frame)
 
     @rtvi.event_handler("on_client_ready")
@@ -168,13 +180,12 @@ async def run_bot(transport: BaseTransport):
         await task.queue_frames([LLMRunFrame()])
 
     @transport.event_handler("on_client_connected")
-    async def on_client_connected(transport, participant):
-        logger.info(f"Client connected")
-        await transport.capture_participant_transcription(participant["id"])
+    async def on_client_connected(transport, client):
+        logger.info("Client connected")
 
     @transport.event_handler("on_client_disconnected")
     async def on_client_disconnected(transport, client):
-        logger.info(f"Client disconnected")
+        logger.info("Client disconnected")
         await task.cancel()
 
     runner = PipelineRunner(handle_sigint=False)
@@ -183,22 +194,44 @@ async def run_bot(transport: BaseTransport):
 
 
 async def bot(runner_args: RunnerArguments):
-    """Main bot entry point compatible with Pipecat Cloud."""
+    """Main bot entry point."""
 
-    transport = DailyTransport(
-        runner_args.room_url,
-        runner_args.token,
-        "Pipecat Bot",
-        params=DailyParams(
-            audio_in_enabled=True,
-            audio_out_enabled=True,
-            video_out_enabled=True,
-            video_out_width=1024,
-            video_out_height=576,
-            vad_analyzer=SileroVADAnalyzer(),
-            transcription_enabled=True,
-        ),
-    )
+    transport = None
+
+    match runner_args:
+        case DailyRunnerArguments():
+            transport = DailyTransport(
+                runner_args.room_url,
+                runner_args.token,
+                "Pipecat Bot",
+                params=DailyParams(
+                    audio_in_enabled=True,
+                    audio_out_enabled=True,
+                    video_out_enabled=True,
+                    video_out_width=1024,
+                    video_out_height=576,
+                    vad_analyzer=SileroVADAnalyzer(params=VADParams(stop_secs=0.2)),
+                    turn_analyzer=LocalSmartTurnAnalyzerV3(),
+                ),
+            )
+        case SmallWebRTCRunnerArguments():
+            webrtc_connection: SmallWebRTCConnection = runner_args.webrtc_connection
+
+            transport = SmallWebRTCTransport(
+                webrtc_connection=webrtc_connection,
+                params=TransportParams(
+                    audio_in_enabled=True,
+                    audio_out_enabled=True,
+                    video_out_enabled=True,
+                    video_out_width=1024,
+                    video_out_height=576,
+                    vad_analyzer=SileroVADAnalyzer(params=VADParams(stop_secs=0.2)),
+                    turn_analyzer=LocalSmartTurnAnalyzerV3(),
+                ),
+            )
+        case _:
+            logger.error(f"Unsupported runner arguments type: {type(runner_args)}")
+            return
 
     await run_bot(transport)
 
