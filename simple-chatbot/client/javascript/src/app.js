@@ -1,386 +1,284 @@
-/**
- * Copyright (c) 2024–2025, Daily
- *
- * SPDX-License-Identifier: BSD 2-Clause License
- */
-
-/**
- * Pipecat Client Implementation
- *
- * This client connects to an RTVI-compatible bot server using WebRTC (via Daily).
- * It handles audio/video streaming and manages the connection lifecycle.
- *
- * Requirements:
- * - A running RTVI bot server (defaults to http://localhost:7860)
- * - The server must implement the /connect endpoint that returns Daily.co room credentials
- * - Browser with WebRTC support
- */
-
 import { PipecatClient, RTVIEvent } from '@pipecat-ai/client-js';
-import { DailyTransport } from '@pipecat-ai/daily-transport';
+import {
+  AVAILABLE_TRANSPORTS,
+  DEFAULT_TRANSPORT,
+  TRANSPORT_CONFIG,
+  createTransport,
+} from './config';
 
-/**
- * ChatbotClient handles the connection and media management for a real-time
- * voice and video interaction with an AI bot.
- */
-class ChatbotClient {
+class VoiceChatClient {
   constructor() {
-    // Initialize client state
-    this.pcClient = null;
-    this.setupDOMElements();
-    this.initializeClientAndTransport();
-  }
+    this.client = null;
+    this.transportType = DEFAULT_TRANSPORT;
+    this.isConnected = false;
 
-  /**
-   * Set up references to DOM elements and create necessary media elements
-   */
-  setupDOMElements() {
-    // Get references to UI control elements
-    this.connectBtn = document.getElementById('connect-btn');
-    this.disconnectBtn = document.getElementById('disconnect-btn');
-    this.statusSpan = document.getElementById('connection-status');
-    this.debugLog = document.getElementById('debug-log');
-    this.botVideoContainer = document.getElementById('bot-video-container');
-    this.deviceSelector = document.getElementById('device-selector');
-    this.micToggleBtn = document.getElementById('mic-toggle-btn');
-    this.sendTextBtn = document.getElementById('send-text-btn');
-
-    // Create an audio element for bot's voice output
-    this.botAudio = document.createElement('audio');
-    this.botAudio.autoplay = true;
-    this.botAudio.playsInline = true;
-    document.body.appendChild(this.botAudio);
-  }
-
-  /**
-   * Set up event listeners for connect/disconnect buttons
-   */
-  setupEventListeners() {
-    this.connectBtn.addEventListener('click', () => {
-      console.log('click');
-      this.connect();
-    });
-    this.disconnectBtn.addEventListener('click', () => this.disconnect());
-
-    // Populate device selector
-    this.pcClient.getAllMics().then((mics) => {
-      console.log('Available mics:', mics);
-      mics.forEach((device) => {
-        const option = document.createElement('option');
-        option.value = device.deviceId;
-        option.textContent = device.label || `Microphone ${device.deviceId}`;
-        this.deviceSelector.appendChild(option);
-      });
-    });
-    this.deviceSelector.addEventListener('change', (event) => {
-      const selectedDeviceId = event.target.value;
-      console.log('Selected device ID:', selectedDeviceId);
-      this.pcClient.updateMic(selectedDeviceId);
-    });
-
-    // Handle mic mute/unmute toggle
-    const micToggleBtn = document.getElementById('mic-toggle-btn');
-
-    micToggleBtn.addEventListener('click', async () => {
-      if (this.pcClient.state === 'disconnected') {
-        await this.pcClient.initDevices();
-      } else {
-        this.pcClient.enableMic(!this.pcClient.isMicEnabled);
-      }
-    });
-
-    const textInput = document.getElementById('text-input');
-
-    const sendTextToLLM = () => {
-      this.sendTextBtn.disabled = true; // Disable button to prevent multiple clicks
-      const text = textInput.value.trim();
-      if (text) {
-        void this.pcClient.appendToContext({
-          role: 'user',
-          content: text,
-          run_immediately: true,
-        });
-      }
-      textInput.value = ''; // Clear the input
-      this.sendTextBtn.disabled = false; // Re-enable button after sending
-    };
-
-    this.sendTextBtn.addEventListener('click', sendTextToLLM);
-
-    // Also handle Enter key in the input
-    textInput.addEventListener('keypress', (e) => {
-      if (e.key === 'Enter') {
-        sendTextToLLM();
-      }
-    });
-  }
-
-  updateMicToggleButton(micEnabled) {
-    console.log('Mic enabled:', micEnabled, this.pcClient?.isMicEnabled);
-    this.micToggleBtn.textContent = micEnabled ? 'Mute Mic' : 'Unmute Mic';
-  }
-  /**
-   * Set up the Pipecat client and Daily transport
-   */
-  async initializeClientAndTransport() {
-    console.log('Initializing Pipecat client and transport...');
-    // Initialize the Pipecat client with a DailyTransport and our configuration
-    this.pcClient = new PipecatClient({
-      transport: new DailyTransport(),
-      enableMic: true,
-      enableCam: false,
-      callbacks: {
-        // Handle connection state changes
-        onConnected: () => {
-          this.updateStatus('Connected');
-          this.connectBtn.disabled = true;
-          this.disconnectBtn.disabled = false;
-          this.log('Client connected');
-        },
-        onDisconnected: () => {
-          this.updateStatus('Disconnected');
-          this.connectBtn.disabled = false;
-          this.disconnectBtn.disabled = true;
-          this.sendTextBtn.disabled = true;
-          this.log('Client disconnected');
-          this.updateMicToggleButton(false);
-        },
-        // Handle transport state changes
-        onTransportStateChanged: (state) => {
-          this.updateStatus(`Transport: ${state}`);
-          this.log(`Transport state changed: ${state}`);
-          if (state === 'ready') {
-            this.setupMediaTracks();
-          }
-        },
-        // Handle bot connection events
-        onBotConnected: (participant) => {
-          this.log(`Bot connected: ${JSON.stringify(participant)}`);
-        },
-        onBotDisconnected: (participant) => {
-          this.log(`Bot disconnected: ${JSON.stringify(participant)}`);
-        },
-        onBotReady: (data) => {
-          this.log(`Bot ready: ${JSON.stringify(data)}`);
-          this.setupMediaTracks();
-          this.sendTextBtn.disabled = false;
-        },
-        // Transcript events
-        onUserTranscript: (data) => {
-          // Only log final transcripts
-          if (data.final) {
-            this.log(`User: ${data.text}`);
-          }
-        },
-        onBotTranscript: (data) => {
-          this.log(`Bot: ${data.text}`);
-        },
-        // Error handling
-        onMessageError: (error) => {
-          console.log('Message error:', error);
-        },
-        onMicUpdated: (data) => {
-          console.log('Mic updated:', data);
-          this.deviceSelector.value = data.deviceId;
-        },
-        onError: (error) => {
-          console.log('Error:', JSON.stringify(error));
-        },
-      },
-    });
-    window.client = this; // Expose client globally for debugging
-
-    // Set up listeners for media track events
-    this.setupTrackListeners();
+    this.setupDOM();
     this.setupEventListeners();
+    this.addEvent('initialized', 'Client initialized');
   }
 
-  /**
-   * Add a timestamped message to the debug log
-   */
-  log(message) {
-    const entry = document.createElement('div');
-    entry.textContent = `${new Date().toISOString()} - ${message}`;
+  setupDOM() {
+    this.transportSelect = document.getElementById('transport-select');
+    this.connectBtn = document.getElementById('connect-btn');
+    this.micBtn = document.getElementById('mic-btn');
+    this.micStatus = document.getElementById('mic-status');
+    this.conversationLog = document.getElementById('conversation-log');
+    this.eventsLog = document.getElementById('events-log');
+    this.botVideoContainer = document.getElementById('bot-video-container');
 
-    // Add styling based on message type
-    if (message.startsWith('User: ')) {
-      entry.style.color = '#2196F3'; // blue for user
-    } else if (message.startsWith('Bot: ')) {
-      entry.style.color = '#4CAF50'; // green for bot
+    // Populate transport selector with available transports
+    this.transportSelect.innerHTML = '';
+    AVAILABLE_TRANSPORTS.forEach((transport) => {
+      const option = document.createElement('option');
+      option.value = transport;
+      option.textContent =
+        transport.charAt(0).toUpperCase() + transport.slice(1);
+      if (transport === 'smallwebrtc') {
+        option.textContent = 'SmallWebRTC';
+      } else if (transport === 'daily') {
+        option.textContent = 'Daily';
+      }
+      this.transportSelect.appendChild(option);
+    });
+
+    // Hide transport selector if only one transport
+    if (AVAILABLE_TRANSPORTS.length === 1) {
+      this.transportSelect.parentElement.style.display = 'none';
     }
 
-    this.debugLog.appendChild(entry);
-    this.debugLog.scrollTop = this.debugLog.scrollHeight;
-    console.log(message);
+    // Add placeholder message
+    this.addConversationMessage(
+      'Connect to start talking with your bot',
+      'placeholder'
+    );
   }
 
-  /**
-   * Update the connection status display
-   */
-  updateStatus(status) {
-    this.statusSpan.textContent = status;
-    this.log(`Status: ${status}`);
+  setupEventListeners() {
+    this.transportSelect.addEventListener('change', (e) => {
+      this.transportType = e.target.value;
+      this.addEvent('transport-changed', this.transportType);
+    });
+
+    this.connectBtn.addEventListener('click', () => {
+      if (this.isConnected) {
+        this.disconnect();
+      } else {
+        this.connect();
+      }
+    });
+
+    this.micBtn.addEventListener('click', () => {
+      if (this.client) {
+        const newState = !this.client.isMicEnabled;
+        this.client.enableMic(newState);
+        this.updateMicButton(newState);
+      }
+    });
   }
 
-  /**
-   * Check for available media tracks and set them up if present
-   * This is called when the bot is ready or when the transport state changes to ready
-   */
-  setupMediaTracks() {
-    if (!this.pcClient) return;
+  async connect() {
+    try {
+      this.addEvent('connecting', `Using ${this.transportType} transport`);
 
-    // Get current tracks from the client
-    const tracks = this.pcClient.tracks();
+      // Create transport using config
+      const transport = await createTransport(this.transportType);
 
-    // Set up any available bot tracks
-    if (tracks.bot?.audio) {
-      this.setupAudioTrack(tracks.bot.audio);
+      // Create client
+      this.client = new PipecatClient({
+        transport,
+        enableMic: true,
+        enableCam: false,
+        callbacks: {
+          onConnected: () => {
+            this.onConnected();
+          },
+          onDisconnected: () => {
+            this.onDisconnected();
+          },
+          onTransportStateChanged: (state) => {
+            this.addEvent('transport-state', state);
+          },
+          onBotReady: () => {
+            this.addEvent('bot-ready', 'Bot is ready to talk');
+          },
+          onUserTranscript: (data) => {
+            if (data.final) {
+              this.addConversationMessage(data.text, 'user');
+            }
+          },
+          onBotTranscript: (data) => {
+            this.addConversationMessage(data.text, 'bot');
+          },
+          onError: (error) => {
+            this.addEvent('error', error.message);
+          },
+        },
+      });
+
+      // Setup audio
+      this.setupAudio();
+
+      // Connect using config
+      const connectParams = TRANSPORT_CONFIG[this.transportType];
+      await this.client.connect(connectParams);
+    } catch (error) {
+      this.addEvent('error', error.message);
+      console.error('Connection error:', error);
     }
-    if (tracks.bot?.video) {
-      this.setupVideoTrack(tracks.bot.video);
+  }
+
+  async disconnect() {
+    if (this.client) {
+      await this.client.disconnect();
     }
   }
 
-  /**
-   * Set up listeners for track events (start/stop)
-   * This handles new tracks being added during the session
-   */
-  setupTrackListeners() {
-    if (!this.pcClient) return;
-
-    // Listen for new tracks starting
-    this.pcClient.on(RTVIEvent.TrackStarted, (track, participant) => {
+  setupAudio() {
+    this.client.on(RTVIEvent.TrackStarted, (track, participant) => {
       if (!participant?.local) {
         if (track.kind === 'audio') {
-          this.setupAudioTrack(track);
+          this.addEvent('track-started', 'Bot audio track');
+          const audio = document.createElement('audio');
+          audio.autoplay = true;
+          audio.srcObject = new MediaStream([track]);
+          document.body.appendChild(audio);
         } else if (track.kind === 'video') {
+          this.addEvent('track-started', 'Bot video track');
           this.setupVideoTrack(track);
         }
-      } else if (track.kind === 'audio') {
-        console.log(`Local audio track started: `, this.pcClient.tracks());
-        // If local audio track starts, update mic
-        this.updateMicToggleButton(true);
       }
     });
 
-    // Listen for tracks stopping
-    this.pcClient.on(RTVIEvent.TrackStopped, (track, participant) => {
-      this.log(
-        `Track stopped event: ${track.kind} from ${
-          participant ? (participant.local ? 'local' : 'bot') : 'unknown'
-        }`
-      );
-      if (participant?.local && track.kind === 'audio') {
-        // If local audio track stops, update mic toggle button
-        this.updateMicToggleButton(false);
+    this.client.on(RTVIEvent.TrackStopped, (track, participant) => {
+      if (!participant?.local && track.kind === 'video') {
+        this.addEvent('track-stopped', 'Bot video track');
+        this.clearVideoTrack();
       }
     });
-  }
-
-  /**
-   * Set up an audio track for playback
-   * Handles both initial setup and track updates
-   */
-  setupAudioTrack(track) {
-    this.log('Setting up audio track');
-    // Check if we're already playing this track
-    if (this.botAudio.srcObject) {
-      const oldTrack = this.botAudio.srcObject.getAudioTracks()[0];
-      if (oldTrack?.id === track.id) return;
-    }
-    // Create a new MediaStream with the track and set it as the audio source
-    this.botAudio.srcObject = new MediaStream([track]);
   }
 
   /**
    * Set up a video track for display
-   * Handles both initial setup and track updates
    */
   setupVideoTrack(track) {
-    this.log('Setting up video track');
+    // Check if we're already displaying this track
+    const existingVideo = this.botVideoContainer.querySelector('video');
+    if (existingVideo?.srcObject) {
+      const oldTrack = existingVideo.srcObject.getVideoTracks()[0];
+      if (oldTrack?.id === track.id) return;
+    }
+
+    // Clear placeholder and any existing video
+    this.botVideoContainer.innerHTML = '';
+
+    // Create video element
     const videoEl = document.createElement('video');
     videoEl.autoplay = true;
     videoEl.playsInline = true;
     videoEl.muted = true;
-    videoEl.style.width = '100%';
-    videoEl.style.height = '100%';
-    videoEl.style.objectFit = 'cover';
-
-    // Check if we're already displaying this track
-    if (this.botVideoContainer.querySelector('video')?.srcObject) {
-      const oldTrack = this.botVideoContainer
-        .querySelector('video')
-        .srcObject.getVideoTracks()[0];
-      if (oldTrack?.id === track.id) return;
-    }
 
     // Create a new MediaStream with the track and set it as the video source
     videoEl.srcObject = new MediaStream([track]);
-    this.botVideoContainer.innerHTML = '';
     this.botVideoContainer.appendChild(videoEl);
   }
 
   /**
-   * Initialize and connect to the bot
-   * This sets up the Pipecat client, initializes devices, and establishes the connection
+   * Clear the video track and show placeholder
    */
-  async connect() {
-    try {
-      // Connect to the bot
-      this.log('Connecting to bot...');
-      await this.pcClient.startBotAndConnect({
-        endpoint: 'http://localhost:7860/start',
-        timeout: 25000,
-      });
+  clearVideoTrack() {
+    const video = this.botVideoContainer.querySelector('video');
+    if (video?.srcObject) {
+      video.srcObject.getTracks().forEach((track) => track.stop());
+      video.srcObject = null;
+    }
+    this.botVideoContainer.innerHTML = `
+      <div class="video-placeholder">
+        <span>Video will appear here when connected</span>
+      </div>
+    `;
+  }
 
-      this.log('Connection complete');
-    } catch (error) {
-      // Handle any errors during connection
-      this.log(`Error connecting: ${error.message}`);
-      this.log(`Error stack: ${error.stack}`);
-      this.updateStatus('Error');
+  onConnected() {
+    this.isConnected = true;
+    this.connectBtn.textContent = 'Disconnect';
+    this.connectBtn.classList.add('disconnect');
+    this.micBtn.disabled = false;
+    this.transportSelect.disabled = true;
+    this.updateMicButton(this.client.isMicEnabled);
+    this.addEvent('connected', 'Successfully connected to bot');
 
-      // Clean up if there's an error
-      if (this.pcClient) {
-        try {
-          await this.pcClient.disconnect();
-        } catch (disconnectError) {
-          this.log(`Error during disconnect: ${disconnectError.message}`);
-        }
-      }
+    // Clear placeholder
+    if (this.conversationLog.querySelector('.placeholder')) {
+      this.conversationLog.innerHTML = '';
     }
   }
 
-  /**
-   * Disconnect from the bot and clean up media resources
-   */
-  async disconnect() {
-    if (this.pcClient) {
-      try {
-        // Disconnect the Pipecat client
-        await this.pcClient.disconnect();
+  onDisconnected() {
+    this.isConnected = false;
+    this.connectBtn.textContent = 'Connect';
+    this.connectBtn.classList.remove('disconnect');
+    this.micBtn.disabled = true;
+    this.transportSelect.disabled = false;
+    this.updateMicButton(false);
+    this.clearVideoTrack();
+    this.addEvent('disconnected', 'Disconnected from bot');
+  }
 
-        // Clean up audio
-        if (this.botAudio.srcObject) {
-          this.botAudio.srcObject.getTracks().forEach((track) => track.stop());
-          this.botAudio.srcObject = null;
-        }
+  updateMicButton(enabled) {
+    this.micStatus.textContent = enabled ? 'Mic is On' : 'Mic is Off';
+    this.micBtn.style.backgroundColor = enabled ? '#10b981' : '#1f2937';
+  }
 
-        // Clean up video
-        if (this.botVideoContainer.querySelector('video')?.srcObject) {
-          const video = this.botVideoContainer.querySelector('video');
-          video.srcObject.getTracks().forEach((track) => track.stop());
-          video.srcObject = null;
-        }
-        this.botVideoContainer.innerHTML = '';
-      } catch (error) {
-        this.log(`Error disconnecting: ${error.message}`);
-      }
+  addConversationMessage(text, role) {
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `conversation-message ${role}`;
+
+    if (role === 'placeholder') {
+      messageDiv.textContent = text;
+    } else {
+      const roleSpan = document.createElement('div');
+      roleSpan.className = 'role';
+      roleSpan.textContent = role === 'user' ? 'You' : 'Bot';
+
+      const textDiv = document.createElement('div');
+      textDiv.textContent = text;
+
+      messageDiv.appendChild(roleSpan);
+      messageDiv.appendChild(textDiv);
     }
+
+    this.conversationLog.appendChild(messageDiv);
+    this.conversationLog.scrollTop = this.conversationLog.scrollHeight;
+  }
+
+  addEvent(eventName, data) {
+    const eventDiv = document.createElement('div');
+    eventDiv.className = 'event-entry';
+
+    const timestamp = new Date().toLocaleTimeString();
+    const timestampSpan = document.createElement('span');
+    timestampSpan.className = 'timestamp';
+    timestampSpan.textContent = timestamp;
+
+    const nameSpan = document.createElement('span');
+    nameSpan.className = 'event-name';
+    nameSpan.textContent = eventName;
+
+    const dataSpan = document.createElement('span');
+    dataSpan.className = 'event-data';
+    dataSpan.textContent =
+      typeof data === 'string' ? data : JSON.stringify(data);
+
+    eventDiv.appendChild(timestampSpan);
+    eventDiv.appendChild(nameSpan);
+    eventDiv.appendChild(dataSpan);
+
+    this.eventsLog.appendChild(eventDiv);
+    this.eventsLog.scrollTop = this.eventsLog.scrollHeight;
   }
 }
 
-// Initialize the client when the page loads
+// Initialize when DOM is loaded
 window.addEventListener('DOMContentLoaded', () => {
-  new ChatbotClient();
+  new VoiceChatClient();
 });

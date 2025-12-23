@@ -1,51 +1,58 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>AI Chatbot</title>
-  </head>
 
-  <body>
-    <div class="container">
-      <div class="status-bar">
-        <div class="status">
-          Status: <span id="connection-status">Disconnected</span>
-        </div>
-        <div class="controls">
-          <button id="connect-btn">Connect</button>
-          <button id="disconnect-btn" disabled>Disconnect</button>
-        </div>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Voice UI Kit - Vanilla JS</title>
+</head>
+
+<body>
+  <div class="container">
+    <!-- Header with controls -->
+    <div class="header">
+      <div class="transport-selector">
+        <label for="transport-select">Transport:</label>
+        <select id="transport-select">
+          <option value="smallwebrtc">SmallWebRTC</option>
+          <option value="daily">Daily</option>
+        </select>
       </div>
-
-      <div class="main-content">
-        <div class="bot-container">
-          <div id="bot-video-container"></div>
-          <audio id="bot-audio" autoplay></audio>
-        </div>
-      </div>
-
-      <div class="device-bar">
-        <div class="device-controls">
-          <select id="device-selector"></select>
-          <button id="mic-toggle-btn">Unmute Mic</button>
-        </div>
-        <div class="text-input-container">
-          <input
-            type="text"
-            id="text-input"
-            placeholder="Type your message..." />
-          <button id="send-text-btn" disabled>Send</button>
-        </div>
-      </div>
-
-      <div class="debug-panel">
-        <h3>Debug Info</h3>
-        <div id="debug-log"></div>
+      <div class="controls">
+        <button id="mic-btn" class="control-btn" disabled>
+          🎤 <span id="mic-status">Mic is Off</span>
+        </button>
+        <button id="connect-btn" class="connect-btn">Connect</button>
       </div>
     </div>
 
-    <script type="module" src="/src/app.js"></script>
-    <link rel="stylesheet" href="/src/style.css" />
-  </body>
+    <!-- Main content area with 50/50 split -->
+    <div class="main-content">
+      <!-- Video panel (left) -->
+      <div class="video-panel">
+        <div id="bot-video-container">
+          <div class="video-placeholder">
+            <span>Video will appear here when connected</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Conversation panel (right) -->
+      <div class="conversation-panel">
+        <h3>Conversation</h3>
+        <div id="conversation-log"></div>
+      </div>
+    </div>
+
+    <!-- Events panel -->
+    <div class="events-panel">
+      <h3>Events</h3>
+      <div id="events-log"></div>
+    </div>
+  </div>
+
+  <script type="module" src="/src/app.js"></script>
+  <link rel="stylesheet" href="/src/style.css" />
+</body>
+
 </html>
