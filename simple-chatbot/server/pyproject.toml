@@ -1,8 +1,20 @@
 [project]
-name = "simple-chatbot-server"
+name = "simple-chatbot"
 version = "0.1.0"
-description = "Simple chatbot server using Pipecat"
+description = "Simple chatbot built with Pipecat"
 requires-python = ">=3.10"
 dependencies = [
-    "pipecat-ai[daily,elevenlabs,openai,silero,google,runner]>=0.0.94",
+    "pipecat-ai[daily,deepgram,elevenlabs,google,local-smart-turn-v3,openai,runner,silero,webrtc]",
+    "pipecatcloud",
 ]
+
+[dependency-groups]
+dev = [
+    "pyright>=1.1.404,<2",
+    "ruff>=0.12.11,<1",
+]
+
+[tool.ruff]
+line-length = 100
+[tool.ruff.lint]
+select = ["I"]

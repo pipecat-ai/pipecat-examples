@@ -80,10 +80,13 @@ The bot server must be running for any of the client implementations to work. St
 ```
 simple-chatbot/
 ├── server/              # Bot server implementation
-│   ├── assets.py        # Sprite images
+│   ├── assets           # Directory of sprite images
 │   ├── bot-openai.py    # OpenAI bot implementation
 │   ├── bot-gemini.py    # Gemini bot implementation
 │   ├── env.example      # Env variable example
+│   ├── Dockerfile       # Dockerfile for building your image
+│   ├── pcc-deploy.toml  # Pipecat Cloud: Deployment specification
+│   ├── pyproject.toml   # Project specification
 │   ├── README.md        # More specific server setup instructions
 │   └── requirements.txt
 └── client/              # Client implementations
