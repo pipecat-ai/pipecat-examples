@@ -180,6 +180,15 @@ When `ENV=production`, the server automatically routes WebSocket connections to 
 
 As you did before, initiate a call via `curl` command to trigger your bot to dial a number.
 
-## Accessing Call Information in Your Bot
+## Accessing Custom Data in Your Bot
 
-Your bot automatically receives caller information through query parameters in the WebSocket URL. The server extracts the `From` and `To` phone numbers and passes them as `body` data to your bot via the WebsocketRunnerArguments (coming soon!).
+Your bot receives custom data through `runner_args.body`:
+
+```python
+async def bot(runner_args: RunnerArguments):
+    body_data = runner_args.body or {}
+    first_name = body_data.get("user", {}).get("firstName", "there")
+    # Use first_name to personalize greetings, prompts, etc.
+```
+
+This approach works consistently in both local development and Pipecat Cloud production deployments.
