@@ -276,12 +276,8 @@ async def websocket_endpoint(
         from bot import bot
         from pipecat.runner.types import WebSocketRunnerArguments
 
-        # Create runner arguments and run the bot
-        runner_args = WebSocketRunnerArguments(websocket=websocket)
-        runner_args.handle_sigint = False
-
-        # TODO: When WebSocketRunnerArguments supports body, add it here:
-        # runner_args = WebSocketRunnerArguments(websocket=websocket, body=body_data)
+        # Create runner arguments with body data
+        runner_args = WebSocketRunnerArguments(websocket=websocket, body=body_data)
 
         await bot(runner_args)
 
