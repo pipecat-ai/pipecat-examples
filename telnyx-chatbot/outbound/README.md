@@ -163,8 +163,17 @@ The custom data in the `body` parameter:
 
 1. **Gets encoded** as base64 JSON and added to the TeXML URL query parameters
 2. **Passes through** Telnyx's TeXML system to the WebSocket URL
-3. **Gets decoded** in the WebSocket endpoint and made available to your bot
+3. **Gets decoded** in the WebSocket endpoint and passed to your bot via `runner_args.body`
 4. **Enables personalized** conversations based on user context, preferences, or business data
+
+**Accessing custom data in your bot:**
+
+```python
+async def bot(runner_args: RunnerArguments):
+    body_data = runner_args.body or {}
+    first_name = body_data.get("user", {}).get("firstName", "there")
+    # Use first_name to personalize greetings, prompts, etc.
+```
 
 > **Note**: The `body` parameter is optional. If not provided, the bot will engage in a standard conversation without custom context.
 
