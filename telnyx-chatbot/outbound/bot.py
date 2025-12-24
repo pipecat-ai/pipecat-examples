@@ -96,6 +96,8 @@ async def bot(runner_args: RunnerArguments):
 
     transport_type, call_data = await parse_telephony_websocket(runner_args.websocket)
     logger.info(f"Auto-detected transport: {transport_type}")
+    # Custom data from the body parameter can be accessed via the runner_args.body attribute
+    logger.info(f"Runner args body: {runner_args.body}")
 
     serializer = TelnyxFrameSerializer(
         stream_id=call_data["stream_id"],
