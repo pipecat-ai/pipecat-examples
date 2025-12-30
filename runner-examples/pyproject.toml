@@ -1,0 +1,20 @@
+[project]
+name = "runner-examples"
+version = "0.1.0"
+description = "Configuration for runner examples"
+requires-python = ">=3.10"
+dependencies = [
+    "pipecat-ai[daily,deepgram,cartesia,openai,runner,silero,webrtc,websocket]",
+    "pipecatcloud",
+]
+
+[dependency-groups]
+dev = [
+    "pyright>=1.1.404,<2",
+    "ruff>=0.12.11,<1",
+]
+
+[tool.ruff]
+line-length = 100
+[tool.ruff.lint]
+select = ["I"]

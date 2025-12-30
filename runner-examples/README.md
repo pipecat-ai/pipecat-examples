@@ -4,11 +4,13 @@ Examples demonstrating the unified development runner for building voice AI bots
 
 ## Prerequisites
 
+1. Set up venv and install dependencies:
+
 ```bash
-pip install pipecat-ai[runner]
+uv sync
 ```
 
-Set up your API keys in `.env`:
+2. Set up your API keys in `.env`:
 
 ```bash
 # Required for all examples
