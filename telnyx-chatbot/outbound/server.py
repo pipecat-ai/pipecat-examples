@@ -79,7 +79,15 @@ def get_websocket_url(host: str):
     env = os.getenv("ENV", "local").lower()
 
     if env == "production":
-        return "wss://api.pipecat.daily.co/ws/telnyx"
+        print("If deployed in a region other than us-west (default), update websocket url!")
+
+        ws_url = "wss://api.pipecat.daily.co/ws/telnyx"
+        # uncomment appropriate region url:
+        # ws_url = wss://us-east.api.pipecat.daily.co/ws/telnyx
+        # ws_url = wss://eu-central.api.pipecat.daily.co/ws/telnyx
+        # ws_url = wss://ap-south.api.pipecat.daily.co/ws/telnyx
+
+        return ws_url
     else:
         return f"wss://{host}/ws"
 

@@ -162,7 +162,14 @@ def get_websocket_url() -> str:
         ws_url = local_server_url.replace("https://", "wss://")
         return f"{ws_url}/ws"
     else:
-        return "wss://api.pipecat.daily.co/ws/twilio"
+        print("If deployed in a region other than us-west (default), update websocket url!")
+
+        ws_url = "wss://api.pipecat.daily.co/ws/twilio"
+        # uncomment appropriate region url:
+        # ws_url = wss://us-east.api.pipecat.daily.co/ws/twilio
+        # ws_url = wss://eu-central.api.pipecat.daily.co/ws/twilio
+        # ws_url = wss://ap-south.api.pipecat.daily.co/ws/twilio
+        return ws_url
 
 
 def generate_twiml(twiml_request: TwimlRequest) -> str:

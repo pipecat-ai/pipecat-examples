@@ -147,6 +147,8 @@ Replace:
 - `AGENT_NAME` with the name of the agent you deployed in the previous stepyour deployed agent name
 - `ORGANIZATION_NAME` with your Pipecat Cloud organization name
 
+> If the bot is deployed to a region other than us-west (default), update the websocket url with region. For example, if deployed in `eu-central`, the url becomes `"wss://eu-central.api.pipecat.daily.co/ws/telnyx?serviceHost=AGENT_NAME.ORGANIZATION_NAME"`
+
 ### Call your Bot
 
 Your bot file is now deployed to Pipecat Cloud and Telnyx is configured to receive calls. Dial the number associated with your bot to start a conversation!

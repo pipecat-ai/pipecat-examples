@@ -185,6 +185,7 @@ Update your bot number's Voicebot Applet configuration for production:
   - `ORGANIZATION_NAME` with your organization ID
 
 > Alternatively, you can test your Pipecat Cloud deployment by keeping your bot number pointed to your local server via ngrok.
+> If the bot is deployed to a region other than us-west (default), update the websocket url with region. For example, if deployed in `eu-central`, the url becomes `"wss://eu-central.api.pipecat.daily.co/ws/exotel"`
 
 ### Call your Bot
 

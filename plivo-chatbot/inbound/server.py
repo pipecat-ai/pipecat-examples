@@ -39,7 +39,12 @@ def get_websocket_url(host: str, body_data: dict = None):
 
         service_host = f"{agent_name}.{org_name}"
         query_params.append(f"serviceHost={service_host}")
+        print("If deployed in a region other than us-west (default), update websocket url!")
         base_url = "wss://api.pipecat.daily.co/ws/plivo"
+        # uncomment appropriate region url:
+        # base_url = wss://us-east.api.pipecat.daily.co/ws/plivo
+        # base_url = wss://eu-central.api.pipecat.daily.co/ws/plivo
+        # base_url = wss://ap-south.api.pipecat.daily.co/ws/plivo
     else:
         base_url = f"wss://{host}/ws"
 
