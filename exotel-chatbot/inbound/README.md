@@ -154,6 +154,8 @@ Update your Voicebot Applet configuration to use your production server:
   - `ORGANIZATION_NAME` with your organization ID
 
 - Update custom parameters as needed for your production environment
+- If the bot is deployed to a region other than us-west (default), update the websocket url with region. For example, if deployed in `eu-central`, the url becomes `"wss://eu-central.api.pipecat.daily.co/ws/exotel"`
+
 
 ### Call your Bot
 
