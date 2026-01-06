@@ -26,6 +26,7 @@ from pipecat.transports.base_transport import BaseTransport, TransportParams
 from pipecat.transports.smallwebrtc.connection import IceServer, SmallWebRTCConnection
 from pipecat.transports.smallwebrtc.request_handler import (
     SmallWebRTCRequest,
+    SmallWebRTCRequestHandler,
 )
 from pipecat.transports.smallwebrtc.transport import SmallWebRTCTransport
 
@@ -49,12 +50,7 @@ transport_params = {
 async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     logger.info(f"Starting bot")
 
-    yield {"status": "initializing bot!"}
-    # Returning the answer
-    if isinstance(transport, SmallWebRTCTransport):
-        yield {"status": "ANSWER:START"}
-        yield {"answer": transport._client._webrtc_connection.get_answer()}
-        yield {"status": "ANSWER:END"}
+    yield {"status": "initializing bot"}
 
     stt = DeepgramSTTService(api_key=os.getenv("DEEPGRAM_API_KEY"))
 
@@ -147,14 +143,25 @@ async def agentcore_bot(payload, context):
         )
     ]
 
-    pipecat_connection = SmallWebRTCConnection(ice_servers=ice_servers)
-    await pipecat_connection.initialize(sdp=request.sdp, type=request.type)
+    transport = None
+    runner_args = None
 
-    # Prepare runner arguments with the callback to run your bot
-    runner_args = SmallWebRTCRunnerArguments(
-        webrtc_connection=pipecat_connection, body=request.request_data
+    async def webrtc_connection_callback(connection: SmallWebRTCConnection):
+        nonlocal transport, runner_args
+        runner_args = SmallWebRTCRunnerArguments(
+            webrtc_connection=connection, body=request.request_data
+        )
+        transport = await create_transport(runner_args, transport_params)
+
+    yield {"status": "initializing connection"}
+    request_handler = SmallWebRTCRequestHandler(ice_servers=ice_servers)
+    answer = await request_handler.handle_web_request(
+        request=request, webrtc_connection_callback=webrtc_connection_callback
     )
-    transport = await create_transport(runner_args, transport_params)
+    yield {"status": "ANSWER:START"}
+    yield {"answer": answer}
+    yield {"status": "ANSWER:END"}
+
     async for result in run_bot(transport, runner_args):
         yield result
 
