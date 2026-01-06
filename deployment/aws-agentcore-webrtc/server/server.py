@@ -76,7 +76,7 @@ async def root_redirect():
 
 
 async def post_offer(request: Request, session_id: str):
-    """Handle WebRTC offer requests via SmallWebRTCRequestHandler."""
+    """Handle WebRTC offer requests."""
 
     data = await request.json()
     response = bedrock.invoke_agent_runtime(
@@ -119,6 +119,43 @@ async def post_offer(request: Request, session_id: str):
         raise HTTPException(500, "Did not find WebRTC answer in agent output")
 
     return answer_sdp
+
+
+async def patch_offer(request: Request, session_id: str):
+    """Handle WebRTC new ice candidate requests."""
+
+    data = await request.json()
+    response = bedrock.invoke_agent_runtime(
+        agentRuntimeArn=AGENT_RUNTIME_ARN,
+        contentType="application/json",
+        payload=json.dumps(data),
+        runtimeSessionId=session_id,
+    )
+
+    result = None
+
+    if "text/event-stream" in response.get("contentType", ""):
+        # Handle streaming response
+        streaming_body: StreamingBody = response["response"]
+        for line in streaming_body.iter_lines(chunk_size=1):
+            if line:
+                line = line.decode("utf-8")
+                if line.startswith("data: "):
+                    line = line[6:]
+                    print(f"Received line: {line}")
+                    try:
+                        # Assume the first valid JSON line is the result
+                        result = json.loads(line)
+                        print("Received event:", result)
+                        break
+                    except json.JSONDecodeError:
+                        print(f"Failed to parse extracted SSE payload as JSON: {line}")
+                        pass
+
+    if result is None:
+        raise HTTPException(500, "Did not get ICE candidate ack from agent")
+
+    return result
 
 
 @app.post("/start")
@@ -167,6 +204,8 @@ async def proxy_request(
         try:
             if request.method == HTTPMethod.POST.value:
                 return await post_offer(request, session_id)
+            elif request.method == HTTPMethod.PATCH.value:
+                return await patch_offer(request, session_id)
         except Exception as e:
             logger.error(f"Failed to parse WebRTC request: {e}")
             return Response(content="Invalid WebRTC request", status_code=400)
