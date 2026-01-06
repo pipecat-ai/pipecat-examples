@@ -58,23 +58,6 @@ When someone calls your Twilio number:
    cp env.example .env
    ```
 
-## Environment Configuration
-
-The bot supports two deployment modes controlled by the `ENV` variable:
-
-### Local Development (`ENV=local`)
-
-- Uses your local server or ngrok URL for WebSocket connections
-- Default configuration for development and testing
-- WebSocket connections go directly to your running server
-
-### Production (`ENV=production`)
-
-- Uses Pipecat Cloud WebSocket URLs automatically
-- Requires the agent name and organization name from your Pipecat Cloud deployment
-- Set these when deploying to production environments
-- WebSocket connections route through Pipecat Cloud infrastructure
-
 ## Local Development
 
 ### Configure Twilio
@@ -120,7 +103,7 @@ The bot supports two deployment modes controlled by the `ENV` variable:
 Run your bot by passing in the `twilio` command line arg
 
 ```bash
-uv run bot.py --transport twilio --proxy your_ngrok_url
+uv run bot.py --transport twilio
 ```
 
 > Note: This bot uses [Pipecat's development runner](https://docs.pipecat.ai/server/utilities/runner/guide), which runs a FastAPI server that handles and routes incoming WebSocket messages to your bot.
