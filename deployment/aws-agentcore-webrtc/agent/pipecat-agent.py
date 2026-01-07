@@ -25,11 +25,16 @@ from pipecat.services.deepgram.stt import DeepgramSTTService
 from pipecat.transports.base_transport import BaseTransport, TransportParams
 from pipecat.transports.smallwebrtc.connection import IceServer, SmallWebRTCConnection
 from pipecat.transports.smallwebrtc.request_handler import (
+    IceCandidate,
+    SmallWebRTCPatchRequest,
     SmallWebRTCRequest,
+    SmallWebRTCRequestHandler,
 )
 from pipecat.transports.smallwebrtc.transport import SmallWebRTCTransport
 
 app = BedrockAgentCoreApp()
+
+request_handler: SmallWebRTCRequestHandler = None
 
 load_dotenv(override=True)
 
@@ -49,12 +54,7 @@ transport_params = {
 async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     logger.info(f"Starting bot")
 
-    yield {"status": "initializing bot!"}
-    # Returning the answer
-    if isinstance(transport, SmallWebRTCTransport):
-        yield {"status": "ANSWER:START"}
-        yield {"answer": transport._client._webrtc_connection.get_answer()}
-        yield {"status": "ANSWER:END"}
+    yield {"status": "initializing bot"}
 
     stt = DeepgramSTTService(api_key=os.getenv("DEEPGRAM_API_KEY"))
 
@@ -132,10 +132,8 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     yield {"status": "completed"}
 
 
-@app.entrypoint
-async def agentcore_bot(payload, context):
-    """Bot entry point for running on Amazon Bedrock AgentCore Runtime."""
-    request = SmallWebRTCRequest.from_dict(payload)
+async def initialize_connection_and_run_bot(request: SmallWebRTCRequest):
+    """Handle initial WebRTC connection setup and run the bot."""
 
     raw_urls = os.getenv("ICE_SERVER_URLS")
     urls = [u.strip() for u in raw_urls.split(",") if u.strip()]
@@ -147,16 +145,75 @@ async def agentcore_bot(payload, context):
         )
     ]
 
-    pipecat_connection = SmallWebRTCConnection(ice_servers=ice_servers)
-    await pipecat_connection.initialize(sdp=request.sdp, type=request.type)
+    transport = None
+    runner_args = None
 
-    # Prepare runner arguments with the callback to run your bot
-    runner_args = SmallWebRTCRunnerArguments(
-        webrtc_connection=pipecat_connection, body=request.request_data
+    async def webrtc_connection_callback(connection: SmallWebRTCConnection):
+        nonlocal transport, runner_args
+        runner_args = SmallWebRTCRunnerArguments(
+            webrtc_connection=connection, body=request.request_data
+        )
+        transport = await create_transport(runner_args, transport_params)
+
+    yield {"status": "initializing connection"}
+    global request_handler
+    request_handler = SmallWebRTCRequestHandler(ice_servers=ice_servers)
+    answer = await request_handler.handle_web_request(
+        request=request, webrtc_connection_callback=webrtc_connection_callback
     )
-    transport = await create_transport(runner_args, transport_params)
+    yield {"status": "ANSWER:START"}
+    yield {"answer": answer}
+    yield {"status": "ANSWER:END"}
+
     async for result in run_bot(transport, runner_args):
         yield result
+
+
+async def add_ice_candidates(patch_request: SmallWebRTCPatchRequest):
+    """Handle ICE candidate additions for existing connections."""
+    await request_handler.handle_patch_request(patch_request)
+    yield {"status": "success"}
+
+
+@app.entrypoint
+async def agentcore_bot(payload, context):
+    """Bot entry point for running on Amazon Bedrock AgentCore Runtime."""
+    request_type = payload.get("type", "unknown")
+    logger.info(f"Received request of type: {request_type}")
+
+    data = payload.get("data")
+    if not data:
+        logger.error("No data found in payload")
+        yield {"status": "error", "message": "No data found in payload"}
+        return
+
+    match request_type:
+        case "offer":
+            # Initial connection setup
+            try:
+                request = SmallWebRTCRequest.from_dict(data)
+            except Exception as e:
+                logger.error(f"Failed to deserialize SmallWebRTCRequest: {e}")
+                yield {"status": "error", "message": f"Invalid request payload: {str(e)}"}
+                return
+            async for result in initialize_connection_and_run_bot(request):
+                yield result
+        case "ice-candidates":
+            # ICE candidate additions
+            try:
+                if "candidates" in data:
+                    data["candidates"] = [IceCandidate(**c) for c in data["candidates"]]
+                patch_request = SmallWebRTCPatchRequest(**data)
+            except Exception as e:
+                logger.error(f"Failed to deserialize SmallWebRTCPatchRequest: {e}")
+                yield {"status": "error", "message": f"Invalid request payload: {str(e)}"}
+                return
+            async for result in add_ice_candidates(patch_request):
+                yield result
+        case _:
+            logger.error(f"Unknown request type: {request_type}")
+            yield {"status": "error", "message": f"Unknown request type: {request_type}"}
+            return
 
 
 # Used for local development
