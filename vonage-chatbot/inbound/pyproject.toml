@@ -1,0 +1,10 @@
+[project]
+name = "vonage-chatbot-dial-in"
+version = "0.1.0"
+description = "Vonage dial-in example for Pipecat"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "pipecat-ai[websocket,cartesia,google,silero,deepgram,runner]>=0.0.99",
+  "pipecatcloud>=0.2.16",
+]
