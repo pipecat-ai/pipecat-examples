@@ -172,29 +172,48 @@ async def initialize_connection_and_run_bot(request: SmallWebRTCRequest):
 async def add_ice_candidates(patch_request: SmallWebRTCPatchRequest):
     """Handle ICE candidate additions for existing connections."""
     await request_handler.handle_patch_request(patch_request)
-    return {"status": "success"}
+    yield {"status": "success"}
 
 
 @app.entrypoint
 async def agentcore_bot(payload, context):
     """Bot entry point for running on Amazon Bedrock AgentCore Runtime."""
-    # Try to deserialize as SmallWebRTCRequest first
-    try:
-        request = SmallWebRTCRequest.from_dict(payload)
-        # Handle initial connection setup
-        async for result in initialize_connection_and_run_bot(request):
-            yield result
-    except (TypeError, KeyError):
-        # Try to deserialize as SmallWebRTCPatchRequest for ICE candidate additions
-        try:
-            if "candidates" in payload:
-                payload["candidates"] = [IceCandidate(**c) for c in payload["candidates"]]
-            patch_request = SmallWebRTCPatchRequest(**payload)
-            result = await add_ice_candidates(patch_request)
-            yield result
-        except (TypeError, KeyError) as e:
-            logger.error(f"Failed to deserialize payload as either request type: {e}")
-            yield {"status": "error", "message": f"Invalid request payload: {str(e)}"}
+    request_type = payload.get("type", "unknown")
+    logger.info(f"Received request of type: {request_type}")
+
+    data = payload.get("data")
+    if not data:
+        logger.error("No data found in payload")
+        yield {"status": "error", "message": "No data found in payload"}
+        return
+
+    match request_type:
+        case "offer":
+            # Initial connection setup
+            try:
+                request = SmallWebRTCRequest.from_dict(data)
+            except Exception as e:
+                logger.error(f"Failed to deserialize SmallWebRTCRequest: {e}")
+                yield {"status": "error", "message": f"Invalid request payload: {str(e)}"}
+                return
+            async for result in initialize_connection_and_run_bot(request):
+                yield result
+        case "ice-candidates":
+            # ICE candidate additions
+            try:
+                if "candidates" in data:
+                    data["candidates"] = [IceCandidate(**c) for c in data["candidates"]]
+                patch_request = SmallWebRTCPatchRequest(**data)
+            except Exception as e:
+                logger.error(f"Failed to deserialize SmallWebRTCPatchRequest: {e}")
+                yield {"status": "error", "message": f"Invalid request payload: {str(e)}"}
+                return
+            async for result in add_ice_candidates(patch_request):
+                yield result
+        case _:
+            logger.error(f"Unknown request type: {request_type}")
+            yield {"status": "error", "message": f"Unknown request type: {request_type}"}
+            return
 
 
 # Used for local development

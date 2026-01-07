@@ -79,10 +79,12 @@ async def post_offer(request: Request, session_id: str):
     """Handle WebRTC offer requests."""
 
     data = await request.json()
+    request = {"type": "offer", "data": data}
+
     response = bedrock.invoke_agent_runtime(
         agentRuntimeArn=AGENT_RUNTIME_ARN,
         contentType="application/json",
-        payload=json.dumps(data),
+        payload=json.dumps(request),
         runtimeSessionId=session_id,
     )
 
@@ -125,10 +127,12 @@ async def patch_offer(request: Request, session_id: str):
     """Handle WebRTC new ice candidate requests."""
 
     data = await request.json()
+    request = {"type": "ice-candidates", "data": data}
+
     response = bedrock.invoke_agent_runtime(
         agentRuntimeArn=AGENT_RUNTIME_ARN,
         contentType="application/json",
-        payload=json.dumps(data),
+        payload=json.dumps(request),
         runtimeSessionId=session_id,
     )
 
