@@ -1,0 +1,19 @@
+[project]
+name = "vonage-chatbot"
+version = "0.1.0"
+description = "Vonage Audio Connector voice chatbot example using Pipecat + OpenAI."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "pipecat-ai[openai,vonage-audio-connector,silero,runner]>=0.0.95",
+  "opentok>=3.0.0",
+  "vonage>=3.3.1",
+  "websockets>=12.0.0",
+  "numpy>=1.26.0",
+  "sounddevice>=0.4.0",
+  "python-dotenv",
+  "loguru",
+  "pydub>=0.25",
+  "PyJWT>=2.8.0",
+]
+
