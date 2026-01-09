@@ -37,7 +37,7 @@ PIPECAT_CLOUD_API_URL = "https://api.pipecat.daily.co/v1"
 MAX_CONCURRENT_REQUESTS = 50
 BASE_RETRY_DELAY = 1.0
 MAX_RETRY_DELAY = 60.0
-MAX_RETRIES = 10
+MAX_RETRIES = 5
 
 
 async def batch_create_rooms(
@@ -57,8 +57,8 @@ async def batch_create_rooms(
     Returns:
         List of created room objects
     """
-    # Room expiration: 5 minutes from now
-    exp_time = int(time.time()) + 300
+    # Room expiration: 3 minutes from now
+    exp_time = int(time.time()) + 180
 
     rooms_config = [
         {
@@ -256,35 +256,32 @@ async def verify_active_sessions(
                 return {"verified": False, "error": error_text}
 
             result = await response.json()
+            logger.debug(f"Sessions API response: {result}")
             total_count = result.get("total_count", 0)
             sessions = result.get("sessions", [])
-            active_count = len(sessions)
 
             logger.info("=" * 50)
             logger.info("VERIFICATION")
             logger.info("=" * 50)
             logger.info(f"Expected active sessions: {expected_count}")
-            logger.info(f"Total sessions reported: {total_count}")
-            logger.info(f"Active sessions found: {active_count}")
+            logger.info(f"Active sessions (total_count): {total_count}")
 
-            if active_count >= expected_count:
+            if total_count >= expected_count:
                 logger.info("✅ Verification PASSED - All agents are running!")
             else:
                 logger.warning(
-                    f"⚠️ Verification WARNING - Only {active_count}/{expected_count} agents running"
+                    f"⚠️ Verification WARNING - Only {total_count}/{expected_count} agents running"
                 )
 
-            # Log some session details
+            # Log some session details from the sample returned
             cold_starts = sum(1 for s in sessions if s.get("coldStart", False))
-            warm_starts = active_count - cold_starts
-            logger.info(f"Cold starts: {cold_starts}")
-            logger.info(f"Warm starts: {warm_starts}")
+            warm_starts = len(sessions) - cold_starts
+            logger.info(f"Sample of {len(sessions)} sessions - Cold starts: {cold_starts}, Warm starts: {warm_starts}")
 
             return {
-                "verified": active_count >= expected_count,
+                "verified": total_count >= expected_count,
                 "expected": expected_count,
-                "active": active_count,
-                "total": total_count,
+                "active": total_count,
                 "cold_starts": cold_starts,
                 "warm_starts": warm_starts,
             }
@@ -323,6 +320,8 @@ async def main():
 
     logger.info(f"Starting {args.num_agents} agents with prefix '{args.room_prefix}'")
 
+    start_time = time.time()
+
     async with aiohttp.ClientSession() as session:
         # Step 1: Batch create all rooms
         rooms = await batch_create_rooms(
@@ -332,6 +331,9 @@ async def main():
             daily_api_key=daily_api_key,
         )
 
+    room_creation_time = time.time()
+    logger.info(f"Room creation took {room_creation_time - start_time:.2f} seconds")
+
     # Step 2: Start agents for all rooms
     results = await start_all_agents(
         rooms=rooms,
@@ -339,8 +341,14 @@ async def main():
         pipecat_api_key=pipecat_api_key,
     )
 
+    agent_start_time = time.time()
+    total_time = agent_start_time - start_time
+    agent_only_time = agent_start_time - room_creation_time
+
     # Step 3: Summarize results
     summarize_results(results)
+    logger.info(f"Agent startup took {agent_only_time:.2f} seconds")
+    logger.info(f"Total time: {total_time:.2f} seconds")
 
     # Step 4: Verify active sessions (requires Private API key)
     success_count = sum(1 for r in results if r["status"] == "success")
