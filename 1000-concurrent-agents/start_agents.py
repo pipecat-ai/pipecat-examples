@@ -31,7 +31,7 @@ logger.add(sys.stderr, level="INFO")
 logger.add("agents.log", level="DEBUG")
 
 DAILY_API_URL = "https://api.daily.co/v1"
-PIPECAT_CLOUD_API_URL = "https://api.pipecat.cloud/v1"
+PIPECAT_CLOUD_API_URL = "https://api.pipecat.daily.co/v1"
 
 # Rate limit settings
 MAX_CONCURRENT_REQUESTS = 50
@@ -57,8 +57,8 @@ async def batch_create_rooms(
     Returns:
         List of created room objects
     """
-    # Room expiration: 10 minutes from now
-    exp_time = int(time.time()) + 600
+    # Room expiration: 5 minutes from now
+    exp_time = int(time.time()) + 300
 
     rooms_config = [
         {
@@ -73,7 +73,7 @@ async def batch_create_rooms(
     logger.info(f"Creating {num_rooms} rooms via batch API...")
 
     async with session.post(
-        f"{DAILY_API_URL}/rooms/batch",
+        f"{DAILY_API_URL}/batch/rooms",
         headers={"Authorization": f"Bearer {daily_api_key}"},
         json={"rooms": rooms_config},
     ) as response:
@@ -82,7 +82,10 @@ async def batch_create_rooms(
             raise Exception(f"Failed to create rooms: {response.status} - {error_text}")
 
         result = await response.json()
-        rooms = result.get("rooms", [])
+        logger.debug(f"Batch API response: {result}")
+        
+        # The batch API returns rooms in the "data" array
+        rooms = result.get("data", [])
         logger.info(f"Successfully created {len(rooms)} rooms")
         return rooms
 
@@ -114,10 +117,15 @@ async def start_agent_with_retry(
         for attempt in range(MAX_RETRIES):
             try:
                 async with session.post(
-                    f"{PIPECAT_CLOUD_API_URL}/agents/{agent_name}/start",
-                    headers={"Authorization": f"Bearer {pipecat_api_key}"},
+                    f"{PIPECAT_CLOUD_API_URL}/public/{agent_name}/start",
+                    headers={
+                        "Authorization": f"Bearer {pipecat_api_key}",
+                        "Content-Type": "application/json",
+                    },
                     json={
-                        "daily_room_url": room_url,
+                        "createDailyRoom": False,
+                        "dailyRoomUrl": room_url,
+                        "transport": "daily",
                     },
                 ) as response:
                     if response.status == 200:
@@ -214,6 +222,74 @@ def summarize_results(results: list[dict]) -> None:
                 logger.info(f"  - {r['room']}: {r.get('error', 'unknown')}")
 
 
+async def verify_active_sessions(
+    agent_name: str,
+    pipecat_private_api_key: str,
+    expected_count: int,
+) -> dict:
+    """Verify that agents are actually running by checking active sessions.
+
+    Args:
+        agent_name: Pipecat Cloud agent name
+        pipecat_private_api_key: Pipecat Cloud Private API key (from Dashboard > Settings > API Keys > Private)
+        expected_count: Expected number of active sessions
+
+    Returns:
+        Dict with verification results
+    """
+    logger.info("Verifying active sessions...")
+
+    async with aiohttp.ClientSession() as session:
+        async with session.get(
+            f"{PIPECAT_CLOUD_API_URL}/agents/{agent_name}/sessions",
+            headers={
+                "Authorization": f"Bearer {pipecat_private_api_key}",
+            },
+            params={
+                "status": "active",
+                "limit": expected_count + 100,  # Get a bit more than expected
+            },
+        ) as response:
+            if response.status != 200:
+                error_text = await response.text()
+                logger.error(f"Failed to get sessions: {response.status} - {error_text}")
+                return {"verified": False, "error": error_text}
+
+            result = await response.json()
+            total_count = result.get("total_count", 0)
+            sessions = result.get("sessions", [])
+            active_count = len(sessions)
+
+            logger.info("=" * 50)
+            logger.info("VERIFICATION")
+            logger.info("=" * 50)
+            logger.info(f"Expected active sessions: {expected_count}")
+            logger.info(f"Total sessions reported: {total_count}")
+            logger.info(f"Active sessions found: {active_count}")
+
+            if active_count >= expected_count:
+                logger.info("✅ Verification PASSED - All agents are running!")
+            else:
+                logger.warning(
+                    f"⚠️ Verification WARNING - Only {active_count}/{expected_count} agents running"
+                )
+
+            # Log some session details
+            cold_starts = sum(1 for s in sessions if s.get("coldStart", False))
+            warm_starts = active_count - cold_starts
+            logger.info(f"Cold starts: {cold_starts}")
+            logger.info(f"Warm starts: {warm_starts}")
+
+            return {
+                "verified": active_count >= expected_count,
+                "expected": expected_count,
+                "active": active_count,
+                "total": total_count,
+                "cold_starts": cold_starts,
+                "warm_starts": warm_starts,
+            }
+
+
 async def main():
     parser = argparse.ArgumentParser(description="Start 1000 concurrent Pipecat Cloud agents")
     parser.add_argument(
@@ -238,6 +314,7 @@ async def main():
 
     daily_api_key = os.getenv("DAILY_API_KEY")
     pipecat_api_key = os.getenv("PIPECAT_CLOUD_API_KEY")
+    pipecat_private_api_key = os.getenv("PIPECAT_CLOUD_PRIVATE_API_KEY")
 
     if not daily_api_key:
         raise ValueError("DAILY_API_KEY environment variable is required")
@@ -264,6 +341,23 @@ async def main():
 
     # Step 3: Summarize results
     summarize_results(results)
+
+    # Step 4: Verify active sessions (requires Private API key)
+    success_count = sum(1 for r in results if r["status"] == "success")
+    if success_count > 0 and pipecat_private_api_key:
+        # Wait a moment for sessions to register
+        logger.info("Waiting 5 seconds for sessions to register...")
+        await asyncio.sleep(5)
+
+        await verify_active_sessions(
+            agent_name=args.agent_name,
+            pipecat_private_api_key=pipecat_private_api_key,
+            expected_count=success_count,
+        )
+    elif success_count > 0:
+        logger.info("Skipping verification (PIPECAT_CLOUD_PRIVATE_API_KEY not set)")
+    else:
+        logger.error("No agents started successfully, skipping verification")
 
 
 if __name__ == "__main__":
