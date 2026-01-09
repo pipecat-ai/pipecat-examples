@@ -34,10 +34,10 @@ DAILY_API_URL = "https://api.daily.co/v1"
 PIPECAT_CLOUD_API_URL = "https://api.pipecat.daily.co/v1"
 
 # Rate limit settings
-MAX_CONCURRENT_REQUESTS = 50
+MAX_CONCURRENT_REQUESTS = 30
 BASE_RETRY_DELAY = 1.0
-MAX_RETRY_DELAY = 60.0
-MAX_RETRIES = 5
+MAX_RETRY_DELAY = 30.0
+MAX_RETRIES = 10
 
 
 async def batch_create_rooms(

@@ -36,7 +36,7 @@ Note the agent name from the deployment output (e.g., `1000-concurrent-agents`).
 Run the orchestration script:
 
 ```bash
-uv run start_agents.py --agent-name <your-agent-name>
+uv run start_agents.py --agent-name 1000-concurrent-agents
 ```
 
 Options:
