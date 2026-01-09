@@ -1,0 +1,16 @@
+[project]
+name = "1000-concurrent-agents"
+version = "0.1.0"
+description = "Example showing how to start 1000 concurrent Pipecat agents"
+requires-python = ">=3.10"
+dependencies = [
+    "pipecat-ai[daily,openai,cartesia,deepgram,silero]",
+    "pipecatcloud",
+    "aiohttp>=3.9.0",
+    "python-dotenv>=1.0.0",
+]
+
+[tool.ruff]
+line-length = 100
+[tool.ruff.lint]
+select = ["I"]
