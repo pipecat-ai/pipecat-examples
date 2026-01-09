@@ -1,5 +1,5 @@
 agent_name = "1000-concurrent-agents"
-image = "hushdaily/1000-concurrent-agents:0.5"
+image = "hushdaily/1000-concurrent-agents:0.6"
 image_credentials = "my-image-pull-secret"
 secret_set = "1000-concurrent-agents-secrets"
 agent_profile = "agent-1x"
