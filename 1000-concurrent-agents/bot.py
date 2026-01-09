@@ -122,13 +122,24 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
 
 async def bot(runner_args: RunnerArguments):
     """Main bot entry point compatible with Pipecat Cloud."""
-    logger.info(f"Starting bot for room: {runner_args.room_url}")
-    
+    logger.info(f"runner_args: {runner_args}")
+    logger.info(f"runner_args type: {type(runner_args)}")
+    logger.info(
+        f"runner_args.__dict__: {runner_args.__dict__ if hasattr(runner_args, '__dict__') else 'no __dict__'}"
+    )
+    logger.info(f"runner_args.body: {runner_args.body}")
+    logger.info(f"runner_args.body type: {type(runner_args.body)}")
+
+    # Get room URL from body (passed via REST API) or fall back to runner_args
+    body = runner_args.body or {}
+    room_url = body.get("dailyRoomUrl") or ""
+    logger.info(f"Starting bot for room: {room_url}")
+
     transport = DailyTransport(
-        runner_args.room_url,
-        runner_args.token,
-        "1000 Concurrent Agents Bot",
-        DailyParams(
+        room_url=room_url,
+        token=None,
+        bot_name="1000 Concurrent Agents Bot",
+        params=DailyParams(
             audio_in_enabled=True,
             audio_out_enabled=True,
             vad_analyzer=SileroVADAnalyzer(params=VADParams(stop_secs=0.2)),

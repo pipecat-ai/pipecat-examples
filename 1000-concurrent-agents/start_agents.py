@@ -83,7 +83,7 @@ async def batch_create_rooms(
 
         result = await response.json()
         logger.debug(f"Batch API response: {result}")
-        
+
         # The batch API returns rooms in the "data" array
         rooms = result.get("data", [])
         logger.info(f"Successfully created {len(rooms)} rooms")
@@ -124,8 +124,11 @@ async def start_agent_with_retry(
                     },
                     json={
                         "createDailyRoom": False,
-                        "dailyRoomUrl": room_url,
                         "transport": "daily",
+                        "dailyRoomUrl": room_url,  # Top-level for Pipecat Cloud
+                        "body": {
+                            "dailyRoomUrl": room_url,  # Also in body for bot access
+                        },
                     },
                 ) as response:
                     if response.status == 200:
@@ -276,7 +279,9 @@ async def verify_active_sessions(
             # Log some session details from the sample returned
             cold_starts = sum(1 for s in sessions if s.get("coldStart", False))
             warm_starts = len(sessions) - cold_starts
-            logger.info(f"Sample of {len(sessions)} sessions - Cold starts: {cold_starts}, Warm starts: {warm_starts}")
+            logger.info(
+                f"Sample of {len(sessions)} sessions - Cold starts: {cold_starts}, Warm starts: {warm_starts}"
+            )
 
             return {
                 "verified": total_count >= expected_count,
