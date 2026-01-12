@@ -27,6 +27,11 @@ from pipecat.transports.websocket.fastapi import (
 
 AUDIO_OUT_SAMPLE_RATE: int = 24_000
 
+# Audio packetization for strict PCM framing
+# 640 bytes = 20ms @ 16kHz, PCM16 mono
+VONAGE_AUDIO_PACKET_BYTES: int = 640
+
+
 load_dotenv(override=True)
 
 
@@ -136,6 +141,7 @@ async def bot(runner_args: RunnerArguments):
             audio_in_enabled=True,
             audio_out_enabled=True,
             add_wav_header=False,
+            fixed_audio_packet_size=VONAGE_AUDIO_PACKET_BYTES,
             vad_analyzer=SileroVADAnalyzer(),
             serializer=serializer,
         ),

@@ -1,5 +1,5 @@
 [project]
-name = "vonage-chatbot"
+name = "vonage-audio-bot"
 version = "0.1.0"
 description = "Vonage Audio Connector voice chatbot example using Pipecat + OpenAI."
 readme = "README.md"
