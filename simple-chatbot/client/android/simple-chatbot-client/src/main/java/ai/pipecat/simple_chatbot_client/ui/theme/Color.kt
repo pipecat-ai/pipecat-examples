@@ -16,6 +16,9 @@ object Colors {
     val endButton = Color(0xFF0F172A)
     val textFieldBorder = Color(0xFFDFE6EF)
 
+    val chipDeselectedBackground = activityBackground
+    val chipDeselectedText = Color(0xFFB3BFCC)
+
     val botIndicatorBackground = Color(0xFF374151)
     val mutedMicBackground = Color(0xFFF04A4A)
     val unmutedMicBackground = Color(0xFF616978)

@@ -2,7 +2,7 @@
 accompanistPermissions = "0.34.0"
 agp = "8.7.3"
 constraintlayoutCompose = "1.1.0"
-pipecatClientDaily = "1.0.3"
+pipecatClient = "1.1.0"
 kotlin = "2.0.20"
 coreKtx = "1.15.0"
 lifecycleRuntimeKtx = "2.8.7"
@@ -15,7 +15,8 @@ kotlinxSerializationPlugin = "2.0.20"
 accompanist-permissions = { module = "com.google.accompanist:accompanist-permissions", version.ref = "accompanistPermissions" }
 androidx-constraintlayout-compose = { module = "androidx.constraintlayout:constraintlayout-compose", version.ref = "constraintlayoutCompose" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
-pipecat-client-daily = { module = "ai.pipecat:daily-transport", version.ref = "pipecatClientDaily" }
+pipecat-client-daily = { module = "ai.pipecat:daily-transport", version.ref = "pipecatClient" }
+pipecat-client-smallwebrtc = { module = "ai.pipecat:small-webrtc-transport", version.ref = "pipecatClient" }
 androidx-lifecycle-runtime-ktx = { group = "androidx.lifecycle", name = "lifecycle-runtime-ktx", version.ref = "lifecycleRuntimeKtx" }
 androidx-activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "activityCompose" }
 androidx-compose-bom = { group = "androidx.compose", name = "compose-bom", version.ref = "composeBom" }

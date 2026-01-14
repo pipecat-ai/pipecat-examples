@@ -32,7 +32,6 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -47,6 +46,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
@@ -123,7 +123,6 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ConnectSettings(
     voiceClientManager: VoiceClientManager,
@@ -132,8 +131,16 @@ fun ConnectSettings(
 
     val start = {
         val backendUrl = Preferences.backendUrl.value
+        val apiKey = Preferences.apiKey.value
+        val transportType = Preferences.transport.value?.let(TransportType::fromString) ?: TransportType.Daily
 
-        voiceClientManager.start(baseUrl = backendUrl!!)
+        voiceClientManager.start(
+            transportType = transportType,
+            params = ClientStartParams(
+                backendUrl = backendUrl ?: "",
+                apiKey = apiKey ?: ""
+            )
+        )
     }
 
     Box(
@@ -161,13 +168,32 @@ fun ConnectSettings(
             ) {
                 Spacer(modifier = Modifier.height(12.dp))
 
+                // TODO add Pipecat logo
+
                 Text(
                     modifier = Modifier.align(Alignment.CenterHorizontally),
-                    text = "Connect to an RTVI server",
+                    text = "Pipecat Android Client",
                     fontSize = 22.sp,
                     fontWeight = FontWeight.W700,
                     style = TextStyles.base
                 )
+
+                Spacer(modifier = Modifier.height(36.dp))
+
+                Text(
+                    text = "Transport",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.W400,
+                    style = TextStyles.base
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Row {
+                    TransportButton(TransportType.Daily)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    TransportButton(TransportType.SmallWebrtc)
+                }
 
                 Spacer(modifier = Modifier.height(36.dp))
 
@@ -188,6 +214,31 @@ fun ConnectSettings(
                     onValueChange = { Preferences.backendUrl.value = it },
                     keyboardOptions = KeyboardOptions(
                         keyboardType = KeyboardType.Uri,
+                        imeAction = ImeAction.Next
+                    ),
+                    colors = textFieldColors(),
+                    shape = RoundedCornerShape(12.dp)
+                )
+
+                Spacer(modifier = Modifier.height(36.dp))
+
+                Text(
+                    text = "API key",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.W400,
+                    style = TextStyles.base
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                TextField(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .border(1.dp, Colors.textFieldBorder, RoundedCornerShape(12.dp)),
+                    value = Preferences.apiKey.value ?: "",
+                    onValueChange = { Preferences.apiKey.value = it },
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Unspecified,
                         imeAction = ImeAction.Next
                     ),
                     colors = textFieldColors(),
@@ -253,5 +304,45 @@ private fun ConnectDialogButton(
             fontWeight = FontWeight.W500,
             color = foreground
         )
+    }
+}
+
+@Composable
+private fun TransportButton(
+    type: TransportType
+) {
+    val currentTransport = Preferences.transport.value?.let(TransportType::fromString) ?: TransportType.Daily
+    val isSelected = type == currentTransport
+
+    val shape = RoundedCornerShape(6.dp)
+
+    val background = if (isSelected) Color.White else Colors.chipDeselectedBackground
+    val textColor = if (isSelected) Colors.buttonNormal else Colors.chipDeselectedText
+
+    Box(
+        Modifier
+            .clip(shape)
+            .clickable {
+                Preferences.transport.value = type.toString()
+            }
+            .background(background)
+            .border(width = 2.dp, color = textColor, shape = shape)
+            .padding(horizontal = 16.dp, vertical = 6.dp)
+    ) {
+        Text(
+            text = type.label,
+            fontSize = 18.sp,
+            fontWeight = FontWeight.W700,
+            color = textColor,
+            style = TextStyles.base
+        )
+    }
+}
+
+@Preview
+@Composable
+private fun TransportButtonPreview() {
+    RTVIClientTheme {
+        TransportButton(TransportType.SmallWebrtc)
     }
 }

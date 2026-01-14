@@ -58,6 +58,7 @@ android {
 
 dependencies {
     implementation(libs.pipecat.client.daily)
+    implementation(libs.pipecat.client.smallwebrtc)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)
