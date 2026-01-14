@@ -7,10 +7,8 @@ requires-python = ">=3.10"
 
 dependencies = [
     "boto3==1.40.27",
-    "loguru>=0.7.0",
-    "pipecat-ai[cartesia,daily,deepgram,google,runner,silero,webrtc]==0.0.98",
-    "pipecatcloud>=0.2.7",
-    "python-dotenv>=1.1.1",
+    "pipecat-ai[cartesia,daily,deepgram,google,runner,silero,webrtc]>=0.0.99",
+    "pipecatcloud>=0.2.18",
 ]
 
 [dependency-groups]

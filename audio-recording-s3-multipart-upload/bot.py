@@ -20,7 +20,10 @@ from pipecat.frames.frames import (
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineParams, PipelineTask
-from pipecat.processors.aggregators.openai_llm_context import OpenAILLMContext
+from pipecat.processors.aggregators.llm_context import LLMContext
+from pipecat.processors.aggregators.llm_response_universal import (
+    LLMContextAggregatorPair,
+)
 from pipecat.processors.audio.audio_buffer_processor import AudioBufferProcessor
 from pipecat.processors.frame_processor import FrameDirection
 from pipecat.processors.frameworks.rtvi import RTVIObserver, RTVIProcessor
@@ -56,7 +59,6 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
 
     llm = GoogleLLMService(
         api_key=os.getenv("GOOGLE_API_KEY"),
-        model="gemini-2.5-flash",
     )
 
     # Function to terminate call
@@ -84,8 +86,8 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     ]
 
     tools = ToolsSchema(standard_tools=[terminate_function])
-    context = OpenAILLMContext(messages, tools)
-    context_aggregator = llm.create_context_aggregator(context)
+    context = LLMContext(messages)
+    user_aggregator, assistant_aggregator = LLMContextAggregatorPair(context)
 
     audio_buffer = AudioBufferProcessor(buffer_size=audio_buffer_size)
 
@@ -121,7 +123,21 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
         observers=[RTVIObserver(rtvi)],
     )
 
-    # 1 track for user audio; 1 track for bot audio
+    #############################
+    # audio_buffer event_handlers
+    # We show `"on_audio_data"` and `"on_track_audio_data"` examples here
+    # Only one event_handler is needed, but as many as all four event_handlers
+    # can be set. Find supported events here:
+    # https://github.com/pipecat-ai/pipecat/blob/main/src/pipecat/processors/audio/audio_buffer_processor.py#L42-L45
+
+    # Triggered when buffer_size is reached, providing merged audio
+    @audio_buffer.event_handler("on_audio_data")
+    async def on_audio_data(buffer, audio, sample_rate, num_channels):
+        logger.info(f"`on_audio_data` event fired")
+        await audio_uploader.upload_audio_wav_to_s3(audio, sample_rate, num_channels)
+
+    # Triggered when buffer_size is reached, providing separate tracks
+    # One track for user audio; One track for bot audio
     @audio_buffer.event_handler("on_track_audio_data")
     async def on_track_audio_data(buffer, user_audio, bot_audio, sample_rate, num_channels):
         logger.info(f"`on_track_audio_data` event fired")
@@ -129,11 +145,7 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
         await audio_uploader.upload_audio_wav_to_s3(bot_audio, sample_rate, num_channels, "bot")
         await audio_uploader.upload_audio_wav_to_s3(user_audio, sample_rate, num_channels, "user")
 
-    # merged user and bot audio
-    @audio_buffer.event_handler("on_audio_data")
-    async def on_audio_data(buffer, audio, sample_rate, num_channels):
-        logger.info(f"`on_audio_data` event fired")
-        await audio_uploader.upload_audio_wav_to_s3(audio, sample_rate, num_channels)
+    #############################
 
     @rtvi.event_handler("on_client_ready")
     async def on_client_ready(rtvi):
