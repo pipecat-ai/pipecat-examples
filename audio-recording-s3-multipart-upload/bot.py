@@ -5,7 +5,6 @@
 #
 
 import os
-import time
 import uuid
 
 from dotenv import load_dotenv
@@ -18,14 +17,13 @@ from pipecat.frames.frames import (
     LLMRunFrame,
     TTSSpeakFrame,
 )
-from pipecat.pipeline.parallel_pipeline import ParallelPipeline
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineParams, PipelineTask
 from pipecat.processors.aggregators.openai_llm_context import OpenAILLMContext
 from pipecat.processors.audio.audio_buffer_processor import AudioBufferProcessor
 from pipecat.processors.frame_processor import FrameDirection
-from pipecat.processors.frameworks.rtvi import RTVIConfig, RTVIObserver, RTVIProcessor
+from pipecat.processors.frameworks.rtvi import RTVIObserver, RTVIProcessor
 from pipecat.runner.types import RunnerArguments
 from pipecat.runner.utils import create_transport
 from pipecat.services.cartesia.tts import CartesiaTTSService
@@ -97,7 +95,7 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     )
 
     # RTVI events for Pipecat client UI
-    rtvi = RTVIProcessor(config=RTVIConfig(config=[]))
+    rtvi = RTVIProcessor()
 
     pipeline = Pipeline(
         [

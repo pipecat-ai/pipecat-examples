@@ -1,4 +1,4 @@
-# Pipecat audio recording s3 multipart upload example
+# Pipecat audio recording S3 multipart upload example
 
 This is a simple Pipecat bot example for how to save audio recordings to s3. It accounts for long audio recordings (multipart) as well as short audio recordings.
 
