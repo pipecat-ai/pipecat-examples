@@ -32,7 +32,7 @@ The bot will wait for the first participant to join. Then, it will mirror a cust
 Now, run the custom track sender. This is a simple `daily-python` application that opens and audio file and sends it as a custom track to the same Daily room.
 
 ```bash
-uv run custom_track_sender.py -u ROOM_URL -i office-ambience-mono-16000.mp3
+uv run custom_track_sender.py -i office-ambience-mono-16000.mp3
 ```
 
 ## Open client

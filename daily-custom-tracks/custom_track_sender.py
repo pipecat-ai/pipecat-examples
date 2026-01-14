@@ -5,13 +5,15 @@
 #
 
 import argparse
+import os
 import time
 
-from daily import CallClient, CustomAudioSource, Daily
+from daily import CallClient, CustomAudioSource, CustomAudioTrack, Daily
+from dotenv import load_dotenv
 from pydub import AudioSegment
 
 parser = argparse.ArgumentParser(description="Daily AI SDK Bot Sample")
-parser.add_argument("-u", "--url", type=str, required=True, help="URL of the Daily room to join")
+parser.add_argument("-u", "--url", type=str, required=False, help="URL of the Daily room to join")
 parser.add_argument(
     "-i", "--input", type=str, required=True, help="Input audio file (needs 16000 sample rate)"
 )
@@ -27,6 +29,8 @@ channels = audio.channels
 print(f"Length: {len(raw_bytes)} bytes")
 print(f"Sample rate: {sample_rate}, Channels: {channels}")
 
+load_dotenv(override=True)
+
 # Initialize the Daily context & create call client
 Daily.init()
 
@@ -34,7 +38,7 @@ client = CallClient()
 
 # Join the room and indicate we have a custom track named "pipecat".
 client.join(
-    args.url,
+    args.url or os.getenv("DAILY_SAMPLE_ROOM_URL"),
     client_settings={
         "publishing": {
             "camera": False,
@@ -50,9 +54,10 @@ time.sleep(2)
 
 # Create the custom audio source. This is where we will write our audio.
 audio_source = CustomAudioSource(sample_rate, channels)
+audio_track = CustomAudioTrack(audio_source)
 
 # Create an audio track and assign it our audio source.
-client.add_custom_audio_track("pipecat", audio_source)
+client.add_custom_audio_track(track_name="pipecat", audio_track=audio_track)
 
 # Just sleep for a second. To do this well we should really use completions.
 time.sleep(1)
