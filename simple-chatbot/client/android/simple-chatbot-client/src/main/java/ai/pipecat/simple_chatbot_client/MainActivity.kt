@@ -223,7 +223,7 @@ fun ConnectSettings(
                 Spacer(modifier = Modifier.height(36.dp))
 
                 Text(
-                    text = "API key",
+                    text = "API key (optional)",
                     fontSize = 16.sp,
                     fontWeight = FontWeight.W400,
                     style = TextStyles.base
@@ -327,11 +327,11 @@ private fun TransportButton(
             }
             .background(background)
             .border(width = 2.dp, color = textColor, shape = shape)
-            .padding(horizontal = 16.dp, vertical = 6.dp)
+            .padding(horizontal = 18.dp, vertical = 8.dp)
     ) {
         Text(
             text = type.label,
-            fontSize = 18.sp,
+            fontSize = 16.sp,
             fontWeight = FontWeight.W700,
             color = textColor,
             style = TextStyles.base
