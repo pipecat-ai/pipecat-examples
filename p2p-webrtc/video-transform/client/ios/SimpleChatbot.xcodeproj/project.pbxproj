@@ -3,7 +3,7 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 56;
+	objectVersion = 60;
 	objects = {
 
 /* Begin PBXBuildFile section */
@@ -19,7 +19,6 @@
 		90383A932D9C35B300D0DDA3 /* ChatView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90383A922D9C35B300D0DDA3 /* ChatView.swift */; };
 		90383A962D9C35BD00D0DDA3 /* LiveMessage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90383A942D9C35BD00D0DDA3 /* LiveMessage.swift */; };
 		90383A982D9D85E700D0DDA3 /* CameraButtonView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90383A972D9D85E700D0DDA3 /* CameraButtonView.swift */; };
-		9050F9A72EA976AA0041369E /* PipecatClientIOSSmallWebrtc in Frameworks */ = {isa = PBXBuildFile; productRef = 9050F9A62EA976AA0041369E /* PipecatClientIOSSmallWebrtc */; };
 		90ABB98E2C735ED6000D9CC7 /* MeetingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90ABB98D2C735ED6000D9CC7 /* MeetingView.swift */; };
 		90ABB9932C73820D000D9CC7 /* MicrophoneView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90ABB9922C73820D000D9CC7 /* MicrophoneView.swift */; };
 		90ABB9982C738356000D9CC7 /* CustomColors.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90ABB9972C738356000D9CC7 /* CustomColors.swift */; };
@@ -29,6 +28,7 @@
 		90ABB9A62C74EA8A000D9CC7 /* SettingsPreference.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90ABB9A52C74EA8A000D9CC7 /* SettingsPreference.swift */; };
 		90ABB9A82C74EAB1000D9CC7 /* SettingsManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90ABB9A72C74EAB1000D9CC7 /* SettingsManager.swift */; };
 		90C5CDCE2EA18A66000DD785 /* PipecatClientIOSSmallWebrtc in Frameworks */ = {isa = PBXBuildFile; productRef = 90C5CDCD2EA18A66000DD785 /* PipecatClientIOSSmallWebrtc */; };
+		CC48D9BB2F17C1E400256756 /* PipecatClientIOSSmallWebrtc in Frameworks */ = {isa = PBXBuildFile; productRef = CC48D9BA2F17C1E400256756 /* PipecatClientIOSSmallWebrtc */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -79,7 +79,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				9050F9A72EA976AA0041369E /* PipecatClientIOSSmallWebrtc in Frameworks */,
+				CC48D9BB2F17C1E400256756 /* PipecatClientIOSSmallWebrtc in Frameworks */,
 				90383A912D9C357F00D0DDA3 /* PipecatClientIOSSmallWebrtc in Frameworks */,
 				90C5CDCE2EA18A66000DD785 /* PipecatClientIOSSmallWebrtc in Frameworks */,
 			);
@@ -238,7 +238,7 @@
 			packageProductDependencies = (
 				90383A902D9C357F00D0DDA3 /* PipecatClientIOSSmallWebrtc */,
 				90C5CDCD2EA18A66000DD785 /* PipecatClientIOSSmallWebrtc */,
-				9050F9A62EA976AA0041369E /* PipecatClientIOSSmallWebrtc */,
+				CC48D9BA2F17C1E400256756 /* PipecatClientIOSSmallWebrtc */,
 			);
 			productName = SimpleChatbot;
 			productReference = 90031FA32C616EE700408370 /* SimpleChatbot.app */;
@@ -313,7 +313,7 @@
 			);
 			mainGroup = 90031F9A2C616EE700408370;
 			packageReferences = (
-				9050F9A52EA976AA0041369E /* XCRemoteSwiftPackageReference "pipecat-client-ios-small-webrtc" */,
+				CC48D9B92F17C1E400256756 /* XCLocalSwiftPackageReference "../../../../../pipecat-ai/ios_repos/pipecat-client-ios-small-webrtc" */,
 			);
 			productRefGroup = 90031FA42C616EE700408370 /* Products */;
 			projectDirPath = "";
@@ -703,28 +703,23 @@
 		};
 /* End XCConfigurationList section */
 
-/* Begin XCRemoteSwiftPackageReference section */
-		9050F9A52EA976AA0041369E /* XCRemoteSwiftPackageReference "pipecat-client-ios-small-webrtc" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/pipecat-ai/pipecat-client-ios-small-webrtc";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 1.1.1;
-			};
+/* Begin XCLocalSwiftPackageReference section */
+		CC48D9B92F17C1E400256756 /* XCLocalSwiftPackageReference "../../../../../pipecat-ai/ios_repos/pipecat-client-ios-small-webrtc" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = "../../../../../pipecat-ai/ios_repos/pipecat-client-ios-small-webrtc";
 		};
-/* End XCRemoteSwiftPackageReference section */
+/* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
 		90383A902D9C357F00D0DDA3 /* PipecatClientIOSSmallWebrtc */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = PipecatClientIOSSmallWebrtc;
 		};
-		9050F9A62EA976AA0041369E /* PipecatClientIOSSmallWebrtc */ = {
+		90C5CDCD2EA18A66000DD785 /* PipecatClientIOSSmallWebrtc */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 9050F9A52EA976AA0041369E /* XCRemoteSwiftPackageReference "pipecat-client-ios-small-webrtc" */;
 			productName = PipecatClientIOSSmallWebrtc;
 		};
-		90C5CDCD2EA18A66000DD785 /* PipecatClientIOSSmallWebrtc */ = {
+		CC48D9BA2F17C1E400256756 /* PipecatClientIOSSmallWebrtc */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = PipecatClientIOSSmallWebrtc;
 		};
