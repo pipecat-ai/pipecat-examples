@@ -4,18 +4,25 @@ This example shows how to send and receive Daily custom tracks. We will run a si
 
 ## Get started
 
-```python
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-```
+1. **Install dependencies** inside a virtual environment:
+
+    ```bash
+    uv sync
+    ```
+
+2. **Configure environment variables:**
+
+    ```bash
+    cp env.example .env
+    # Open .env and add your API keys
+    ```
 
 ## Run the bot
 
 Start the bot by giving it a Daily room URL.
 
 ```bash
-python bot.py -u ROOM_URL
+uv run bot.py -d
 ```
 
 The bot will wait for the first participant to join. Then, it will mirror a custom track named "pipecat" into a new custom track named "pipecat-mirror".
@@ -25,7 +32,7 @@ The bot will wait for the first participant to join. Then, it will mirror a cust
 Now, run the custom track sender. This is a simple `daily-python` application that opens and audio file and sends it as a custom track to the same Daily room.
 
 ```bash
-python custom_track_sender.py -u ROOM_URL -i office-ambience-mono-16000.mp3
+uv run custom_track_sender.py -u ROOM_URL -i office-ambience-mono-16000.mp3
 ```
 
 ## Open client

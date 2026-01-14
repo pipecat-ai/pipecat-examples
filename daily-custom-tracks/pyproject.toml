@@ -1,0 +1,19 @@
+[project]
+name = "daily-custom-tracks-example"
+version = "0.1.0"
+description = "Example for building voice AI bots with Pipecat and Daily custom tracks"
+requires-python = ">=3.12"
+dependencies = [
+    "pipecat-ai[daily,runner]>=0.0.99",
+    "pydub",
+]
+
+[dependency-groups]
+dev = [
+    "ruff~=0.12.1",
+]
+
+[tool.ruff]
+line-length = 100
+[tool.ruff.lint]
+select = ["I"]
