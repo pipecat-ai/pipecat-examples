@@ -8,6 +8,7 @@ import ai.pipecat.client.result.Future
 import ai.pipecat.client.result.RTVIError
 import ai.pipecat.client.small_webrtc_transport.SmallWebRTCTransport
 import ai.pipecat.client.types.APIRequest
+import ai.pipecat.client.types.BotOutputData
 import ai.pipecat.client.types.BotReadyData
 import ai.pipecat.client.types.Participant
 import ai.pipecat.client.types.PipecatMetrics
@@ -84,7 +85,6 @@ class VoiceClientManager(private val context: Context) {
         transportType: TransportType,
         params: ClientStartParams,
     ) {
-
         if (client.value != null) {
             return
         }
@@ -94,7 +94,7 @@ class VoiceClientManager(private val context: Context) {
         val url = if (params.backendUrl.endsWith("/")) {
             params.backendUrl
         } else {
-            "$params.backendUrl/"
+            "${params.backendUrl}/"
         } + "start"
 
         state.value = TransportState.Disconnected
@@ -135,9 +135,11 @@ class VoiceClientManager(private val context: Context) {
                 }
             }
 
-            override fun onBotTranscript(text: String) {
-                Log.i(TAG, "Bot transcript: $text")
-                chatHistory.appendOrUpdateBot(text)
+            override fun onBotOutput(data: BotOutputData) {
+                Log.i(TAG, "Bot transcript: ${data}")
+                if (data.aggregatedBy == "word") {
+                    chatHistory.appendOrUpdateBot(data.text)
+                }
             }
 
             override fun onBotStartedSpeaking() {
