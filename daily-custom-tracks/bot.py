@@ -75,8 +75,8 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
         idle_timeout_secs=runner_args.pipeline_idle_timeout_secs,
     )
 
-    @transport.event_handler("on_first_participant_joined")
-    async def on_first_participant_joined(transport, participant):
+    @transport.event_handler("on_participant_joined")
+    async def on_participant_joined(transport, participant):
         await transport.capture_participant_audio(participant["id"], audio_source="pipecat")
 
     runner = PipelineRunner(handle_sigint=runner_args.handle_sigint)
