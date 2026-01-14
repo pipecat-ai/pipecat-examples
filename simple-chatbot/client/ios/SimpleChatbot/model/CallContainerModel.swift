@@ -192,12 +192,6 @@ extension CallContainerModel:PipecatClientDelegate {
         }
     }
     
-    func onBotTranscript(data: BotLLMText) {
-        Task { @MainActor in
-            self.handleEvent(eventName: "onBotTranscript", eventValue: data)
-        }
-    }
-    
     func onError(message: RTVIMessageInbound) {
         Task { @MainActor in
             self.handleEvent(eventName: "onError", eventValue: message)
@@ -232,6 +226,12 @@ extension CallContainerModel:PipecatClientDelegate {
     func onMetrics(data: PipecatMetrics) {
         Task { @MainActor in
             self.handleEvent(eventName: "onMetrics", eventValue: data)
+        }
+    }
+    
+    func onBotOutput(data: BotOutputData) {
+        Task { @MainActor in
+            self.handleEvent(eventName: "onBotOutput", eventValue: data)
         }
     }
 }
