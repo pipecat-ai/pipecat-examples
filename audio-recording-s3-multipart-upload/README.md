@@ -101,7 +101,7 @@ s3://YOUR_BUCKET_NAME/000000000000_test_conversations/CONVERSATION_UUID/CONVERSA
 s3://YOUR_BUCKET_NAME/000000000000_test_conversations/CONVERSATION_UUID/CONVERSATION_UUID_bot.wav
 s3://YOUR_BUCKET_NAME/000000000000_test_conversations/CONVERSATION_UUID/CONVERSATION_UUID_user.wav
 ```
-Amend this s3key [here]() if desired.
+Amend this s3key in `AudioUploader` if desired.
 
 ## Deploy bot
 
