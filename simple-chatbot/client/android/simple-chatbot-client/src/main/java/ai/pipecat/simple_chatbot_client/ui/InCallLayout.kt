@@ -23,8 +23,6 @@ fun InCallLayout(voiceClientManager: VoiceClientManager) {
 
     Column(Modifier.fillMaxSize().imePadding()) {
 
-        InCallHeader(expiryTime = null)
-
         Box(
             modifier = Modifier
                 .weight(1f)
