@@ -266,24 +266,19 @@ extension CallContainerModel:PipecatClientDelegate {
     }
     
     func onUserStartedSpeaking() {
-        self.createLiveMessage(content: "User started speaking", type: .system)
         self.handleEvent(eventName: "onUserStartedSpeaking")
         self.createLiveMessage(type: .user)
     }
     
     func onUserStoppedSpeaking() {
-        self.createLiveMessage(content: "User stopped speaking", type: .system)
         self.handleEvent(eventName: "onUserStoppedSpeaking")
     }
     
     func onBotStartedSpeaking() {
-        self.createLiveMessage(content: "Bot started speaking", type: .system)
         self.handleEvent(eventName: "onBotStartedSpeaking")
-        self.createLiveMessage(type: .bot)
     }
     
     func onBotStoppedSpeaking() {
-        self.createLiveMessage(content: "Bot stopped speaking", type: .system)
         self.handleEvent(eventName: "onBotStoppedSpeaking")
     }
     
@@ -294,9 +289,13 @@ extension CallContainerModel:PipecatClientDelegate {
         }
     }
     
-    func onBotTranscript(data: BotLLMText) {
-        self.handleEvent(eventName: "onBotTranscript", eventValue: data)
-        self.appendTextToLiveMessage(fromBot: true, content: data.text)
+    func onBotOutput(data: BotOutputData) {
+        if data.aggregatedBy == .sentence {
+            self.createLiveMessage(type: .bot)
+        } else if data.aggregatedBy == .word {
+            self.handleEvent(eventName: "onBotOutput", eventValue: data)
+            self.appendTextToLiveMessage(fromBot: true, content: data.text + " ")
+        }
     }
     
 }
