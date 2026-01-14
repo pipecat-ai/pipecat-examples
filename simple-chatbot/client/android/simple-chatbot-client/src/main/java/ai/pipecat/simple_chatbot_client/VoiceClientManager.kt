@@ -4,10 +4,9 @@ import ai.pipecat.client.PipecatClient
 import ai.pipecat.client.PipecatClientOptions
 import ai.pipecat.client.PipecatEventCallbacks
 import ai.pipecat.client.daily.DailyTransport
-import ai.pipecat.client.daily.DailyTransportConnectParams
-import ai.pipecat.client.daily.PipecatClientDaily
 import ai.pipecat.client.result.Future
 import ai.pipecat.client.result.RTVIError
+import ai.pipecat.client.small_webrtc_transport.SmallWebRTCTransport
 import ai.pipecat.client.types.APIRequest
 import ai.pipecat.client.types.BotReadyData
 import ai.pipecat.client.types.Participant
@@ -29,6 +28,28 @@ import androidx.compose.runtime.snapshots.SnapshotStateList
 @Immutable
 data class Error(val message: String)
 
+data class ClientStartParams(
+    val backendUrl: String,
+    val apiKey: String
+)
+
+enum class TransportType(val label: String) {
+    Daily("Daily"),
+    SmallWebrtc("Small WebRTC");
+
+    override fun toString() = label
+
+    companion object {
+        fun fromString(value: String): TransportType? {
+            return when (value) {
+                Daily.label -> Daily
+                SmallWebrtc.label -> SmallWebrtc
+                else -> null
+            }
+        }
+    }
+}
+
 @Stable
 class VoiceClientManager(private val context: Context) {
 
@@ -36,7 +57,7 @@ class VoiceClientManager(private val context: Context) {
         private const val TAG = "VoiceClientManager"
     }
 
-    private val client = mutableStateOf<PipecatClientDaily?>(null)
+    private val client = mutableStateOf<PipecatClient<*, *>?>(null)
 
     val state = mutableStateOf<TransportState?>(null)
 
@@ -59,7 +80,10 @@ class VoiceClientManager(private val context: Context) {
         errors.add(Error(it.description))
     }
 
-    fun start(baseUrl: String) {
+    fun start(
+        transportType: TransportType,
+        params: ClientStartParams,
+    ) {
 
         if (client.value != null) {
             return
@@ -67,10 +91,10 @@ class VoiceClientManager(private val context: Context) {
 
         chatHistory.clear()
 
-        val url = if (baseUrl.endsWith("/")) {
-            baseUrl
+        val url = if (params.backendUrl.endsWith("/")) {
+            params.backendUrl
         } else {
-            "$baseUrl/"
+            "$params.backendUrl/"
         } + "start"
 
         state.value = TransportState.Disconnected
@@ -191,12 +215,20 @@ class VoiceClientManager(private val context: Context) {
             callbacks = callbacks
         )
 
-        val client = PipecatClient(DailyTransport(context), options)
+        val transport = when (transportType) {
+            TransportType.Daily -> DailyTransport(context)
+            TransportType.SmallWebrtc -> SmallWebRTCTransport(context)
+        }
+
+        val client = PipecatClient(transport, options)
 
         client.startBotAndConnect(
             APIRequest(
                 endpoint = url,
-                requestData = Value.Object()
+                requestData = Value.Object(),
+                headers = listOfNotNull(
+                    params.apiKey.trim().takeIf { it.isNotEmpty() }?.let {"Authorization" to "Bearer $it"}
+                ).toMap()
             )
         ).displayErrors().withErrorCallback {
             callbacks.onDisconnected()
