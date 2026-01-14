@@ -91,12 +91,6 @@ class VoiceClientManager(private val context: Context) {
 
         chatHistory.clear()
 
-        val url = if (params.backendUrl.endsWith("/")) {
-            params.backendUrl
-        } else {
-            "${params.backendUrl}/"
-        } + "start"
-
         state.value = TransportState.Disconnected
 
         val callbacks = object : PipecatEventCallbacks() {
@@ -226,7 +220,7 @@ class VoiceClientManager(private val context: Context) {
 
         client.startBotAndConnect(
             APIRequest(
-                endpoint = url,
+                endpoint = params.backendUrl,
                 requestData = Value.Object(),
                 headers = listOfNotNull(
                     params.apiKey.trim().takeIf { it.isNotEmpty() }?.let {"Authorization" to "Bearer $it"}
