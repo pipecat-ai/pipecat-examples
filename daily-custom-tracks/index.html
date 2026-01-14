@@ -46,15 +46,24 @@
     }
 
     async function buildAudioPlayer(track, participantId) {
+        // Check if a player for this specific track already exists
+        const existingPlayer = document.querySelector(`audio[data-participant-id="${participantId}"][data-track-id="${track.id}"]`);
+        if (existingPlayer) {
+            console.log("Player already exists for track:", track.id);
+            return existingPlayer;
+        }
+
         const audioContainer = document.getElementById("audio-container");
         const player = document.createElement("audio");
         player.dataset.participantId = participantId;
+        player.dataset.trackId = track.id; // Add track ID to identify the specific track
 
         // Create a new button for controlling audio
         const audioControlButton = document.createElement("button");
         audioControlButton.className = "ui primary green button"
         audioControlButton.innerText = track._mediaTag == "cam-audio" ? "english" : track._mediaTag;
         audioControlButton.dataset.participantId = participantId;
+        audioControlButton.dataset.trackId = track.id; // Add track ID to the button too
         audioControlButton.onclick = () => {
             if (player.paused) {
 
