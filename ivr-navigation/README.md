@@ -51,7 +51,6 @@ For detailed setup instructions on purchasing phone numbers and enabling dial-ou
 
 - Python 3.10+
 - `uv` package manager (recommended) or pip
-- ngrok (for local development)
 - Docker (for production deployment)
 
 ## Setup
