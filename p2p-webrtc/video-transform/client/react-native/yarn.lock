@@ -1340,10 +1340,10 @@
     "@jridgewell/resolve-uri" "^3.1.0"
     "@jridgewell/sourcemap-codec" "^1.4.14"
 
-"@pipecat-ai/client-js@^1.4.0":
-  version "1.4.1"
-  resolved "https://registry.yarnpkg.com/@pipecat-ai/client-js/-/client-js-1.4.1.tgz#23fbfe4e29dfbf7e45a318cbdcabe38d4c3051e4"
-  integrity sha512-NwqpsSpNd2nK0Nm33lUTxU0qc0sTPcC9x/sJaOFraEtAxhbEXWOo0mam0E/AqXQ9m/r/HusXoI645u384HujsA==
+"@pipecat-ai/client-js@^1.5.0":
+  version "1.5.0"
+  resolved "https://registry.yarnpkg.com/@pipecat-ai/client-js/-/client-js-1.5.0.tgz#ea7f4535472cc2fe9e459c38fb8877e9d588ea5c"
+  integrity sha512-WE8n5P98XoOyEX+k6DkcxBFaeoP82rDl3BEm4Zxf8tw1Umw5zFsv73qR6ztU4D5WDbYiscA3J+hGfe+g8PSUIw==
   dependencies:
     "@types/events" "^3.0.3"
     bowser "^2.11.0"
@@ -1357,12 +1357,12 @@
   resolved "https://registry.yarnpkg.com/@pipecat-ai/react-native-daily-media-manager/-/react-native-daily-media-manager-0.0.1.tgz#b05dde837dffc4ccd5b41addbfae2ffc43b47dc6"
   integrity sha512-7QOz+vbjFOxMQJ4D45Q9mvc3KBZJjXDguhDACxWnkJYic92VKMkom9fT6lGNoAPFEbBT5jV0DeIdcGHrLMk0ZA==
 
-"@pipecat-ai/react-native-small-webrtc-transport@1.4.1":
-  version "1.4.1"
-  resolved "https://registry.yarnpkg.com/@pipecat-ai/react-native-small-webrtc-transport/-/react-native-small-webrtc-transport-1.4.1.tgz#81771a7fe63ee791b6fa5fb988b5a472df87210b"
-  integrity sha512-x0yvX6+CI2DXHZt4nN41+FAJHnmKew1emI1WUOz6PvcfVgSnyMUX5w/bUGD+7XpXMudOqiba1ubIerZBw9S0og==
+"@pipecat-ai/react-native-small-webrtc-transport@^1.5.0":
+  version "1.5.0"
+  resolved "https://registry.yarnpkg.com/@pipecat-ai/react-native-small-webrtc-transport/-/react-native-small-webrtc-transport-1.5.0.tgz#251b3badaac1955efdf0bd2c3e7b9cc39ace8226"
+  integrity sha512-XaPsEtNNl6kB2CfrYDJlI7SQvTMvn8+NCV9pDdrYooxUmMN20wA1vfYH13GZ2AK9D5bpxhuZonBn6iZ7aGTELA==
   dependencies:
-    "@pipecat-ai/client-js" "^1.4.0"
+    "@pipecat-ai/client-js" "^1.5.0"
     lodash "^4.17.21"
 
 "@pkgjs/parseargs@^0.11.0":

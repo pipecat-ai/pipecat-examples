@@ -95,7 +95,13 @@ export const VoiceClientProvider: React.FC<VoiceClientProviderProps> = ({ childr
           if (p?.local && track.kind === 'video'){
             setVideoTrack(track)
           }
-        }
+        },
+        onServerMessage: (data: any) => {
+          console.log("Received server message:", data)
+        },
+        onBotOutput: (output) => {
+          console.log('Bot output:', output);
+        },
       },
     })
     return client
