@@ -109,7 +109,7 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
             tts,  # TTS
             transport.output(),  # Transport bot output
             audio_buffer,  # collect all audio (user and bot)
-            context_aggregator.assistant(),  # Assistant/bot spoken responses
+            assistant_aggregator,  # Assistant/bot spoken responses
         ]
     )
 
