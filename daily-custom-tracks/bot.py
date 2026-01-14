@@ -20,6 +20,7 @@ from pipecat.transports.daily.transport import DailyParams
 
 logger.remove(0)
 logger.add(sys.stderr, level="DEBUG")
+load_dotenv(override=True)
 
 # We store functions so objects (e.g. SileroVADAnalyzer) don't get
 # instantiated. The function will be called when the desired transport gets
@@ -33,7 +34,6 @@ transport_params = {
     ),
 }
 
-load_dotenv(override=True)
 
 class CustomTrackMirrorProcessor(FrameProcessor):
     def __init__(self, transport_destination: str, **kwargs):
