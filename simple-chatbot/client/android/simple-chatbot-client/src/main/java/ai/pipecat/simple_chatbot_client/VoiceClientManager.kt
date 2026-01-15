@@ -19,6 +19,7 @@ import ai.pipecat.client.types.TransportState
 import ai.pipecat.client.types.Value
 import android.content.Context
 import android.util.Log
+import androidx.annotation.DrawableRes
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.mutableFloatStateOf
@@ -34,9 +35,9 @@ data class ClientStartParams(
     val apiKey: String
 )
 
-enum class TransportType(val label: String) {
-    Daily("Daily"),
-    SmallWebrtc("Small WebRTC");
+enum class TransportType(val label: String, @DrawableRes val icon: Int) {
+    Daily("Daily", R.drawable.daily_logo),
+    SmallWebrtc("Small WebRTC", R.drawable.webrtc_logo);
 
     override fun toString() = label
 

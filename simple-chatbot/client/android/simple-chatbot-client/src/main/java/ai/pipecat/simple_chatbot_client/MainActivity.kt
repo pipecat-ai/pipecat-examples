@@ -189,14 +189,26 @@ fun ConnectSettings(
                     )
             ) {
                 @Composable
-                fun FieldLabel(text: String) {
-                    Text(
-                        text = text.uppercase(),
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.W700,
-                        style = TextStyles.base,
-                        color = Color.Black
-                    )
+                fun FieldLabel(@DrawableRes icon: Int, text: String) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+
+                        Icon(
+                            modifier = Modifier.size(16.dp),
+                            painter = painterResource(icon),
+                            contentDescription = null,
+                            tint = Colors.unmutedMicBackground
+                        )
+
+                        Spacer(modifier = Modifier.width(8.dp))
+
+                        Text(
+                            text = text.uppercase(),
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.W700,
+                            style = TextStyles.base,
+                            color = Color.Black
+                        )
+                    }
 
                     Spacer(modifier = Modifier.height(12.dp))
                 }
@@ -206,7 +218,7 @@ fun ConnectSettings(
                     Spacer(modifier = Modifier.height(48.dp))
                 }
 
-                FieldLabel("Transport")
+                FieldLabel(R.drawable.network_outline, "Transport")
 
                 Row {
                     TransportButton(TransportType.Daily)
@@ -216,7 +228,7 @@ fun ConnectSettings(
 
                 FieldSpacer()
 
-                FieldLabel("Backend URL")
+                FieldLabel(R.drawable.link, "Backend URL")
 
                 TextField(
                     modifier = Modifier
@@ -235,7 +247,7 @@ fun ConnectSettings(
 
                 FieldSpacer()
 
-                FieldLabel("API key (optional)")
+                FieldLabel(R.drawable.key_outline, "API key (optional)")
 
                 TextField(
                     modifier = Modifier
@@ -328,7 +340,7 @@ private fun TransportButton(
     val background = if (isSelected) Color.White else Colors.chipDeselectedBackground
     val textColor = if (isSelected) Colors.buttonNormal else Colors.chipDeselectedText
 
-    Box(
+    Row(
         Modifier
             .clip(shape)
             .clickable {
@@ -336,8 +348,17 @@ private fun TransportButton(
             }
             .background(background)
             .border(width = 1.dp, color = textColor, shape = shape)
-            .padding(horizontal = 18.dp, vertical = 8.dp)
+            .padding(horizontal = 18.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
+        Image(
+            modifier = Modifier.size(16.dp),
+            painter = painterResource(type.icon),
+            contentDescription = null,
+        )
+
+        Spacer(Modifier.width(10.dp))
+
         Text(
             text = type.label,
             fontSize = 16.sp,
