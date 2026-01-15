@@ -24,5 +24,5 @@ object Colors {
     val unmutedMicBackground = Color(0xFF616978)
     val micActive = Color(0xFF67AA67)
 
-    val logTextColor = Color(0x98b3d9FF)
+    val logTextColor = mutedMicBackground
 }

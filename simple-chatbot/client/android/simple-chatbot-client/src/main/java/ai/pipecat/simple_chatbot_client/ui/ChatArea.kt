@@ -2,6 +2,7 @@ package ai.pipecat.simple_chatbot_client.ui
 
 import ai.pipecat.client.types.SendTextOptions
 import ai.pipecat.simple_chatbot_client.ChatHistoryElement
+import ai.pipecat.simple_chatbot_client.HDivider
 import ai.pipecat.simple_chatbot_client.R
 import ai.pipecat.simple_chatbot_client.ui.theme.Colors
 import ai.pipecat.simple_chatbot_client.ui.theme.TextStyles
@@ -13,7 +14,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -46,10 +46,9 @@ import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.tooling.preview.Preview
@@ -61,12 +60,11 @@ private fun FooterButton(
     modifier: Modifier,
     onClick: () -> Unit,
     @DrawableRes icon: Int,
-    text: String? = null,
     foreground: Color,
     background: Color,
     border: Color,
 ) {
-    val shape = RoundedCornerShape(12.dp)
+    val shape = RectangleShape
 
     Row(
         modifier
@@ -84,38 +82,24 @@ private fun FooterButton(
             tint = foreground,
             contentDescription = null
         )
-
-        if (text != null) {
-            Spacer(modifier = Modifier.width(8.dp))
-
-            Text(
-                text = text,
-                style = TextStyles.base,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.W600,
-                color = foreground
-            )
-        }
     }
 }
 
 
 @Composable
-fun ColumnScope.InCallFooter(
+fun ChatArea(
+    modifier: Modifier,
     onSubmitChatText: (String, SendTextOptions) -> Unit,
     chatHistory: SnapshotStateList<ChatHistoryElement>
 ) {
     var showOptionsPopup by remember { mutableStateOf(false) }
     var sendTextOptions by remember { mutableStateOf(SendTextOptions()) }
 
-    // Chat history
-
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(90.dp)
-            .padding(horizontal = 15.dp),
+    Column(
+        modifier = modifier
     ) {
+        // History
+
         val listState = rememberLazyListState()
 
         LaunchedEffect(chatHistory.size, chatHistory.lastOrNull()) {
@@ -123,12 +107,7 @@ fun ColumnScope.InCallFooter(
         }
 
         LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .shadow(4.dp, RoundedCornerShape(12.dp))
-                .clip(RoundedCornerShape(12.dp))
-                .background(Colors.botIndicatorBackground)
-                .border(5.dp, Color.White, RoundedCornerShape(12.dp)),
+            modifier = Modifier.fillMaxWidth().weight(1f),
             state = listState
         ) {
             item {
@@ -136,17 +115,26 @@ fun ColumnScope.InCallFooter(
             }
 
             items(chatHistory) { item ->
+
+                val prefix = when (item.type) {
+                    ChatHistoryElement.Type.Bot -> "Bot: "
+                    ChatHistoryElement.Type.User -> "User: "
+                    ChatHistoryElement.Type.Log -> ""
+                }
+
                 Text(
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 1.dp),
-                    text = item.text,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 1.dp),
+                    text = prefix + item.text,
                     style = TextStyles.base,
                     color = when (item.type) {
-                        ChatHistoryElement.Type.Bot -> Colors.activityBackground
-                        ChatHistoryElement.Type.User -> Colors.lightGrey
+                        ChatHistoryElement.Type.Bot -> Color.Black
+                        ChatHistoryElement.Type.User -> Colors.unmutedMicBackground
                         ChatHistoryElement.Type.Log -> Colors.logTextColor
                     },
-                    fontSize = 12.sp
+                    fontSize = 14.sp
                 )
+                Spacer(Modifier.height(8.dp))
+
             }
 
             item {
@@ -155,14 +143,14 @@ fun ColumnScope.InCallFooter(
         }
     }
 
-    Spacer(Modifier.height(15.dp))
+    HDivider()
 
     // Text input field
 
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 15.dp),
+            .padding(15.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         var chatText by remember { mutableStateOf("") }
@@ -175,7 +163,7 @@ fun ColumnScope.InCallFooter(
         TextField(
             modifier = Modifier
                 .weight(1f)
-                .border(1.dp, Colors.textFieldBorder, RoundedCornerShape(12.dp)),
+                .border(1.dp, Colors.textFieldBorder, RectangleShape),
             value = chatText,
             textStyle = TextStyles.base,
             onValueChange = { chatText = it },
@@ -187,7 +175,11 @@ fun ColumnScope.InCallFooter(
                 onGo = { submitChatText() }
             ),
             placeholder = {
-                Text("Send text message...")
+                Text(
+                    text = "Send text message...",
+                    style = TextStyles.base,
+                    fontSize = 14.sp,
+                )
             },
             colors = textFieldColors(),
             shape = RoundedCornerShape(12.dp),
@@ -200,7 +192,6 @@ fun ColumnScope.InCallFooter(
                 modifier = Modifier,
                 onClick = { showOptionsPopup = !showOptionsPopup },
                 icon = R.drawable.three_dots,
-                text = null,
                 foreground = Color.White,
                 background = Colors.endButton,
                 border = Colors.endButton
@@ -274,7 +265,6 @@ fun ColumnScope.InCallFooter(
             modifier = Modifier,
             onClick = submitChatText,
             icon = R.drawable.send,
-            text = null,
             foreground = Color.White,
             background = Colors.endButton,
             border = Colors.endButton
@@ -284,13 +274,13 @@ fun ColumnScope.InCallFooter(
 
 @Composable
 @Preview
-private fun InCallFooterPreview() {
+private fun ChatAreaPreview() {
     Column(
         Modifier
             .fillMaxWidth()
             .background(Colors.activityBackground)
     ) {
-        InCallFooter({ _, _ -> }, remember { mutableStateListOf(
+        ChatArea(Modifier.fillMaxSize(), { _, _ -> }, remember { mutableStateListOf(
             ChatHistoryElement(ChatHistoryElement.Type.Bot, "Bot"),
             ChatHistoryElement(ChatHistoryElement.Type.User, "User"),
             ChatHistoryElement(ChatHistoryElement.Type.Log, "Log")
