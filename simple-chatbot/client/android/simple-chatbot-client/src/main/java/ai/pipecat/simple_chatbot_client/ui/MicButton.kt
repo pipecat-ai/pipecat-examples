@@ -2,6 +2,7 @@ package ai.pipecat.simple_chatbot_client.ui
 
 import ai.pipecat.simple_chatbot_client.R
 import ai.pipecat.simple_chatbot_client.ui.theme.Colors
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
@@ -30,16 +31,17 @@ fun MicButton(
     isTalking: State<Boolean>,
     audioLevel: FloatState,
 ) {
+    val level = animateFloatAsState(audioLevel.floatValue)
+
     Box(
         modifier = modifier
             .clickable(onClick = onClick)
             .drawBehind {
                 if (micEnabled) {
-                    val level = audioLevel.floatValue
-                    val height = size.height * level
+                    val height = size.height * level.value
 
                     drawRect(
-                        color = Color.White,
+                        color = Colors.textFieldBorder,
                         topLeft = Offset(0f, size.height - height),
                         size = Size(size.width, height)
                     )
