@@ -11,6 +11,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.annotation.DrawableRes
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -40,8 +41,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -132,7 +133,8 @@ fun ConnectSettings(
     val start = {
         val backendUrl = Preferences.backendUrl.value
         val apiKey = Preferences.apiKey.value
-        val transportType = Preferences.transport.value?.let(TransportType::fromString) ?: TransportType.Daily
+        val transportType =
+            Preferences.transport.value?.let(TransportType::fromString) ?: TransportType.Daily
 
         voiceClientManager.start(
             transportType = transportType,
@@ -143,20 +145,42 @@ fun ConnectSettings(
         )
     }
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(scrollState)
-            .imePadding()
-            .padding(20.dp),
-        contentAlignment = Alignment.Center
-    ) {
+    Column(Modifier.fillMaxSize()) {
+
+        @Composable
+        fun Divider() {
+            Box(Modifier.fillMaxWidth().height(1.dp).background(Colors.textFieldBorder))
+        }
+
+        Row(
+            modifier = Modifier.padding(vertical = 12.dp, horizontal = 24.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                modifier = Modifier.weight(1f),
+                text = "Pipecat Android Client",
+                fontSize = 18.sp,
+                fontWeight = FontWeight.W900,
+                style = TextStyles.base,
+                color = Color.Black
+            )
+
+            Image(
+                modifier = Modifier.size(48.dp),
+                painter = painterResource(R.drawable.pipecat),
+                contentDescription = null
+            )
+        }
+
+        Divider()
+
         Box(
-            Modifier
+            modifier = Modifier
                 .fillMaxWidth()
-                .shadow(2.dp, RoundedCornerShape(16.dp))
-                .clip(RoundedCornerShape(16.dp))
-                .background(Colors.mainSurfaceBackground)
+                .weight(1f)
+                .verticalScroll(scrollState)
+                .imePadding()
+                .padding(20.dp),
         ) {
             Column(
                 Modifier
@@ -166,28 +190,25 @@ fun ConnectSettings(
                         horizontal = 28.dp
                     )
             ) {
-                Spacer(modifier = Modifier.height(12.dp))
+                @Composable
+                fun FieldLabel(text: String) {
+                    Text(
+                        text = text.uppercase(),
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.W700,
+                        style = TextStyles.base,
+                        color = Color.Black
+                    )
 
-                // TODO add Pipecat logo
+                    Spacer(modifier = Modifier.height(12.dp))
+                }
 
-                Text(
-                    modifier = Modifier.align(Alignment.CenterHorizontally),
-                    text = "Pipecat Android Client",
-                    fontSize = 22.sp,
-                    fontWeight = FontWeight.W700,
-                    style = TextStyles.base
-                )
+                @Composable
+                fun FieldSpacer() {
+                    Spacer(modifier = Modifier.height(48.dp))
+                }
 
-                Spacer(modifier = Modifier.height(36.dp))
-
-                Text(
-                    text = "Transport",
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.W400,
-                    style = TextStyles.base
-                )
-
-                Spacer(modifier = Modifier.height(12.dp))
+                FieldLabel("Transport")
 
                 Row {
                     TransportButton(TransportType.Daily)
@@ -195,21 +216,14 @@ fun ConnectSettings(
                     TransportButton(TransportType.SmallWebrtc)
                 }
 
-                Spacer(modifier = Modifier.height(36.dp))
+                FieldSpacer()
 
-                Text(
-                    text = "Backend URL",
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.W400,
-                    style = TextStyles.base
-                )
-
-                Spacer(modifier = Modifier.height(12.dp))
+                FieldLabel("Backend URL")
 
                 TextField(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .border(1.dp, Colors.textFieldBorder, RoundedCornerShape(12.dp)),
+                        .border(1.dp, Colors.textFieldBorder, RectangleShape),
                     value = Preferences.backendUrl.value ?: "",
                     onValueChange = { Preferences.backendUrl.value = it },
                     keyboardOptions = KeyboardOptions(
@@ -217,24 +231,18 @@ fun ConnectSettings(
                         imeAction = ImeAction.Next
                     ),
                     colors = textFieldColors(),
-                    shape = RoundedCornerShape(12.dp)
+                    shape = RectangleShape,
+                    textStyle = TextStyles.base
                 )
 
-                Spacer(modifier = Modifier.height(36.dp))
+                FieldSpacer()
 
-                Text(
-                    text = "API key (optional)",
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.W400,
-                    style = TextStyles.base
-                )
-
-                Spacer(modifier = Modifier.height(12.dp))
+                FieldLabel("API key (optional)")
 
                 TextField(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .border(1.dp, Colors.textFieldBorder, RoundedCornerShape(12.dp)),
+                        .border(1.dp, Colors.textFieldBorder, RectangleShape),
                     value = Preferences.apiKey.value ?: "",
                     onValueChange = { Preferences.apiKey.value = it },
                     keyboardOptions = KeyboardOptions(
@@ -242,10 +250,11 @@ fun ConnectSettings(
                         imeAction = ImeAction.Next
                     ),
                     colors = textFieldColors(),
-                    shape = RoundedCornerShape(12.dp)
+                    shape = RectangleShape,
+                    textStyle = TextStyles.base,
                 )
 
-                Spacer(modifier = Modifier.height(36.dp))
+                FieldSpacer()
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -299,10 +308,11 @@ private fun ConnectDialogButton(
         }
 
         Text(
-            text = text,
-            fontSize = 16.sp,
-            fontWeight = FontWeight.W500,
-            color = foreground
+            text = text.uppercase(),
+            fontSize = 14.sp,
+            fontWeight = FontWeight.W700,
+            color = foreground,
+            style = TextStyles.base
         )
     }
 }
@@ -311,10 +321,11 @@ private fun ConnectDialogButton(
 private fun TransportButton(
     type: TransportType
 ) {
-    val currentTransport = Preferences.transport.value?.let(TransportType::fromString) ?: TransportType.Daily
+    val currentTransport =
+        Preferences.transport.value?.let(TransportType::fromString) ?: TransportType.Daily
     val isSelected = type == currentTransport
 
-    val shape = RoundedCornerShape(6.dp)
+    val shape = RectangleShape
 
     val background = if (isSelected) Color.White else Colors.chipDeselectedBackground
     val textColor = if (isSelected) Colors.buttonNormal else Colors.chipDeselectedText
@@ -326,7 +337,7 @@ private fun TransportButton(
                 Preferences.transport.value = type.toString()
             }
             .background(background)
-            .border(width = 2.dp, color = textColor, shape = shape)
+            .border(width = 1.dp, color = textColor, shape = shape)
             .padding(horizontal = 18.dp, vertical = 8.dp)
     ) {
         Text(
