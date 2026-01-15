@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
@@ -124,7 +125,8 @@ fun InCallLayout(voiceClientManager: VoiceClientManager) {
             HDivider()
         }
 
-        InCallFooter(
+        ChatArea(
+            modifier = Modifier.weight(1f).fillMaxWidth(),
             onSubmitChatText = voiceClientManager::sendText,
             chatHistory = voiceClientManager.chatHistory,
         )

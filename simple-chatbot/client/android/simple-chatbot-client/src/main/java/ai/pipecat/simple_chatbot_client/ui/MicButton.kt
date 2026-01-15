@@ -48,7 +48,7 @@ fun MicButton(
         contentAlignment = Alignment.Center
     ) {
         Icon(
-            modifier = Modifier.size(36.dp),
+            modifier = Modifier.size(30.dp),
             painter = painterResource(
                 if (micEnabled) {
                     R.drawable.microphone

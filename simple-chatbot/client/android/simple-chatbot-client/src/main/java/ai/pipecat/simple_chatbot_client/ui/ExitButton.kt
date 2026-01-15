@@ -23,7 +23,7 @@ fun ExitButton(
         contentAlignment = Alignment.Center
     ) {
         Icon(
-            modifier = Modifier.size(36.dp),
+            modifier = Modifier.size(30.dp),
             painter = painterResource(R.drawable.exit_run),
             tint = Color.Black,
             contentDescription = "End call",
