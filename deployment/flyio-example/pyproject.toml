@@ -1,0 +1,23 @@
+[project]
+name = "flyio-example"
+version = "0.1.0"
+description = "Pipecat example - flyio-example"
+requires-python = ">=3.10"
+dependencies = [
+    "pipecat-ai[daily,openai,silero]==0.0.99,,
+    "fastapi,
+    "uvicorn,
+    "python-dotenv,
+    "loguru,
+]
+
+[dependency-groups]
+dev = [
+    "pyright>=1.1.404,<2,
+    "ruff>=0.12.11,<1,
+]
+
+[tool.ruff]
+line-length = 100
+[tool.ruff.lint]
+select = ["I"]

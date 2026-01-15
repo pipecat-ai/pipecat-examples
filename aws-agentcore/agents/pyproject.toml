@@ -1,0 +1,21 @@
+[project]
+name = "agents"
+version = "0.1.0"
+description = "Pipecat example - agents"
+requires-python = ">=3.10"
+dependencies = [
+    "bedrock-agentcore,
+    "strands-agents,
+    "strands-agents-tools,
+]
+
+[dependency-groups]
+dev = [
+    "pyright>=1.1.404,<2,
+    "ruff>=0.12.11,<1,
+]
+
+[tool.ruff]
+line-length = 100
+[tool.ruff.lint]
+select = ["I"]

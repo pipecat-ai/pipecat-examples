@@ -1,13 +1,13 @@
 [project]
-name = "instant-voice"
+name = "news-chatbot"
 version = "0.1.0"
-description = "Pipecat example - instant-voice"
+description = "Pipecat example - news-chatbot"
 requires-python = ">=3.10"
 dependencies = [
-    "pipecat-ai[openai,silero,websocket,google,daily]==0.0.99",
     "python-dotenv",
     "fastapi[all]",
     "uvicorn",
+    "pipecat-ai[daily,google,deepgram,cartesia,silero,openai]==0.0.99",
 ]
 
 [dependency-groups]
@@ -17,13 +17,6 @@ dev = [
 ]
 
 [tool.ruff]
-exclude = [".git", "*_pb2.py"]
 line-length = 100
-
 [tool.ruff.lint]
-select = [
-    "I", # Import rules
-]
-
-[tool.ruff.lint.pydocstyle]
-convention = "google"
+select = ["I"]

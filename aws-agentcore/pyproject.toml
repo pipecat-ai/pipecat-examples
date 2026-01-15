@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Example of a Pipecat bot that uses an agent deployed to Amazon Bedrock AgentCore Runtime"
 requires-python = ">=3.10"
 dependencies = [
-    "pipecat-ai[cartesia,daily,deepgram,local-smart-turn-v3,openai,runner,silero,webrtc,aws]",
+    "pipecat-ai[cartesia,daily,deepgram,local-smart-turn-v3,openai,runner,silero,webrtc,aws]==0.0.99",
 ]
 
 [dependency-groups]
