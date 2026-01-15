@@ -3469,7 +3469,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "pipecat-ai", extras = ["daily", "deepgram", "elevenlabs", "google", "local-smart-turn-v3", "openai", "runner", "silero", "webrtc"], specifier = "==0.0.99" },
+    { name = "pipecat-ai", extras = ["daily", "deepgram", "elevenlabs", "google", "local-smart-turn-v3", "openai", "runner", "silero", "webrtc"], specifier = ">=0.0.99" },
     { name = "pipecatcloud" },
 ]
 

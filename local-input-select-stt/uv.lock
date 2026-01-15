@@ -872,7 +872,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "pipecat-ai", extras = ["whisper", "openai"], specifier = "==0.0.99" },
+    { name = "pipecat-ai", extras = ["whisper", "openai"], specifier = ">=0.0.99" },
     { name = "pyaudio", specifier = "==0.2.14" },
     { name = "pydantic-settings", specifier = "==2.7.1" },
     { name = "textual", specifier = "==1.0.0" },

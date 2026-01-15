@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Pipecat example - instant-voice"
 requires-python = ">=3.10"
 dependencies = [
-    "pipecat-ai[openai,silero,websocket,google,daily]==0.0.99",
+    "pipecat-ai[openai,silero,websocket,google,daily]>=0.0.99",
     "python-dotenv",
     "fastapi[all]",
     "uvicorn",

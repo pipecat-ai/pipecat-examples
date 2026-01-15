@@ -2503,7 +2503,7 @@ dev = [
 requires-dist = [
     { name = "aiohttp" },
     { name = "pillow" },
-    { name = "pipecat-ai", extras = ["google", "daily", "deepgram", "cartesia", "silero", "local-smart-turn-v3"], specifier = "==0.0.99" },
+    { name = "pipecat-ai", extras = ["google", "daily", "deepgram", "cartesia", "silero", "local-smart-turn-v3"], specifier = ">=0.0.99" },
     { name = "pipecatcloud" },
     { name = "python-dotenv" },
 ]

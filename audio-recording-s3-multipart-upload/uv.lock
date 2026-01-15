@@ -267,7 +267,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "boto3", specifier = "==1.40.27" },
-    { name = "pipecat-ai", extras = ["cartesia", "daily", "deepgram", "google", "runner", "silero", "webrtc"], specifier = "==0.0.99" },
+    { name = "pipecat-ai", extras = ["cartesia", "daily", "deepgram", "google", "runner", "silero", "webrtc"], specifier = ">=0.0.99" },
     { name = "pipecatcloud", specifier = ">=0.2.18" },
 ]
 

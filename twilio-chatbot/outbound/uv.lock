@@ -3176,7 +3176,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
-    { name = "pipecat-ai", extras = ["websocket", "cartesia", "google", "silero", "deepgram", "runner"], specifier = "==0.0.99" },
+    { name = "pipecat-ai", extras = ["websocket", "cartesia", "google", "silero", "deepgram", "runner"], specifier = ">=0.0.99" },
     { name = "pipecatcloud", specifier = ">=0.2.7" },
     { name = "twilio" },
 ]

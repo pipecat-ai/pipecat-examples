@@ -367,7 +367,7 @@ dev = [
 requires-dist = [
     { name = "fastapi" },
     { name = "pipecat-ai", specifier = "==0.0.99,==0.0.99" },
-    { name = "pipecat-ai", extras = ["webrtc", "daily", "deepgram", "cartesia", "silero"], specifier = "==0.0.99" },
+    { name = "pipecat-ai", extras = ["webrtc", "daily", "deepgram", "cartesia", "silero"], specifier = ">=0.0.99" },
     { name = "python-dotenv" },
     { name = "strands-agents" },
     { name = "uvicorn" },

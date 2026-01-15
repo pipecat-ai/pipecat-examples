@@ -636,7 +636,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "fastapi", extras = ["all"] },
-    { name = "pipecat-ai", extras = ["silero", "websocket", "openai", "deepgram", "cartesia", "sentry"], specifier = "==0.0.99" },
+    { name = "pipecat-ai", extras = ["silero", "websocket", "openai", "deepgram", "cartesia", "sentry"], specifier = ">=0.0.99" },
     { name = "python-dotenv" },
     { name = "uvicorn" },
 ]

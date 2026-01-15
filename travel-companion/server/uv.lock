@@ -2884,7 +2884,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "aiohttp" },
-    { name = "pipecat-ai", extras = ["daily", "openai", "silero", "google", "runner"], specifier = "==0.0.99" },
+    { name = "pipecat-ai", extras = ["daily", "openai", "silero", "google", "runner"], specifier = ">=0.0.99" },
 ]
 
 [package.metadata.requires-dev]

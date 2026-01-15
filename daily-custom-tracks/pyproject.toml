@@ -6,7 +6,7 @@ requires-python = ">=3.10"
 dependencies = [
     "pydub",
     "aiohttp",
-    "pipecat-ai[daily]==0.0.99",
+    "pipecat-ai[daily]>=0.0.99",
 ]
 
 [dependency-groups]

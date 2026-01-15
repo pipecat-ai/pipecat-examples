@@ -573,7 +573,7 @@ dev = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "pipecat-ai", extras = ["deepgram", "cartesia", "elevenlabs", "local-smart-turn-v3", "openai", "runner", "silero", "webrtc"], specifier = "==0.0.99" }]
+requires-dist = [{ name = "pipecat-ai", extras = ["deepgram", "cartesia", "elevenlabs", "local-smart-turn-v3", "openai", "runner", "silero", "webrtc"], specifier = ">=0.0.99" }]
 
 [package.metadata.requires-dev]
 dev = [

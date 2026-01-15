@@ -671,7 +671,7 @@ dev = [
 requires-dist = [
     { name = "aiortc" },
     { name = "fastapi", extras = ["all"] },
-    { name = "pipecat-ai", extras = ["google", "silero", "webrtc"], specifier = "==0.0.99" },
+    { name = "pipecat-ai", extras = ["google", "silero", "webrtc"], specifier = ">=0.0.99" },
     { name = "python-dotenv" },
     { name = "uvicorn" },
 ]

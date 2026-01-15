@@ -2183,7 +2183,7 @@ requires-dist = [
     { name = "aiohttp" },
     { name = "async-timeout" },
     { name = "fastapi" },
-    { name = "pipecat-ai", extras = ["daily", "silero", "openai", "cartesia", "google"], specifier = "==0.0.99" },
+    { name = "pipecat-ai", extras = ["daily", "silero", "openai", "cartesia", "google"], specifier = ">=0.0.99" },
     { name = "python-dotenv" },
     { name = "uvicorn" },
 ]

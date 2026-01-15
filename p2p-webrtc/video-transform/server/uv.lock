@@ -3224,7 +3224,7 @@ requires-dist = [
     { name = "aiortc" },
     { name = "fastapi", extras = ["all"] },
     { name = "opencv-python" },
-    { name = "pipecat-ai", extras = ["google", "silero", "webrtc"], specifier = "==0.0.99" },
+    { name = "pipecat-ai", extras = ["google", "silero", "webrtc"], specifier = ">=0.0.99" },
     { name = "pipecat-ai-small-webrtc-prebuilt" },
     { name = "python-dotenv" },
     { name = "uvicorn" },
