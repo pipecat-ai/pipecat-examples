@@ -21,15 +21,14 @@ fun RTVIClientTheme(
 
     MaterialTheme(
         colorScheme = colorScheme,
-        typography = Typography,
         content = content
     )
 }
 
 @Composable
 fun textFieldColors() = TextFieldDefaults.colors().copy(
-    unfocusedContainerColor = Colors.activityBackground,
-    focusedContainerColor = Colors.activityBackground,
+    unfocusedContainerColor = Color.White,
+    focusedContainerColor = Color.White,
     focusedIndicatorColor = Color.Transparent,
     disabledIndicatorColor = Color.Transparent,
     unfocusedIndicatorColor = Color.Transparent,

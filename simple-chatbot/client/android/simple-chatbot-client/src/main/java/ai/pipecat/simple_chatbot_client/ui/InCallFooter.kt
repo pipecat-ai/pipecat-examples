@@ -5,6 +5,7 @@ import ai.pipecat.simple_chatbot_client.ChatHistoryElement
 import ai.pipecat.simple_chatbot_client.R
 import ai.pipecat.simple_chatbot_client.ui.theme.Colors
 import ai.pipecat.simple_chatbot_client.ui.theme.TextStyles
+import ai.pipecat.simple_chatbot_client.ui.theme.TextStyles.base
 import ai.pipecat.simple_chatbot_client.ui.theme.textFieldColors
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.background
@@ -140,7 +141,7 @@ fun ColumnScope.InCallFooter(
                 Text(
                     modifier = Modifier.padding(horizontal = 10.dp, vertical = 1.dp),
                     text = item.text,
-                    style = TextStyles.mono,
+                    style = base,
                     color = when (item.type) {
                         ChatHistoryElement.Type.Bot -> Colors.activityBackground
                         ChatHistoryElement.Type.User -> Colors.lightGrey
