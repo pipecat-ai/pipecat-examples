@@ -4,14 +4,15 @@ version = "0.1.0"
 description = "Pipecat example - daily-custom-tracks"
 requires-python = ">=3.10"
 dependencies = [
-    "pydub,
-    "pipecat-ai[daily]==0.0.99,,
+    "pydub",
+    "aiohttp",
+    "pipecat-ai[daily]==0.0.99",
 ]
 
 [dependency-groups]
 dev = [
-    "pyright>=1.1.404,<2,
-    "ruff>=0.12.11,<1,
+    "pyright>=1.1.404,<2",
+    "ruff>=0.12.11,<1",
 ]
 
 [tool.ruff]
