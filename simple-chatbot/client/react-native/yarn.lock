@@ -1507,10 +1507,10 @@
     "@jridgewell/resolve-uri" "^3.1.0"
     "@jridgewell/sourcemap-codec" "^1.4.14"
 
-"@pipecat-ai/client-js@^1.4.0":
-  version "1.4.0"
-  resolved "https://registry.yarnpkg.com/@pipecat-ai/client-js/-/client-js-1.4.0.tgz#fec361219e7a0f4c1c5516934cb0f3e826005c5d"
-  integrity sha512-HOWz4OWXbIetkywwrfVuEiEpU8FVFksmyP/rSWHSQGu/V2MJflAXfFt2tQmtu8RiQCA7C1qurfZGsxeccYmJXw==
+"@pipecat-ai/client-js@^1.5.0":
+  version "1.5.0"
+  resolved "https://registry.yarnpkg.com/@pipecat-ai/client-js/-/client-js-1.5.0.tgz#ea7f4535472cc2fe9e459c38fb8877e9d588ea5c"
+  integrity sha512-WE8n5P98XoOyEX+k6DkcxBFaeoP82rDl3BEm4Zxf8tw1Umw5zFsv73qR6ztU4D5WDbYiscA3J+hGfe+g8PSUIw==
   dependencies:
     "@types/events" "^3.0.3"
     bowser "^2.11.0"
@@ -1519,12 +1519,12 @@
     typed-emitter "^2.1.0"
     uuid "^10.0.0"
 
-"@pipecat-ai/react-native-daily-transport@^1.4.0":
-  version "1.4.0"
-  resolved "https://registry.yarnpkg.com/@pipecat-ai/react-native-daily-transport/-/react-native-daily-transport-1.4.0.tgz#dd5a4afe01c358003686bc05e7fd27325bad048c"
-  integrity sha512-HXMCJB44tGy2G29TKo2PY1IH/I5iNfJL8jIuZ+j5DraqeVuS28HtouwBIqm+HNI6lPhRN7H7BKKOttD0GkdsdA==
+"@pipecat-ai/react-native-daily-transport@^1.5.0":
+  version "1.5.0"
+  resolved "https://registry.yarnpkg.com/@pipecat-ai/react-native-daily-transport/-/react-native-daily-transport-1.5.0.tgz#3ccaf7847db0dffcce5fd3cd6a4a071e6497206f"
+  integrity sha512-WMIHQtZlnH+N2q/cSCJazV5fwyl+mutdzq/mXDcbKknQZihssLdhiYpDisS5nMX9UUb0XKwAnS+mWOfDbmWLsQ==
   dependencies:
-    "@pipecat-ai/client-js" "^1.4.0"
+    "@pipecat-ai/client-js" "^1.5.0"
 
 "@pkgjs/parseargs@^0.11.0":
   version "0.11.0"

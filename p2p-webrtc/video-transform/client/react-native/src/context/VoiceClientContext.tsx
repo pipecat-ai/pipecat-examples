@@ -9,7 +9,7 @@ import {
   APIRequest,
   PipecatClient,
   TransportState,
-  Participant
+  Participant, AggregationType
 } from '@pipecat-ai/client-js';
 
 import { DailyMediaManager } from '@pipecat-ai/react-native-daily-media-manager';
@@ -102,26 +102,17 @@ export const VoiceClientProvider: React.FC<VoiceClientProviderProps> = ({ childr
         onLocalAudioLevel: (level: number) => {
           setLocalAudioLevel(level)
         },
-        onUserStartedSpeaking:() => {
-          createLiveMessage("User started speaking", "system")
-        },
-        onUserStoppedSpeaking:() => {
-          createLiveMessage("User stopped speaking", "system")
-        },
         onUserTranscript:(data) => {
-          createLiveMessage(data.text, "user")
+          console.log('User transcript:', data.text)
+          if (data.final) {
+            createLiveMessage(data.text, "user")
+          }
         },
         onBotStartedSpeaking: () => {
-          createLiveMessage("Bot started speaking", "system")
           botSpeakingRef.current = true
-          createLiveMessage("", "bot")
         },
         onBotStoppedSpeaking: () => {
-          createLiveMessage("Bot stopped speaking", "system")
           botSpeakingRef.current = false
-        },
-        onBotTtsText:(data) => {
-          appendTextToLiveMessage(data.text)
         },
         onConnected: () => {
           setIsMicEnabled(client.isMicEnabled)
@@ -147,7 +138,17 @@ export const VoiceClientProvider: React.FC<VoiceClientProviderProps> = ({ childr
           } else {
             setRemoteVideoTrack(undefined)
           }
-        }
+        },
+        onServerMessage: (data: any) => {
+          console.log("Received server message:", data)
+        },
+        onBotOutput: (output) => {
+          if (!output.spoken && output.aggregated_by === AggregationType.SENTENCE){
+            createLiveMessage("", "bot")
+          } else if (output.spoken) {
+            appendTextToLiveMessage(output.text + " ")
+          }
+        },
       },
     })
     return client
