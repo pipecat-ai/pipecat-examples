@@ -4,21 +4,35 @@
 # SPDX-License-Identifier: BSD 2-Clause License
 #
 
-import asyncio
 import sys
 
-import aiohttp
+from dotenv import load_dotenv
 from loguru import logger
 from pipecat.frames.frames import Frame, InputAudioRawFrame, OutputAudioRawFrame
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineParams, PipelineTask
 from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
-from pipecat.transports.daily.transport import DailyParams, DailyTransport
-from runner import configure
+from pipecat.runner.types import RunnerArguments
+from pipecat.runner.utils import create_transport
+from pipecat.transports.base_transport import BaseTransport
+from pipecat.transports.daily.transport import DailyParams
 
 logger.remove(0)
 logger.add(sys.stderr, level="DEBUG")
+load_dotenv(override=True)
+
+# We store functions so objects (e.g. SileroVADAnalyzer) don't get
+# instantiated. The function will be called when the desired transport gets
+# selected.
+transport_params = {
+    "daily": lambda: DailyParams(
+        audio_in_enabled=True,
+        audio_out_enabled=True,
+        microphone_out_enabled=False,  # Disable since we just use custom tracks
+        audio_out_destinations=["pipecat-mirror"],
+    ),
+}
 
 
 class CustomTrackMirrorProcessor(FrameProcessor):
@@ -41,48 +55,42 @@ class CustomTrackMirrorProcessor(FrameProcessor):
             await self.push_frame(frame, direction)
 
 
-async def main():
-    async with aiohttp.ClientSession() as session:
-        (room_url, _) = await configure(session)
+async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
+    pipeline = Pipeline(
+        [
+            transport.input(),  # Transport user input
+            CustomTrackMirrorProcessor("pipecat-mirror"),
+            transport.output(),  # Transport bot output
+        ]
+    )
 
-        transport = DailyTransport(
-            room_url,
-            None,
-            "Custom tracks mirror",
-            DailyParams(
-                audio_in_enabled=True,
-                audio_out_enabled=True,
-                microphone_out_enabled=False,  # Disable since we just use custom tracks
-                audio_out_destinations=["pipecat-mirror"],
-            ),
-        )
+    task = PipelineTask(
+        pipeline,
+        params=PipelineParams(
+            audio_in_sample_rate=16000,
+            audio_out_sample_rate=16000,
+            enable_metrics=True,
+            enable_usage_metrics=True,
+        ),
+        idle_timeout_secs=runner_args.pipeline_idle_timeout_secs,
+    )
 
-        pipeline = Pipeline(
-            [
-                transport.input(),  # Transport user input
-                CustomTrackMirrorProcessor("pipecat-mirror"),
-                transport.output(),  # Transport bot output
-            ]
-        )
+    @transport.event_handler("on_participant_joined")
+    async def on_participant_joined(transport, participant):
+        await transport.capture_participant_audio(participant["id"], audio_source="pipecat")
 
-        task = PipelineTask(
-            pipeline,
-            params=PipelineParams(
-                audio_in_sample_rate=16000,
-                audio_out_sample_rate=16000,
-                enable_metrics=True,
-                enable_usage_metrics=True,
-            ),
-        )
+    runner = PipelineRunner(handle_sigint=runner_args.handle_sigint)
 
-        @transport.event_handler("on_first_participant_joined")
-        async def on_first_participant_joined(transport, participant):
-            await transport.capture_participant_audio(participant["id"], audio_source="pipecat")
+    await runner.run(task)
 
-        runner = PipelineRunner()
 
-        await runner.run(task)
+async def bot(runner_args: RunnerArguments):
+    """Main bot entry point compatible with Pipecat Cloud."""
+    transport = await create_transport(runner_args, transport_params)
+    await run_bot(transport, runner_args)
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    from pipecat.runner.run import main
+
+    main()
