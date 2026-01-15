@@ -5,7 +5,6 @@ import ai.pipecat.simple_chatbot_client.ChatHistoryElement
 import ai.pipecat.simple_chatbot_client.R
 import ai.pipecat.simple_chatbot_client.ui.theme.Colors
 import ai.pipecat.simple_chatbot_client.ui.theme.TextStyles
-import ai.pipecat.simple_chatbot_client.ui.theme.TextStyles.base
 import ai.pipecat.simple_chatbot_client.ui.theme.textFieldColors
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.background
@@ -103,7 +102,6 @@ private fun FooterButton(
 
 @Composable
 fun ColumnScope.InCallFooter(
-    onClickEnd: () -> Unit,
     onSubmitChatText: (String, SendTextOptions) -> Unit,
     chatHistory: SnapshotStateList<ChatHistoryElement>
 ) {
@@ -141,7 +139,7 @@ fun ColumnScope.InCallFooter(
                 Text(
                     modifier = Modifier.padding(horizontal = 10.dp, vertical = 1.dp),
                     text = item.text,
-                    style = base,
+                    style = TextStyles.base,
                     color = when (item.type) {
                         ChatHistoryElement.Type.Bot -> Colors.activityBackground
                         ChatHistoryElement.Type.User -> Colors.lightGrey
@@ -282,25 +280,6 @@ fun ColumnScope.InCallFooter(
             border = Colors.endButton
         )
     }
-
-
-    // End button
-
-    Row(Modifier
-        .fillMaxWidth(0.5f)
-        .padding(15.dp)
-        .align(Alignment.CenterHorizontally)
-    ) {
-        FooterButton(
-            modifier = Modifier.weight(1f),
-            onClick = onClickEnd,
-            icon = R.drawable.phone_hangup,
-            text = "End",
-            foreground = Color.White,
-            background = Colors.endButton,
-            border = Colors.endButton
-        )
-    }
 }
 
 @Composable
@@ -311,7 +290,7 @@ private fun InCallFooterPreview() {
             .fillMaxWidth()
             .background(Colors.activityBackground)
     ) {
-        InCallFooter({}, { _, _ -> }, remember { mutableStateListOf(
+        InCallFooter({ _, _ -> }, remember { mutableStateListOf(
             ChatHistoryElement(ChatHistoryElement.Type.Bot, "Bot"),
             ChatHistoryElement(ChatHistoryElement.Type.User, "User"),
             ChatHistoryElement(ChatHistoryElement.Type.Log, "Log")
