@@ -4,6 +4,29 @@ This repository contains example applications for [Pipecat](https://github.com/p
 
 **Always consult [docs.pipecat.ai](https://docs.pipecat.ai/) for API references, guides, and troubleshooting.**
 
+## Core Concept: Frames and Frame Processing
+
+Pipecat's fundamental pattern is **pushing and processing frames**. When creating examples, always follow this pattern:
+
+- **Frames** are data containers (audio, text, images, control signals) that flow through your pipeline like packages on a conveyor belt
+- **Frame Processors** receive frames, process them, and push new frames downstream via `push_frame()`
+- Processors don't consume frames—they pass them along, allowing multiple processors to use the same data
+- Frame order is guaranteed: SystemFrames process immediately, DataFrames/ControlFrames are queued in order
+
+Every custom processor follows this pattern:
+```python
+class MyProcessor(FrameProcessor):
+    async def process_frame(self, frame: Frame, direction: FrameDirection):
+        await super().process_frame(frame, direction)
+        # Handle specific frame types
+        if isinstance(frame, SomeFrame):
+            # Do processing...
+        # Always push frame to next processor
+        await self.push_frame(frame, direction)
+```
+
+**Reference:** [Pipeline & Frame Processing Guide](https://docs.pipecat.ai/guides/learn/pipeline)
+
 ## Architecture Overview
 
 Each example is a **standalone project** in its own directory with:
