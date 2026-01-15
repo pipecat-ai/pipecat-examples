@@ -6,15 +6,9 @@ import ai.pipecat.simple_chatbot_client.HDivider
 import ai.pipecat.simple_chatbot_client.R
 import ai.pipecat.simple_chatbot_client.ui.theme.Colors
 import ai.pipecat.simple_chatbot_client.ui.theme.TextStyles
-import ai.pipecat.simple_chatbot_client.ui.theme.textFieldColors
-import androidx.annotation.DrawableRes
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -26,15 +20,13 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -45,45 +37,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.RectangleShape
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-
-@Composable
-private fun FooterButton(
-    modifier: Modifier,
-    onClick: () -> Unit,
-    @DrawableRes icon: Int,
-    foreground: Color,
-    background: Color,
-    border: Color,
-) {
-    val shape = RectangleShape
-
-    Row(
-        modifier
-            .border(1.dp, border, shape)
-            .clip(shape)
-            .background(background)
-            .clickable(onClick = onClick)
-            .padding(vertical = 10.dp, horizontal = 18.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.Center
-    ) {
-        Icon(
-            modifier = Modifier.size(24.dp),
-            painter = painterResource(icon),
-            tint = foreground,
-            contentDescription = null
-        )
-    }
-}
 
 
 @Composable
@@ -107,7 +66,9 @@ fun ChatArea(
         }
 
         LazyColumn(
-            modifier = Modifier.fillMaxWidth().weight(1f),
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f),
             state = listState
         ) {
             item {
@@ -133,8 +94,8 @@ fun ChatArea(
                     },
                     fontSize = 14.sp
                 )
-                Spacer(Modifier.height(8.dp))
 
+                Spacer(Modifier.height(8.dp))
             }
 
             item {
@@ -148,11 +109,20 @@ fun ChatArea(
     // Text input field
 
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(15.dp),
-        verticalAlignment = Alignment.CenterVertically
+        modifier = Modifier.fillMaxWidth(),
     ) {
+        val rowHeight = 64.dp
+
+        @Composable
+        fun VDivider() {
+            Box(
+                Modifier
+                    .height(64.dp)
+                    .width(1.dp)
+                    .background(Colors.textFieldBorder)
+            )
+        }
+
         var chatText by remember { mutableStateOf("") }
 
         val submitChatText = {
@@ -160,57 +130,61 @@ fun ChatArea(
             chatText = ""
         }
 
-        TextField(
+        Box(
             modifier = Modifier
                 .weight(1f)
-                .border(1.dp, Colors.textFieldBorder, RectangleShape),
-            value = chatText,
-            textStyle = TextStyles.base,
-            onValueChange = { chatText = it },
-            keyboardOptions = KeyboardOptions(
-                keyboardType = KeyboardType.Text,
-                imeAction = ImeAction.Go
-            ),
-            keyboardActions = KeyboardActions(
-                onGo = { submitChatText() }
-            ),
-            placeholder = {
+                .height(rowHeight)
+                .background(Color.White)
+                .padding(vertical = 6.dp, horizontal = 12.dp)
+        ) {
+            BasicTextField(
+                modifier = Modifier.fillMaxSize(),
+                value = chatText,
+                textStyle = TextStyles.base,
+                onValueChange = { chatText = it },
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Text,
+                    imeAction = ImeAction.Go
+                ),
+                keyboardActions = KeyboardActions(
+                    onGo = { submitChatText() }
+                ),
+            )
+
+            if (chatText.isEmpty()) {
                 Text(
                     text = "Send text message...",
                     style = TextStyles.base,
                     fontSize = 14.sp,
+                    color = Colors.unmutedMicBackground
                 )
-            },
-            colors = textFieldColors(),
-            shape = RoundedCornerShape(12.dp),
-        )
+            }
+        }
 
-        Spacer(Modifier.width(8.dp))
+        VDivider()
 
         Box {
-            FooterButton(
-                modifier = Modifier,
-                onClick = { showOptionsPopup = !showOptionsPopup },
+            ToolbarIconButton(
+                modifier = Modifier.size(rowHeight),
                 icon = R.drawable.three_dots,
-                foreground = Color.White,
-                background = Colors.endButton,
-                border = Colors.endButton
-            )
-            
+                contentDescription = "More options",
+            ) {
+                showOptionsPopup = !showOptionsPopup
+            }
+
             DropdownMenu(
                 expanded = showOptionsPopup,
                 onDismissRequest = { showOptionsPopup = false },
-                modifier = Modifier.padding(PaddingValues(end = 16.dp)),
                 containerColor = Color.White,
             ) {
                 DropdownMenuItem(
-                    text = { 
+                    text = {
                         Row(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Checkbox(
                                 checked = sendTextOptions.runImmediately ?: true,
-                                onCheckedChange = { 
+                                onCheckedChange = {
                                     sendTextOptions = sendTextOptions.copy(runImmediately = it)
                                 }
                             )
@@ -223,21 +197,21 @@ fun ChatArea(
                             )
                         }
                     },
-                    onClick = { 
+                    onClick = {
                         sendTextOptions = sendTextOptions.copy(
                             runImmediately = !(sendTextOptions.runImmediately ?: true)
                         )
                     }
                 )
-                
+
                 DropdownMenuItem(
-                    text = { 
+                    text = {
                         Row(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Checkbox(
                                 checked = sendTextOptions.audioResponse ?: true,
-                                onCheckedChange = { 
+                                onCheckedChange = {
                                     sendTextOptions = sendTextOptions.copy(audioResponse = it)
                                 }
                             )
@@ -250,7 +224,7 @@ fun ChatArea(
                             )
                         }
                     },
-                    onClick = { 
+                    onClick = {
                         sendTextOptions = sendTextOptions.copy(
                             audioResponse = !(sendTextOptions.audioResponse ?: true)
                         )
@@ -259,15 +233,13 @@ fun ChatArea(
             }
         }
 
-        Spacer(Modifier.width(8.dp))
+        VDivider()
 
-        FooterButton(
-            modifier = Modifier,
-            onClick = submitChatText,
+        ToolbarIconButton(
+            modifier = Modifier.size(rowHeight),
             icon = R.drawable.send,
-            foreground = Color.White,
-            background = Colors.endButton,
-            border = Colors.endButton
+            contentDescription = "Send",
+            onClick = submitChatText
         )
     }
 }
@@ -280,10 +252,12 @@ private fun ChatAreaPreview() {
             .fillMaxWidth()
             .background(Colors.activityBackground)
     ) {
-        ChatArea(Modifier.fillMaxSize(), { _, _ -> }, remember { mutableStateListOf(
-            ChatHistoryElement(ChatHistoryElement.Type.Bot, "Bot"),
-            ChatHistoryElement(ChatHistoryElement.Type.User, "User"),
-            ChatHistoryElement(ChatHistoryElement.Type.Log, "Log")
-        ) })
+        ChatArea(Modifier.fillMaxSize(), { _, _ -> }, remember {
+            mutableStateListOf(
+                ChatHistoryElement(ChatHistoryElement.Type.Bot, "Bot"),
+                ChatHistoryElement(ChatHistoryElement.Type.User, "User"),
+                ChatHistoryElement(ChatHistoryElement.Type.Log, "Log")
+            )
+        })
     }
 }

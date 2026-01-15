@@ -126,7 +126,7 @@ fun InCallLayout(voiceClientManager: VoiceClientManager) {
         }
 
         ChatArea(
-            modifier = Modifier.weight(1f).fillMaxWidth(),
+            modifier = Modifier.weight(2f).fillMaxWidth(),
             onSubmitChatText = voiceClientManager::sendText,
             chatHistory = voiceClientManager.chatHistory,
         )
