@@ -143,9 +143,9 @@ export const VoiceClientProvider: React.FC<VoiceClientProviderProps> = ({ childr
           console.log("Received server message:", data)
         },
         onBotOutput: (output) => {
-          if (output.aggregated_by === AggregationType.SENTENCE){
+          if (!output.spoken && output.aggregated_by === AggregationType.SENTENCE){
             createLiveMessage("", "bot")
-          } else if (output.aggregated_by === AggregationType.WORD){
+          } else if (output.spoken) {
             appendTextToLiveMessage(output.text + " ")
           }
         },
