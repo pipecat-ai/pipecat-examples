@@ -70,6 +70,7 @@ class VoiceClientManager(private val context: Context) {
     val botAudioLevel = mutableFloatStateOf(0f)
     val userAudioLevel = mutableFloatStateOf(0f)
 
+    val transportType = mutableStateOf<TransportType?>(null)
     val mic = mutableStateOf(false)
     val camera = mutableStateOf(false)
     val tracks = mutableStateOf<Tracks?>(null)
@@ -90,6 +91,7 @@ class VoiceClientManager(private val context: Context) {
         }
 
         chatHistory.clear()
+        this.transportType.value = transportType
 
         state.value = TransportState.Disconnected
 

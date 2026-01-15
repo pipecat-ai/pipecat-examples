@@ -28,7 +28,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
@@ -84,9 +83,13 @@ class MainActivity : ComponentActivity() {
                             val dismiss: () -> Unit = { voiceClientManager.errors.removeAt(0) }
 
                             AlertDialog(
+                                shape = RectangleShape,
                                 onDismissRequest = dismiss,
                                 confirmButton = {
-                                    Button(onClick = dismiss) {
+                                    Button(
+                                        onClick = dismiss,
+                                        shape = RectangleShape
+                                    ) {
                                         Text(
                                             text = "OK",
                                             fontSize = 14.sp,
@@ -100,8 +103,8 @@ class MainActivity : ComponentActivity() {
                                 title = {
                                     Text(
                                         text = "Error",
-                                        fontSize = 22.sp,
-                                        fontWeight = FontWeight.W600,
+                                        fontSize = 18.sp,
+                                        fontWeight = FontWeight.W700,
                                         color = Color.Black,
                                         style = TextStyles.base
                                     )
@@ -109,7 +112,7 @@ class MainActivity : ComponentActivity() {
                                 text = {
                                     Text(
                                         text = errorText.message,
-                                        fontSize = 16.sp,
+                                        fontSize = 14.sp,
                                         fontWeight = FontWeight.W400,
                                         color = Color.Black,
                                         style = TextStyles.base
@@ -147,11 +150,6 @@ fun ConnectSettings(
 
     Column(Modifier.fillMaxSize()) {
 
-        @Composable
-        fun Divider() {
-            Box(Modifier.fillMaxWidth().height(1.dp).background(Colors.textFieldBorder))
-        }
-
         Row(
             modifier = Modifier.padding(vertical = 12.dp, horizontal = 24.dp),
             verticalAlignment = Alignment.CenterVertically
@@ -172,7 +170,7 @@ fun ConnectSettings(
             )
         }
 
-        Divider()
+        HDivider()
 
         Box(
             modifier = Modifier
@@ -284,7 +282,7 @@ private fun ConnectDialogButton(
     modifier: Modifier = Modifier,
     @DrawableRes icon: Int? = null,
 ) {
-    val shape = RoundedCornerShape(8.dp)
+    val shape = RectangleShape
 
     Row(
         modifier
