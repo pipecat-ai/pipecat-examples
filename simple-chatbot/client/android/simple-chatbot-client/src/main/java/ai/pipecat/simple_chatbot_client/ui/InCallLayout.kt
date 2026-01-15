@@ -5,6 +5,7 @@ import ai.pipecat.simple_chatbot_client.HDivider
 import ai.pipecat.simple_chatbot_client.VoiceClientManager
 import ai.pipecat.simple_chatbot_client.ui.theme.Colors
 import ai.pipecat.simple_chatbot_client.ui.theme.TextStyles
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -48,15 +49,16 @@ fun InCallLayout(voiceClientManager: VoiceClientManager) {
                 Box(Modifier.height(64.dp).width(1.dp).background(Colors.textFieldBorder))
             }
 
+            val level = animateFloatAsState(voiceClientManager.botAudioLevel.floatValue)
+
             Box(
                 modifier = Modifier
                     .weight(1f)
                     .height(rowHeight)
                     .drawBehind {
-                        val level = voiceClientManager.botAudioLevel.floatValue
                         drawRect(
-                            color = Color.White,
-                            size = Size(width = size.width * level, height = size.height)
+                            color = Colors.textFieldBorder,
+                            size = Size(width = size.width * level.value, height = size.height)
                         )
                     },
                 contentAlignment = Alignment.CenterStart
