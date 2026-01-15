@@ -5,7 +5,8 @@ description = "Push to talk example"
 requires-python = ">=3.10"
 dependencies = [
     "pipecat-ai[daily,deepgram,openai,silero,cartesia,runner]>=0.0.99",
-    "pipecatcloud>=0.2.6"
+    "pipecatcloud>=0.2.6",
+    "aiortc",
 ]
 
 [dependency-groups]
