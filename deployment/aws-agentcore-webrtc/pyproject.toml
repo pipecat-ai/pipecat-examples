@@ -9,7 +9,7 @@ dependencies = [
     "aioboto3",
     "bedrock-agentcore",
     "python-dotenv",
-    "pipecat-ai[aws,webrtc,daily,silero,deepgram,openai,cartesia,runner]",
+    "pipecat-ai[aws,webrtc,daily,silero,deepgram,openai,cartesia,runner]==0.0.99",
     "pipecat-ai-small-webrtc-prebuilt>=2.0.0"
 ]
 
