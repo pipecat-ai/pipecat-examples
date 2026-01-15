@@ -30,7 +30,7 @@ dependencies = [
 requires-dist = [
     { name = "aiohttp" },
     { name = "bedrock-agentcore" },
-    { name = "pipecat-ai", extras = ["aws", "webrtc", "daily", "silero", "deepgram", "openai", "cartesia", "runner"], specifier = "==0.0.99" },
+    { name = "pipecat-ai", extras = ["aws", "webrtc", "daily", "silero", "deepgram", "openai", "cartesia", "runner"], specifier = ">=0.0.99" },
 ]
 
 [[package]]

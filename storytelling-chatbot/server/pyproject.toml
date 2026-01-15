@@ -9,7 +9,7 @@ dependencies = [
     "uvicorn",
     "python-dotenv",
     "aiohttp",
-    "pipecat-ai[daily,silero,openai,cartesia,google]==0.0.99",
+    "pipecat-ai[daily,silero,openai,cartesia,google]>=0.0.99",
 ]
 
 [dependency-groups]

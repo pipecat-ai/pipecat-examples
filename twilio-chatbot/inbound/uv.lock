@@ -876,7 +876,7 @@ dev = [
 requires-dist = [
     { name = "aiofiles" },
     { name = "aiohttp" },
-    { name = "pipecat-ai", extras = ["websocket", "cartesia", "openai", "silero", "deepgram", "runner"], specifier = "==0.0.99" },
+    { name = "pipecat-ai", extras = ["websocket", "cartesia", "openai", "silero", "deepgram", "runner"], specifier = ">=0.0.99" },
 ]
 
 [package.metadata.requires-dev]

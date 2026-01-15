@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Word Wrangler guessing game powered by Gemini"
 requires-python = ">=3.10"
 dependencies = [
-    "pipecat-ai[daily,silero,google,local-smart-turn-v3,runner]==0.0.99",
+    "pipecat-ai[daily,silero,google,local-smart-turn-v3,runner]>=0.0.99",
     "pipecatcloud>=0.2.6"
 ]
 

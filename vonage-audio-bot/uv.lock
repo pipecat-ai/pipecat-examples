@@ -3226,7 +3226,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "opentok", specifier = ">=3.0.0" },
-    { name = "pipecat-ai", extras = ["openai", "websocket", "silero", "runner"], specifier = "==0.0.99" },
+    { name = "pipecat-ai", extras = ["openai", "websocket", "silero", "runner"], specifier = ">=0.0.99" },
     { name = "pydub", specifier = ">=0.25" },
     { name = "pyjwt", specifier = ">=2.8.0" },
     { name = "python-dotenv" },

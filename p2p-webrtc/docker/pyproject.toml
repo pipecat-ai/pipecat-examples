@@ -8,7 +8,7 @@ dependencies = [
     "fastapi[all]",
     "uvicorn",
     "aiortc",
-    "pipecat-ai[google,silero,webrtc]==0.0.99,",
+    "pipecat-ai[google,silero,webrtc]>=0.0.99,",
 ]
 
 [dependency-groups]

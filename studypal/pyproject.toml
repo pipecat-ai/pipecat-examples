@@ -5,7 +5,7 @@ description = "Studypal example"
 requires-python = ">=3.10"
 dependencies = [
     "aiohttp",
-    "pipecat-ai[daily,anthropic,cartesia,silero]==0.0.99",
+    "pipecat-ai[daily,anthropic,cartesia,silero]>=0.0.99",
 ]
 
 [dependency-groups]

@@ -28,7 +28,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "bedrock-agentcore" },
-    { name = "pipecat-ai", extras = ["aws", "cartesia", "daily", "deepgram", "runner", "silero", "websocket", "local-smart-turn-v3"], specifier = "==0.0.99" },
+    { name = "pipecat-ai", extras = ["aws", "cartesia", "daily", "deepgram", "runner", "silero", "websocket", "local-smart-turn-v3"], specifier = ">=0.0.99" },
 ]
 
 [[package]]

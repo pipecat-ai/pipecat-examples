@@ -2286,7 +2286,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "opentelemetry-exporter-otlp-proto-http" },
-    { name = "pipecat-ai", extras = ["daily", "webrtc", "websocket", "silero", "cartesia", "deepgram", "openai", "tracing", "runner"], specifier = "==0.0.99" },
+    { name = "pipecat-ai", extras = ["daily", "webrtc", "websocket", "silero", "cartesia", "deepgram", "openai", "tracing", "runner"], specifier = ">=0.0.99" },
     { name = "pipecatcloud", specifier = ">=0.2.5" },
 ]
 

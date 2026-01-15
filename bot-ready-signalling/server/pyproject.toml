@@ -7,7 +7,7 @@ dependencies = [
     "python-dotenv",
     "fastapi[all]",
     "uvicorn",
-    "pipecat-ai[daily,cartesia,openai]==0.0.99,",
+    "pipecat-ai[daily,cartesia,openai]>=0.0.99,",
 ]
 
 [dependency-groups]
