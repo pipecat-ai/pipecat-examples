@@ -3,7 +3,6 @@ package ai.pipecat.simple_chatbot_client.ui
 import ai.pipecat.simple_chatbot_client.R
 import ai.pipecat.simple_chatbot_client.ui.theme.Colors
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
@@ -29,12 +28,7 @@ fun CamButton(
             .combinedClickable(
                 onClick = onClick,
                 onLongClick = onLongClick
-            )
-            .background(if (camEnabled) {
-                Color.Transparent
-            } else {
-                Colors.mutedMicBackground
-            }),
+            ),
         contentAlignment = Alignment.Center
     ) {
         Icon(
@@ -49,7 +43,7 @@ fun CamButton(
             tint = if (camEnabled) {
                 Color.Black
             } else {
-                Color.White
+                Colors.mutedMicBackground
             },
             contentDescription = if (camEnabled) {
                 "Turn camera off"

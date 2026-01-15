@@ -88,6 +88,13 @@ fun InCallLayout(voiceClientManager: VoiceClientManager) {
                 onLongClick = voiceClientManager::flipCamera,
                 camEnabled = voiceClientManager.camera.value,
             )
+
+            VDivider()
+
+            ExitButton(
+                modifier = Modifier.size(rowHeight),
+                onClick = voiceClientManager::stop
+            )
         }
 
         HDivider()
@@ -118,7 +125,6 @@ fun InCallLayout(voiceClientManager: VoiceClientManager) {
         }
 
         InCallFooter(
-            onClickEnd = voiceClientManager::stop,
             onSubmitChatText = voiceClientManager::sendText,
             chatHistory = voiceClientManager.chatHistory,
         )

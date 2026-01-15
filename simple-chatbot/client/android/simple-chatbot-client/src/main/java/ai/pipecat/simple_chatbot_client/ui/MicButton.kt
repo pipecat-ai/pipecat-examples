@@ -43,11 +43,6 @@ fun MicButton(
                         topLeft = Offset(0f, size.height - height),
                         size = Size(size.width, height)
                     )
-                } else {
-                    drawRect(
-                        color = Colors.mutedMicBackground,
-                        size = size
-                    )
                 }
             },
         contentAlignment = Alignment.Center
@@ -61,12 +56,12 @@ fun MicButton(
                     R.drawable.microphone_off
                 }
             ),
-            tint = if (isTalking.value) {
+            tint = if (!micEnabled) {
+                Colors.mutedMicBackground
+            } else if (isTalking.value) {
                 Colors.micActive
-            } else if (micEnabled) {
-                Color.Black
             } else {
-                Color.White
+                Color.Black
             },
             contentDescription = if (micEnabled) {
                 "Mute microphone"
