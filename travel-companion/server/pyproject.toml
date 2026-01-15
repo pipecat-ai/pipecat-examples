@@ -4,13 +4,14 @@ version = "0.1.0"
 description = "Pipecat example - server"
 requires-python = ">=3.10"
 dependencies = [
-    "pipecat-ai[daily,openai,silero,google,runner]==0.0.99,,
+    "aiohttp",
+    "pipecat-ai[daily,openai,silero,google,runner]==0.0.99",
 ]
 
 [dependency-groups]
 dev = [
-    "pyright>=1.1.404,<2,
-    "ruff>=0.12.11,<1,
+    "pyright>=1.1.404,<2",
+    "ruff>=0.12.11,<1",
 ]
 
 [tool.ruff]

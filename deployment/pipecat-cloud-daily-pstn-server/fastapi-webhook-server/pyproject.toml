@@ -4,18 +4,18 @@ version = "0.1.0"
 description = "Pipecat example - fastapi-webhook-server"
 requires-python = ">=3.10"
 dependencies = [
-    "fastapi,
-    "uvicorn,
-    "python-dotenv,
-    "requests,
-    "pydantic,
-    "loguru,
+    "fastapi",
+    "uvicorn",
+    "python-dotenv",
+    "requests",
+    "pydantic",
+    "loguru",
 ]
 
 [dependency-groups]
 dev = [
-    "pyright>=1.1.404,<2,
-    "ruff>=0.12.11,<1,
+    "pyright>=1.1.404,<2",
+    "ruff>=0.12.11,<1",
 ]
 
 [tool.ruff]

@@ -4,18 +4,18 @@ version = "0.1.0"
 description = "Pipecat example - aws-strands"
 requires-python = ">=3.10"
 dependencies = [
-    "fastapi,
-    "uvicorn,
-    "python-dotenv,
-    "pipecat-ai[webrtc,daily,deepgram,cartesia,silero]==0.0.99,,
-    "pipecat-ai==0.0.99==0.0.99,,
-    "strands-agents,
+    "fastapi",
+    "uvicorn",
+    "python-dotenv",
+    "pipecat-ai[webrtc,daily,deepgram,cartesia,silero]==0.0.99,",
+    "pipecat-ai==0.0.99==0.0.99,",
+    "strands-agents",
 ]
 
 [dependency-groups]
 dev = [
-    "pyright>=1.1.404,<2,
-    "ruff>=0.12.11,<1,
+    "pyright>=1.1.404,<2",
+    "ruff>=0.12.11,<1",
 ]
 
 [tool.ruff]
