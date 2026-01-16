@@ -43,14 +43,14 @@ Receives and sends raw PCM audio frames to/from Pipecat.
 
 ## Prerequisites
 
-### Vonage (TokBox / Video API)
+### Vonage (Opentok / Video API)
 
-- A Vonage (TokBox) account with:
+- A Vonage (Opentok / Video API) account with:
 - A Vonage Video API project with either:
-  -Vonage account credentials
+  - Vonage account credentials
     - Project Application ID
     - Project Private Key file
-  -Opentok/ Nexmo account credentials
+  - Opentok / Nexmo account credentials
     - Project API Key
     - Project Secret
 - A routed Vonage session
@@ -82,11 +82,11 @@ uv sync
 
 From your **Opentok (TokBox) dashboard:**
 - Project API Key and Secret
-  - Select your project on [Vonage Tokbox](https://tokbox.com/account/#/)
+  - Select your project on [Vonage Opentok](https://tokbox.com/account/#/)
 OR
 From your **Vonage Video API dashboard:**
 - Project Application ID and Private Key file
-  - Select your project on [Vonage Video API](https://developer.vonage.com/en/video/getting-started/overview)
+  - Select your project on [Vonage Video API](https://developer.vonage.com/en/video/getting-started)
 
 - Session ID
   - Create a routed session using:
