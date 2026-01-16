@@ -10,7 +10,6 @@ import os
 
 import aiohttp
 import tiktoken
-from bs4 import BeautifulSoup
 from dotenv import load_dotenv
 from loguru import logger
 from pipecat.audio.turn.smart_turn.local_smart_turn_v3 import LocalSmartTurnAnalyzerV3
@@ -85,25 +84,51 @@ async def get_article_content(url: str, aiohttp_session: aiohttp.ClientSession):
         return await get_wikipedia_content(url, aiohttp_session)
 
 
-# Helper function to extract content from Wikipedia url (this is
-# technically agnostic to URL type but will work best with Wikipedia
-# articles)
+# Helper function to extract content from Wikipedia url using the Wikipedia API
 
 
 async def get_wikipedia_content(url: str, aiohttp_session: aiohttp.ClientSession):
-    async with aiohttp_session.get(url) as response:
-        if response.status != 200:
-            return "Failed to download Wikipedia article."
-
-        text = await response.text()
-        soup = BeautifulSoup(text, "html.parser")
-
-        content = soup.find("div", {"class": "mw-parser-output"})
-
-        if content:
-            return content.get_text()
+    # Extract the article title from the URL
+    # Example: https://en.wikipedia.org/wiki/Python_(programming_language) -> Python_(programming_language)
+    try:
+        title = url.split("/wiki/")[-1]
+        # Determine the language subdomain (default to 'en')
+        if "wikipedia.org" in url:
+            lang = url.split("://")[1].split(".")[0]
         else:
+            lang = "en"
+
+        # Use Wikipedia's API to get plain text content
+        api_url = f"https://{lang}.wikipedia.org/w/api.php"
+        params = {
+            "action": "query",
+            "format": "json",
+            "prop": "extracts",
+            "titles": title,
+            "explaintext": 1,
+            "exsectionformat": "plain",
+        }
+
+        async with aiohttp_session.get(api_url, params=params) as response:
+            if response.status != 200:
+                return "Failed to download Wikipedia article."
+
+            data = await response.json()
+            pages = data.get("query", {}).get("pages", {})
+
+            for page_id, page_data in pages.items():
+                if page_id == "-1":
+                    return "Wikipedia article not found."
+                extract = page_data.get("extract", "")
+                if extract:
+                    return extract
+                else:
+                    return "Failed to extract Wikipedia article content."
+
             return "Failed to extract Wikipedia article content."
+    except Exception as e:
+        logger.error(f"Error extracting Wikipedia content: {e}")
+        return f"Failed to extract Wikipedia article: {str(e)}"
 
 
 # Helper function to extract content from arXiv url
@@ -133,7 +158,12 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
 
     url = input("Enter the URL of the article you would like to talk about: ")
 
-    async with aiohttp.ClientSession() as session:
+    # Set up headers with User-Agent for all requests
+    headers = {
+        "User-Agent": "StudyPal/1.0 (Educational bot; https://github.com/pipecat-ai/pipecat-examples)"
+    }
+
+    async with aiohttp.ClientSession(headers=headers) as session:
         article_content = await get_article_content(url, session)
         article_content = truncate_content(article_content, model_name="gpt-4o-mini")
 
