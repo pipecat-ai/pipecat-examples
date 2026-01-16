@@ -29,7 +29,9 @@ from fastapi import FastAPI, HTTPException, Request, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from loguru import logger
-from opentok import Client as OpenTokClient  # Vonage Video SDK
+from opentok import Client as OpenTokClient  # Opentok Video SDK
+from vonage import Auth, HttpClientOptions, Vonage
+from vonage_video import AudioConnectorOptions, TokenOptions
 
 load_dotenv(override=True)
 
@@ -49,6 +51,8 @@ async def connect_audio_connector(
     ws_uri: str,
     audio_rate: int,
     api_base: str,
+    application_id: str,
+    private_key: str,
 ) -> Any:
     """
     Calls Vonage (OpenTok) Audio Connector connect API.
@@ -58,7 +62,7 @@ async def connect_audio_connector(
         f"Calling Vonage Audio Connector connect: session_id={session_id}, ws_uri={ws_uri}, audioRate={audio_rate}"
     )
 
-    def _call_connect() -> Any:
+    def _call_opentok_connect() -> Any:
         try:
             ot = OpenTokClient(api_key, api_secret, api_url=api_base)
         except TypeError:
@@ -73,8 +77,38 @@ async def connect_audio_connector(
         resp = ot.connect_audio_to_websocket(session_id, token, ws_opts)
         return resp
 
+    def _call_vonage_connect() -> Any:
+        # Create an Auth instance
+        logger.info("CREATING AUTH")
+        auth = Auth(
+            application_id=application_id,
+            private_key=private_key,
+        )
+
+        options = HttpClientOptions(video_host="video." + api_base, timeout=30)
+
+        # Create a Vonage instance
+        vng = Vonage(auth=auth, http_client_options=options)
+
+        token_options = TokenOptions(session_id=session_id, role="publisher")
+        client_token = vng.video.generate_client_token(token_options)
+        ws_opts = {
+            "uri": ws_uri,
+            "audioRate": audio_rate,
+            "bidirectional": True,
+        }
+
+        audio_connector_options = AudioConnectorOptions(
+            session_id=session_id, token=client_token, websocket=ws_opts
+        )
+        return vng.video.start_audio_connector(audio_connector_options)
+
     loop = asyncio.get_running_loop()
-    return await loop.run_in_executor(None, _call_connect)
+    # Choose which connector to call based on the flag
+    if application_id:
+        return await loop.run_in_executor(None, _call_vonage_connect)
+    else:
+        return await loop.run_in_executor(None, _call_opentok_connect)
 
 
 @asynccontextmanager
@@ -105,13 +139,29 @@ async def connect(request: Request) -> JSONResponse:
     Trigger Vonage Audio Connector to connect to our WebSocket.
     You can call this from curl or from your UI/client.
     """
-    api_key = _require_env("VONAGE_API_KEY")
-    api_secret = _require_env("VONAGE_API_SECRET")
+    application_id = os.getenv("VONAGE_APPLICATION_ID")
+    private_key = os.getenv("VONAGE_PRIVATE_KEY")
+
+    api_key = os.getenv("OPENTOK_API_KEY")
+    api_secret = os.getenv("OPENTOK_API_SECRET")
+
+    # Determine API base and set the flag indicating application-based auth
+    if application_id and private_key:
+        # Vonage application auth path uses Vonage Video API host
+        api_base = os.getenv("API_URL", "api.vonage.com")
+        use_application_auth = True
+    elif api_key and api_secret:
+        # OpenTok key/secret path uses OpenTok API URL
+        api_base = os.getenv("API_URL", "https://api.opentok.com")
+        use_application_auth = False
+    else:
+        raise HTTPException(
+            status_code=500,
+            detail="Missing Vonage auth env vars: either VONAGE_APPLICATION_ID and VONAGE_PRIVATE_KEY, or VONAGE_API_KEY and VONAGE_API_SECRET",
+        )
+
     session_id = _require_env("VONAGE_SESSION_ID")
-
-    api_base = os.getenv("OPENTOK_API_URL", "https://api.opentok.com")
     audio_rate = int(os.getenv("VONAGE_AUDIO_RATE", "16000"))
-
     ws_uri = os.getenv("WS_URI")
 
     try:
@@ -122,6 +172,8 @@ async def connect(request: Request) -> JSONResponse:
             ws_uri=ws_uri,
             audio_rate=audio_rate,
             api_base=api_base,
+            application_id=application_id,
+            private_key=private_key,
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to connect Audio Connector: {e}")
