@@ -131,7 +131,7 @@ First, run the agent locally:
 
 ```bash
 cd agent
-uv run python agent.py
+uv run agent.py
 ```
 
 This will make the agent reachable at "ws://localhost:8080/ws".
@@ -139,7 +139,7 @@ This will make the agent reachable at "ws://localhost:8080/ws".
 Then, run the server as usual, but with the `LOCAL_AGENT=1` environment variable:
 
 ```bash
-LOCAL_AGENT=1 uv run python server.py
+LOCAL_AGENT=1 uv run server.py
 ```
 
 You can then [run your client as usual](#running-the-client).

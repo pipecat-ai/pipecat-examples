@@ -7,36 +7,40 @@ A Pipecat example demonstrating the simplest way to create a voice agent using `
 ### 1️⃣ Start the Bot Server
 
 #### 🔧 Set Up the Environment
-1. Create and activate a virtual environment:
+
+1. Navigate to the server directory:
+
    ```bash
-   python3 -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   cd server
    ```
 
 2. Install dependencies:
+
    ```bash
-   pip install -r requirements.txt
+   uv sync
    ```
 
 3. Configure environment variables:
-   - Copy `env.example` to `.env`
    ```bash
    cp env.example .env
    ```
    - Add your API keys
-   - Choose what do you wish to use, 'fast_api' or 'websocket_server'
+   - Choose what you wish to use: 'fast_api' or 'websocket_server'
 
 #### ▶️ Run the Server
+
 ```bash
-python server/server.py
+uv run server.py
 ```
 
 ### 3️⃣ Connect Using a Custom Client App
 
 For client-side setup, refer to the:
+
 - [Typescript Guide](client/README.md).
 
 ## ⚠️ Important Note
+
 Ensure the bot server is running before using any client implementations.
 
 ## 📌 Requirements
@@ -48,6 +52,7 @@ Ensure the bot server is running before using any client implementations.
 ---
 
 ### 💡 Notes
+
 - Ensure all dependencies are installed before running the server.
 - Check the `.env` file for missing configurations.
 

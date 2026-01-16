@@ -18,39 +18,39 @@ The purpose of this example is to create an environment for testing the bot and 
 
 Follow these steps to set up and run the Freeze Test Client:
 
-1. **Run the Bot Server**  
-   - Set up and activate your virtual environment:
-       ```bash
-       python3 -m venv venv
-       source venv/bin/activate  # On Windows: venv\Scripts\activate
-       ```
+1. **Run the Bot Server**
 
    - Install dependencies:
-      ```bash
-      pip install -r requirements.txt
-      ```
+
+     ```bash
+     uv sync
+     ```
 
    - Create your `.env` file and set your env vars:
-      ```bash
-      cp env.example .env
-      ```
-   
+
+     ```bash
+     cp env.example .env
+     ```
+
    - Run the server:
-      ```bash
-      python freeze_test_bot.py
-      ```
+     ```bash
+     uv run freeze_test_bot.py
+     ```
 
 2. **Navigate to the Client Directory**
+
    ```bash
    cd client
    ```
 
 3. **Install Dependencies**
+
    ```bash
    npm install
    ```
 
 4. **Run the Client Application**
+
    ```bash
    npm run dev
    ```

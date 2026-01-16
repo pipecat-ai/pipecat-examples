@@ -2,7 +2,7 @@
 
 This is a simple Pipecat bot example for how to save audio recordings to s3 via [`AudioBufferProcessor`](https://docs.pipecat.ai/guides/fundamentals/recording-audio#how-the-audiobufferprocessor-works). It accounts for long audio recordings (multipart) as well as short audio recordings.
 
-By default, `AudioBufferProcessor` keeps all user and bot audio in a buffer in memory until the end of the call.  If the conversation is long, this buffer will grow very large and can cause an OOM (out of memory) error.  To avoid this, one can pass in the param [buffer-size](https://docs.pipecat.ai/server/utilities/audio/audio-buffer-processor#param-buffer-size) to trigger the event handler when the buffer reaches this size.  This limits memory use for the audio buffer to the `buffer-size` and thus helps avoid OOM errors.
+By default, `AudioBufferProcessor` keeps all user and bot audio in a buffer in memory until the end of the call. If the conversation is long, this buffer will grow very large and can cause an OOM (out of memory) error. To avoid this, one can pass in the param [buffer-size](https://docs.pipecat.ai/server/utilities/audio/audio-buffer-processor#param-buffer-size) to trigger the event handler when the buffer reaches this size. This limits memory use for the audio buffer to the `buffer-size` and thus helps avoid OOM errors.
 
 This example code illustrates how to implement `AudioBufferProcessor` with a 5mb buffer-size and event handlers to upload merged audio as well as bot audio and user audio files to an AWS s3 bucket.
 
@@ -46,6 +46,7 @@ aws s3api create-bucket \
 ```
 
 3. Create IAM policies and role
+
 ```bash
 AWS_PROFILE=YOUR_AWS_PROFILE \
 ./create_s3_role.sh YOUR_BUCKET_NAME
@@ -87,20 +88,26 @@ AWS_PROFILE=YOUR_AWS_PROFILE \
 
 ## Run bot
 
-   ```bash
-   uv run python bot.py
-   ```
+```bash
+# Using SmallWebRTC transport
+uv run bot.py
+
+# Using Daily transport
+uv run bot.py -t daily
+```
 
 > To trigger the 5mb audio buffer-size handler, talk to the bot for at least 1.5 - 2 minutes.
 
 After the pipeline finishes, which happens when the bot leaves the call, ie if `terminate_call` function is triggered or when the pipeline idle times out, the `@audio_buffer.event_handler`s will run and finish the multipart upload. A nice feature of s3 multipart upload is no post-processing is needed to stitch the audio chunks together. They automagically form one WAV file. Check `YOUR_BUCKET_NAME` in AWS s3 dashboard to see for yourself.
 
 By default, the audio files will save to the following s3keys:
+
 ```ini
 s3://YOUR_BUCKET_NAME/000000000000_test_conversations/CONVERSATION_UUID/CONVERSATION_UUID.wav
 s3://YOUR_BUCKET_NAME/000000000000_test_conversations/CONVERSATION_UUID/CONVERSATION_UUID_bot.wav
 s3://YOUR_BUCKET_NAME/000000000000_test_conversations/CONVERSATION_UUID/CONVERSATION_UUID_user.wav
 ```
+
 Amend this s3key in `AudioUploader` if desired.
 
 ## Deploy bot
@@ -108,7 +115,8 @@ Amend this s3key in `AudioUploader` if desired.
 See [quickstart README](https://github.com/pipecat-ai/pipecat/blob/main/examples/quickstart/README.md#step-2-deploy-to-production-5-min).
 
 ## Pro Tip
-Check for and abort dangling multipart uploads (they cost $$$).  They can build up, usually during development.
+
+Check for and abort dangling multipart uploads (they cost $$$). They can build up, usually during development.
 
 ```bash
 AWS_PROFILE=YOUR_AWS_PROFILE \
@@ -117,6 +125,7 @@ aws s3api list-multipart-uploads \
 ```
 
 To abort any dangling multipart uploads, you need the s3 key and upload-id. Abort like so:
+
 ```bash
 AWS_PROFILE=YOUR_AWS_PROFILE \
 aws s3api abort-multipart-upload \

@@ -2,7 +2,7 @@
   {
     "path": "audio-recording-s3-multipart-upload",
     "entryPoint": "bot.py",
-    "runCommand": "uv run python bot.py",
+    "runCommand": "uv run bot.py",
     "skip": false
   },
   {
@@ -14,13 +14,13 @@
   {
     "path": "aws-strands",
     "entryPoint": "black-box.py",
-    "runCommand": "uv run python black-box.py",
+    "runCommand": "uv run black-box.py",
     "skip": false
   },
   {
     "path": "bot-ready-signalling/server",
     "entryPoint": "server.py",
-    "runCommand": "uv run python server.py",
+    "runCommand": "uv run server.py",
     "skip": false
   },
   {
@@ -32,7 +32,7 @@
   {
     "path": "daily-custom-tracks",
     "entryPoint": "bot.py",
-    "runCommand": "uv run python bot.py -u https://example.daily.co/room",
+    "runCommand": "uv run bot.py -u https://example.daily.co/room",
     "skip": false
   },
   {
@@ -72,7 +72,7 @@
   {
     "path": "deployment/aws-agentcore-websocket/server",
     "entryPoint": "server.py",
-    "runCommand": "uv run python server.py",
+    "runCommand": "uv run server.py",
     "skip": true,
     "skipReason": "deployment example - requires deployed AgentCore agent"
   },
@@ -111,13 +111,13 @@
   {
     "path": "freeze-test",
     "entryPoint": "freeze_test_bot.py",
-    "runCommand": "uv run python freeze_test_bot.py",
+    "runCommand": "uv run freeze_test_bot.py",
     "skip": false
   },
   {
     "path": "instant-voice/server",
     "entryPoint": "src/server.py",
-    "runCommand": "uv run python src/server.py",
+    "runCommand": "uv run src/server.py",
     "skip": false
   },
   {
@@ -129,14 +129,14 @@
   {
     "path": "local-input-select-stt",
     "entryPoint": "bot.py",
-    "runCommand": "uv run python bot.py",
+    "runCommand": "uv run bot.py",
     "skip": true,
     "skipReason": "requires local audio device"
   },
   {
     "path": "news-chatbot/server",
     "entryPoint": "server.py",
-    "runCommand": "uv run python server.py",
+    "runCommand": "uv run server.py",
     "skip": false
   },
   {
@@ -154,7 +154,7 @@
   {
     "path": "p2p-webrtc/daily-interop-bridge",
     "entryPoint": "server.py",
-    "runCommand": "uv run python server.py",
+    "runCommand": "uv run server.py",
     "skip": false
   },
   {
@@ -173,13 +173,13 @@
   {
     "path": "p2p-webrtc/video-transform/server",
     "entryPoint": "server.py",
-    "runCommand": "uv run python server.py",
+    "runCommand": "uv run server.py",
     "skip": false
   },
   {
     "path": "p2p-webrtc/voice-agent",
     "entryPoint": "server.py",
-    "runCommand": "uv run python server.py",
+    "runCommand": "uv run server.py",
     "skip": false
   },
   {
@@ -233,7 +233,7 @@
   {
     "path": "runner-examples",
     "entryPoint": "01-single-transport-bot.py",
-    "runCommand": "uv run python 01-single-transport-bot.py -t daily",
+    "runCommand": "uv run 01-single-transport-bot.py -t daily",
     "skip": false
   },
   {
@@ -245,7 +245,7 @@
   {
     "path": "storytelling-chatbot/server",
     "entryPoint": "bot_runner.py",
-    "runCommand": "uv run python bot_runner.py --host localhost",
+    "runCommand": "uv run bot_runner.py --host localhost",
     "skip": false
   },
   {
@@ -269,13 +269,13 @@
   {
     "path": "translation-chatbot",
     "entryPoint": "server.py",
-    "runCommand": "uv run python server.py",
+    "runCommand": "uv run server.py",
     "skip": false
   },
   {
     "path": "travel-companion/server",
     "entryPoint": "src/server.py",
-    "runCommand": "uv run python src/server.py --host 127.0.0.1",
+    "runCommand": "uv run src/server.py --host 127.0.0.1",
     "skip": false
   },
   {
@@ -293,19 +293,19 @@
   {
     "path": "vonage-audio-bot",
     "entryPoint": "server.py",
-    "runCommand": "uv run python server.py",
+    "runCommand": "uv run server.py",
     "skip": false
   },
   {
     "path": "websocket/server",
     "entryPoint": "server.py",
-    "runCommand": "uv run python server.py",
+    "runCommand": "uv run server.py",
     "skip": false
   },
   {
     "path": "whatsapp",
     "entryPoint": "server.py",
-    "runCommand": "uv run python server.py",
+    "runCommand": "uv run server.py",
     "skip": false
   },
   {

@@ -125,8 +125,8 @@ With your agent deployed to AgentCore, you can now run the example.
 
 ```bash
 # Using SmallWebRTC transport
-uv run python bot.py
+uv run bot.py
 
 # Using Daily transport
-uv run python bot.py -t daily -d
+uv run bot.py -t daily
 ```
