@@ -18,15 +18,16 @@ import subprocess
 import sys
 import time
 from pathlib import Path
+from typing import Any
 
 
-def find_demo_config(demo_path: str, manifest_path: Path) -> dict | None:
+def find_demo_config(demo_path: str, manifest_path: Path) -> dict[str, Any] | None:
     """Find demo configuration from manifest."""
     if not manifest_path.exists():
         return None
 
     with open(manifest_path) as f:
-        demos = json.load(f)
+        demos: list[dict[str, Any]] = json.load(f)
 
     for demo in demos:
         if demo["path"] == demo_path:
@@ -114,11 +115,12 @@ def run_demo_with_timeout(
                     return 1
 
             # Use select to read output without blocking (with 0.5s timeout)
-            readable, _, _ = select.select([process.stdout], [], [], 0.5)
-            if readable:
-                line = process.stdout.readline()
-                if line:
-                    print(line, end="")
+            if process.stdout:
+                readable, _, _ = select.select([process.stdout], [], [], 0.5)
+                if readable:
+                    line = process.stdout.readline()
+                    if line:
+                        print(line, end="")
 
     except KeyboardInterrupt:
         print("\nInterrupted by user")
@@ -181,7 +183,7 @@ def main():
         print(f"Reason: {demo_config.get('skipReason', 'No reason provided')}")
         return 0
 
-    run_command = args.command or demo_config.get("runCommand")
+    run_command: str | None = args.command or demo_config.get("runCommand")
     if not run_command:
         print(f"Error: No run command found for demo: {args.demo_path}")
         return 2
