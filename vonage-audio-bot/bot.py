@@ -18,7 +18,9 @@ from pipecat.processors.aggregators.llm_response_universal import LLMContextAggr
 from pipecat.runner.types import RunnerArguments
 from pipecat.runner.utils import parse_telephony_websocket
 from pipecat.serializers.vonage import VonageFrameSerializer
-from pipecat.services.openai import OpenAILLMService, OpenAISTTService, OpenAITTSService
+from pipecat.services.openai.llm import OpenAILLMService
+from pipecat.services.openai.stt import OpenAISTTService
+from pipecat.services.openai.tts import OpenAITTSService
 from pipecat.transports.base_transport import BaseTransport
 from pipecat.transports.websocket.fastapi import (
     FastAPIWebsocketParams,
@@ -117,13 +119,6 @@ async def bot(runner_args: RunnerArguments):
     Entry point for your FastAPI /ws endpoint (like the Telnyx server.py pattern).
     Vonage Audio Connector will connect as the WebSocket client.
     """
-    transport_type = "vonage"
-    call_data = {"content_type": f"audio/l16;rate={_env_int('VONAGE_AUDIO_RATE', 16000)}"}
-
-    logger.info(f"Auto-detected transport: {transport_type}")
-    logger.info(f"Runner args body: {getattr(runner_args, 'body', None)}")
-    logger.info(f"Call data keys: {list(call_data.keys())}")
-
     # This should match the audioRate you used when calling connect_audio_to_websocket().
     sample_rate = _env_int("VONAGE_AUDIO_RATE", 16000)
 
