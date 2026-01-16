@@ -9,7 +9,6 @@ import sys
 from contextlib import asynccontextmanager
 
 import uvicorn
-from bot import run_bot
 from dotenv import load_dotenv
 from fastapi import BackgroundTasks, FastAPI, Request
 from fastapi.responses import FileResponse
@@ -19,6 +18,8 @@ from pipecat.transports.smallwebrtc.request_handler import (
     SmallWebRTCRequest,
     SmallWebRTCRequestHandler,
 )
+
+from bot import run_bot
 
 # Load environment variables
 load_dotenv(override=True)

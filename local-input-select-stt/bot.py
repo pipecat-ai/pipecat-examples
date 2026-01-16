@@ -16,6 +16,7 @@ from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineTask
 from pipecat.services.whisper.stt import Model, WhisperSTTService
 from pipecat.transports.local.audio import LocalAudioTransport, LocalAudioTransportParams
+
 from select_audio_device import AudioDevice, run_device_selector
 
 load_dotenv(override=True)
