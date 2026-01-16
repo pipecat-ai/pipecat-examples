@@ -237,6 +237,24 @@
     "skip": false
   },
   {
+    "path": "runner-examples",
+    "entryPoint": "02-two-transport-bot.py",
+    "runCommand": "uv run 02-two-transport-bot.py -t daily",
+    "skip": false
+  },
+  {
+    "path": "runner-examples",
+    "entryPoint": "03-all-transport-bot.py",
+    "runCommand": "uv run 03-all-transport-bot.py -t daily",
+    "skip": false
+  },
+  {
+    "path": "runner-examples",
+    "entryPoint": "04-all-transport-factory-bot.py",
+    "runCommand": "uv run 04-all-transport-factory-bot.py -t daily",
+    "skip": false
+  },
+  {
     "path": "simple-chatbot/server",
     "entryPoint": "bot-openai.py",
     "runCommand": "uv run bot-openai.py -t daily",
@@ -275,7 +293,7 @@
   {
     "path": "travel-companion/server",
     "entryPoint": "src/server.py",
-    "runCommand": "uv run src/server.py --host 127.0.0.1",
+    "runCommand": "uv run bot.py -t daily",
     "skip": false
   },
   {
