@@ -1,10 +1,14 @@
-# Pipecat Simple Chatbot Client for Android
+# Pipecat Demo Client for Android
 
-Demo app which connects to the `simple-chatbot` backend over RTVI.
+Demo app which connects to an RTVI server, such as Pipecat, using the Pipecat Android client.
 
-## Screenshot
+* Supports Daily and Small WebRTC transports
+* Shows local and remove video streams
+* Text and voice chat
 
-<img alt="screenshot" src="files/screenshot_mainmenu.png" width="300px" /> <img alt="screenshot" src="files/screenshot_call.png" width="300px" />
+<p align="center">
+<img alt="main menu screenshot" src="files/screenshot_mainmenu.png" width="350px" /> <img alt="in-call screenshot" src="files/screenshot_call.png" width="350px" />
+</p>
 
 ## How to run
 
