@@ -8,6 +8,7 @@ dependencies = [
     "fastapi[all]",
     "uvicorn",
     "pipecat-ai[silero,webrtc,daily]>=0.0.99",
+    "pipecat_ai_small_webrtc_prebuilt",
 ]
 
 [dependency-groups]
