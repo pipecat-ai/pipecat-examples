@@ -12,7 +12,6 @@ from http import HTTPMethod
 from typing import Any, Dict, List, Optional, TypedDict, Union
 
 import uvicorn
-from bot import run_bot
 from dotenv import load_dotenv
 from fastapi import BackgroundTasks, FastAPI, Request, Response
 from fastapi.responses import RedirectResponse
@@ -24,6 +23,8 @@ from pipecat.transports.smallwebrtc.request_handler import (
     SmallWebRTCRequestHandler,
 )
 from pipecat_ai_small_webrtc_prebuilt.frontend import SmallWebRTCPrebuiltUI
+
+from bot import run_bot
 
 # Load environment variables
 load_dotenv(override=True)

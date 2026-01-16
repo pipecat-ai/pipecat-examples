@@ -61,18 +61,16 @@ Adds pictures to our story. Prompting is quite key for style consistency, so we 
    cd ../server
    ```
 
-2. Set up your virtual environment and install requirements
+2. Install dependencies
 
    ```shell
-   python3 -m venv venv
-   source venv/bin/activate
-   pip install -r requirements.txt
+   uv sync
    ```
 
 3. Create environment file and set variables
 
    ```shell
-   mv env.example .env
+   cp env.example .env
    ```
 
    You'll need API keys for:
@@ -97,10 +95,10 @@ Adds pictures to our story. Prompting is quite key for style consistency, so we 
 2. Run the application:
 
    ```shell
-   python server/bot_runner.py --host localhost
+   uv run server/bot_runner.py --host localhost
    ```
 
-   You can run with a custom domain or port using: `python server/bot_runner.py --host somehost --p someport`
+   You can run with a custom domain or port using: `uv run server/bot_runner.py --host somehost --p someport`
 
 3. ➡️ Open the host URL in your browser: http://localhost:7860
 

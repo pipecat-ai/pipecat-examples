@@ -1,7 +1,7 @@
 # Bot ready signaling
 
-A simple Pipecat example demonstrating how to handle signaling between the client and the bot, 
-ensuring that the bot starts sending audio only when the client is available, 
+A simple Pipecat example demonstrating how to handle signaling between the client and the bot,
+ensuring that the bot starts sending audio only when the client is available,
 thereby avoiding the risk of cutting off the beginning of the audio.
 
 ## Quick Start
@@ -9,23 +9,28 @@ thereby avoiding the risk of cutting off the beginning of the audio.
 ### First, start the bot server:
 
 1. Navigate to the server directory:
+
    ```bash
    cd server
    ```
-2. Create and activate a virtual environment:
+
+2. Install dependencies:
+
    ```bash
-   python3 -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   uv sync
    ```
-3. Install requirements:
+
+3. Copy env.example to .env and configure:
+
    ```bash
-   pip install -r requirements.txt
+   cp env.example .env
    ```
-4. Copy env.example to .env and configure:
+
    - Add your API keys
-5. Start the server:
+
+4. Start the server:
    ```bash
-   python server.py
+   uv run server.py
    ```
 
 ### Next, connect using the client app:

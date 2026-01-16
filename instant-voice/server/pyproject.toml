@@ -1,3 +1,21 @@
+[project]
+name = "instant-voice"
+version = "0.1.0"
+description = "Pipecat example - instant-voice"
+requires-python = ">=3.10"
+dependencies = [
+    "pipecat-ai[openai,silero,websocket,google,daily]>=0.0.99",
+    "python-dotenv",
+    "fastapi[all]",
+    "uvicorn",
+]
+
+[dependency-groups]
+dev = [
+    "pyright>=1.1.404,<2",
+    "ruff>=0.12.11,<1",
+]
+
 [tool.ruff]
 exclude = [".git", "*_pb2.py"]
 line-length = 100

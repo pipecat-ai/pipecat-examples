@@ -1,0 +1,21 @@
+[project]
+name = "local-input-select-stt"
+version = "0.1.0"
+description = "Pipecat example - local-input-select-stt"
+requires-python = ">=3.10"
+dependencies = [
+    "pipecat-ai[whisper,openai,local]>=0.0.99",
+    "textual>=1.0.0",
+    "pydantic-settings>=2.7.1",
+]
+
+[dependency-groups]
+dev = [
+    "pyright>=1.1.404,<2",
+    "ruff>=0.12.11,<1",
+]
+
+[tool.ruff]
+line-length = 100
+[tool.ruff.lint]
+select = ["I"]

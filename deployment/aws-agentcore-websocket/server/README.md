@@ -30,7 +30,7 @@ uv sync
 Start the server on port 7860:
 
 ```bash
-uv run python server.py
+uv run server.py
 ```
 
 The server will be available at `http://localhost:7860`.
@@ -40,7 +40,7 @@ The server will be available at `http://localhost:7860`.
 If you want to test a locally-running agent (reachable at "ws://localhost:8080/ws"), start the server like this:
 
 ```bash
-LOCAL_AGENT=1 uv run python server.py
+LOCAL_AGENT=1 uv run server.py
 ```
 
 ## Endpoint

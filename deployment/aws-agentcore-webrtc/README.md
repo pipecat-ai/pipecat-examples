@@ -134,7 +134,7 @@ This script:
 
    ```bash
    cd server
-   uv run python server.py
+   uv run server.py
    ```
 
 2. Access the UI:
@@ -180,7 +180,7 @@ Remove your agent:
 Run your bot locally for testing:
 
 ```bash
-PIPECAT_LOCAL_DEV=1 uv run python pipecat-agent.py
+PIPECAT_LOCAL_DEV=1 uv run pipecat-agent.py
 ```
 
 ## Additional Resources

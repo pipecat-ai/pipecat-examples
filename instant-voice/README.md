@@ -6,11 +6,13 @@ By leveraging optimizations on both the server and client sides, users can start
 ## How It Works
 
 ### Server-Side Improvements:
+
 - A **pool of Daily rooms** is managed to ensure quick connections.
 - When a user connects, an existing room from the pool is assigned.
 - A new room is created asynchronously to maintain the predefined pool size.
 
 ### Client-Side Improvements:
+
 - Using the **DailyTransport** property `bufferLocalAudioUntilBotReady` set to enabled, users can start speaking immediately
   upon receiving the `AUDIO_BUFFERING_STARTED` event (typically within ~1s).
 - This allows users to speak even before the bot is fully ready or the WebRTC connection is fully established.
@@ -20,23 +22,28 @@ By leveraging optimizations on both the server and client sides, users can start
 ### 1. Start the Bot Server
 
 1. Navigate to the server directory:
+
    ```bash
    cd server
    ```
-2. Create and activate a virtual environment:
+
+2. Install dependencies:
+
    ```bash
-   python3 -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   uv sync
    ```
-3. Install dependencies:
+
+3. Copy the `.env.example` file to `.env` and configure it:
+
    ```bash
-   pip install -r requirements.txt
+   cp env.example .env
    ```
-4. Copy the `.env.example` file to `.env` and configure it:
-    - Add your API keys.
-5. Start the server:
+
+   - Add your API keys
+
+4. Start the server:
    ```bash
-   python src/server.py
+   uv run src/server.py
    ```
 
 ### 2. Connect Using the Client App
@@ -44,10 +51,12 @@ By leveraging optimizations on both the server and client sides, users can start
 For client-side setup, refer to the [JavaScript Guide](client/javascript/README.md).
 
 ## Important Notes
+
 - The bot server **must** be running before using the client implementation.
 - Ensure your environment variables are correctly set up.
 
 ## Requirements
+
 - **Python 3.10+**
 - **Node.js 16+** (for JavaScript/React client)
 - **Daily API key**

@@ -15,7 +15,7 @@ A FastAPI server that handles PSTN (Public Switched Telephone Network) and SIP (
 3. Install dependencies:
 
    ```bash
-   pip install -r requirements.txt
+   uv sync
    ```
 
 4. Copy `env.example` to `.env`:
@@ -35,7 +35,7 @@ A FastAPI server that handles PSTN (Public Switched Telephone Network) and SIP (
 Start the server:
 
 ```bash
-python server.py
+uv run server.py
 ```
 
 The server will run on `http://localhost:7860` and you can expose it via ngrok for testing:

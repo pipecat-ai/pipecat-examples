@@ -11,13 +11,14 @@ from contextlib import asynccontextmanager
 from typing import Dict
 
 import uvicorn
-from bot import run_bot
 from dotenv import load_dotenv
 from fastapi import BackgroundTasks, FastAPI
 from fastapi.responses import RedirectResponse
 from loguru import logger
 from pipecat.transports.smallwebrtc.connection import IceServer, SmallWebRTCConnection
 from pipecat_ai_small_webrtc_prebuilt.frontend import SmallWebRTCPrebuiltUI
+
+from bot import run_bot
 
 # Load environment variables
 load_dotenv(override=True)

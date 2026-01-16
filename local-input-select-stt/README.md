@@ -32,10 +32,10 @@ _(Don't worry – I'll be adding a GIF demo here soon!)_
 
 ## 🔧 Installation
 
-Install Dependencies:
+Install dependencies:
 
 ```bash
-pip install -r requirements.txt
+uv sync
 ```
 
 ---
@@ -45,7 +45,7 @@ pip install -r requirements.txt
 Run the main script:
 
 ```bash
-python bot.py
+uv run bot.py
 ```
 
 When the app launches, you'll see a textual interface that lets you select your audio input device. Once selected, the app will begin capturing audio, transcribing it using Whisper.
