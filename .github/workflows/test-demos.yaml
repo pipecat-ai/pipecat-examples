@@ -27,6 +27,9 @@ env:
   LANGFUSE_PUBLIC_KEY: mock_langfuse_public_key
   LANGFUSE_SECRET_KEY: mock_langfuse_secret_key
   OPENAI_API_KEY: mock_openai_api_key
+  WHATSAPP_TOKEN: mock_whatsapp_token
+  WHATSAPP_WEBHOOK_VERIFICATION_TOKEN: mock_whatsapp_webhook_verification_token
+  WHATSAPP_PHONE_NUMBER_ID: mock_whatsapp_phone_number_id
 
 jobs:
   # Generate test matrix from demos.json

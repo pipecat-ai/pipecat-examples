@@ -16,6 +16,7 @@ A real-time voice bot that integrates with WhatsApp Business API to handle voice
 > **Important Note**: For production, make sure your WhatsApp Business account has access to this feature.
 
 > Find more details here:
+>
 > - [Getting Started Guide](https://developers.facebook.com/docs/whatsapp/cloud-api/get-started/)
 > - [Voice Calling Documentation](https://developers.facebook.com/docs/whatsapp/cloud-api/calling/)
 > - [Webhooks Setup](https://developers.facebook.com/docs/whatsapp/webhooks/)
@@ -23,6 +24,7 @@ A real-time voice bot that integrates with WhatsApp Business API to handle voice
 ### WhatsApp Business API Configuration
 
 #### Enable Voice Calls
+
 Your WhatsApp Business phone number must be configured to accept voice calls[[2]](https://developers.facebook.com/docs/whatsapp/cloud-api/calling/):
 
 > For development, you'll be provided with a free test phone number valid for 90 days.
@@ -34,6 +36,7 @@ Your WhatsApp Business phone number must be configured to accept voice calls[[2]
 5. Save the configuration
 
 #### Configure Webhook
+
 Set up your webhook endpoint in the Meta Developer Console[[3]](https://developers.facebook.com/docs/whatsapp/webhooks/):
 
 1. Go to **WhatsApp** → **Configuration** → **Webhooks**
@@ -44,6 +47,7 @@ Set up your webhook endpoint in the Meta Developer Console[[3]](https://develope
 5. In the webhook fields below, select: `calls` (required for voice call events)
 
 #### Configure Access Token
+
 1. Go to **WhatsApp** → **API Setup**
 2. Click "Generate access token"
    - Use this token for your `WHATSAPP_TOKEN` environment variable
@@ -54,6 +58,7 @@ Set up your webhook endpoint in the Meta Developer Console[[3]](https://develope
 ### Environment Setup
 
 1. **Install dependencies**:
+
    ```bash
    uv sync
    ```
@@ -67,7 +72,7 @@ Set up your webhook endpoint in the Meta Developer Console[[3]](https://develope
 ### Run the Server
 
 ```bash
-python server.py
+uv run server.py
 ```
 
 > The server will start and listen for incoming WhatsApp webhook events.
@@ -79,12 +84,14 @@ python server.py
 3. The bot should answer and engage in conversation
 
 ## Documentation References
+
 - [WhatsApp Cloud API Getting Started](https://developers.facebook.com/docs/whatsapp/cloud-api/get-started/)
 - [Voice Calling API Documentation](https://developers.facebook.com/docs/whatsapp/cloud-api/calling/)
 - [Webhook Configuration Guide](https://developers.facebook.com/docs/whatsapp/webhooks/)
 - [SDP Overview and Samples](https://developers.facebook.com/docs/whatsapp/cloud-api/calling/reference#sdp-overview-and-sample-sdp-structures)
 
 ## 💡 Troubleshooting
+
 - Ensure all dependencies are installed before running the server
 - Verify your `.env` file contains all required configuration values
 - Make sure voice calling is enabled for your WhatsApp Business number
@@ -92,7 +99,7 @@ python server.py
 - Ensure your business account is verified for production use
 
 ## Notes
+
 - Voice calling feature requires WhatsApp Business API access
 - Test numbers are valid for 90 days in development mode
 - Production deployment requires business verification
-

@@ -26,7 +26,7 @@
   },
   {
     "path": "daily-custom-tracks",
-    "runCommand": "uv run bot.py -u https://example.daily.co/room",
+    "runCommand": "uv run bot.py -t daily",
     "skip": false
   },
   {
@@ -240,7 +240,7 @@
   },
   {
     "path": "translation-chatbot",
-    "runCommand": "uv run server.py",
+    "runCommand": "uv run bot.py -t daily",
     "skip": false
   },
   {
