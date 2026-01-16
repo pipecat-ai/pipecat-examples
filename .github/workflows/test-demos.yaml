@@ -104,7 +104,9 @@ jobs:
           CHANGED_FILES="${{ needs.generate-matrix.outputs.changed_files }}"
           DEMO_PATH="${{ matrix.path }}"
 
-          if echo "$CHANGED_FILES" | grep -q "^$DEMO_PATH/"; then
+          # Check if any changed file starts with the demo path
+          # Use word boundary to match the demo path at the start of a filename
+          if echo "$CHANGED_FILES" | grep -qE "(^|,)$DEMO_PATH/"; then
             echo "run=true" >> $GITHUB_OUTPUT
             echo "Demo $DEMO_PATH changed - will test"
           else
