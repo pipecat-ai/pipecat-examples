@@ -7,8 +7,6 @@ dependencies = [
     "python-dotenv",
     "fastapi[all]",
     "uvicorn",
-    "aiortc",
-    "opencv-python",
     "pipecat-ai[google,silero,webrtc]>=0.0.99",
     "pipecat-ai-small-webrtc-prebuilt",
 ]

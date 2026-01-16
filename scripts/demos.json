@@ -1,354 +1,348 @@
 [
-    {
-        "path": "simple-chatbot/server",
-        "entryPoint": "bot-openai.py",
-        "runCommand": "uv run bot-openai.py --transport daily",
-        "skip": false
-    },
-    {
-        "path": "news-chatbot/server",
-        "entryPoint": "server.py",
-        "runCommand": "uv run python server.py",
-        "skip": false
-    },
-    {
-        "path": "storytelling-chatbot/server",
-        "entryPoint": "bot_runner.py",
-        "runCommand": "uv run python bot_runner.py --host localhost",
-        "skip": false
-    },
-    {
-        "path": "travel-companion/server",
-        "entryPoint": "src/server.py",
-        "runCommand": "uv run python src/server.py --host 127.0.0.1",
-        "skip": false
-    },
-    {
-        "path": "translation-chatbot",
-        "entryPoint": "server.py",
-        "runCommand": "uv run python server.py",
-        "skip": false
-    },
-    {
-        "path": "instant-voice/server",
-        "entryPoint": "src/server.py",
-        "runCommand": "uv run python src/server.py",
-        "skip": false
-    },
-    {
-        "path": "local-smart-turn/server",
-        "entryPoint": "server.py",
-        "runCommand": "uv run python server.py",
-        "skip": false
-    },
-    {
-        "path": "bot-ready-signalling/server",
-        "entryPoint": "server.py",
-        "runCommand": "uv run python server.py",
-        "skip": false
-    },
-    {
-        "path": "push-to-talk/server",
-        "entryPoint": "bot.py",
-        "runCommand": "uv run bot.py -t daily",
-        "skip": false
-    },
-    {
-        "path": "websocket/server",
-        "entryPoint": "server.py",
-        "runCommand": "uv run python server.py",
-        "skip": false
-    },
-    {
-        "path": "code-helper/server",
-        "entryPoint": "bot.py",
-        "runCommand": "uv run bot.py",
-        "skip": false
-    },
-    {
-        "path": "studypal",
-        "entryPoint": "studypal.py",
-        "runCommand": "uv run studypal.py -t daily",
-        "skip": false
-    },
-    {
-        "path": "freeze-test",
-        "entryPoint": "freeze_test_bot.py",
-        "runCommand": "uv run python freeze_test_bot.py",
-        "skip": false
-    },
-    {
-        "path": "daily-custom-tracks",
-        "entryPoint": "bot.py",
-        "runCommand": "uv run python bot.py -u https://example.daily.co/room",
-        "skip": false
-    },
-    {
-        "path": "daily-multi-translation",
-        "entryPoint": "bot.py",
-        "runCommand": "uv run bot.py -t daily",
-        "skip": false
-    },
-    {
-        "path": "local-input-select-stt",
-        "entryPoint": "bot.py",
-        "runCommand": "uv run python bot.py",
-        "skip": true,
-        "skipReason": "requires local audio device"
-    },
-    {
-        "path": "runner-examples",
-        "entryPoint": "01-single-transport-bot.py",
-        "runCommand": "uv run python 01-single-transport-bot.py -t daily",
-        "skip": false
-    },
-    {
-        "path": "aws-strands",
-        "entryPoint": "black-box.py",
-        "runCommand": "uv run python black-box.py",
-        "skip": false
-    },
-    {
-        "path": "aws-agentcore",
-        "entryPoint": "bot.py",
-        "runCommand": "uv run bot.py",
-        "skip": false
-    },
-    {
-        "path": "audio-recording-s3-multipart-upload",
-        "entryPoint": "bot.py",
-        "runCommand": "uv run python bot.py",
-        "skip": false
-    },
-    {
-        "path": "open-telemetry/langfuse",
-        "entryPoint": "bot.py",
-        "runCommand": "uv run bot.py",
-        "skip": false
-    },
-    {
-        "path": "open-telemetry/jaeger",
-        "entryPoint": "bot.py",
-        "runCommand": "uv run bot.py",
-        "skip": false
-    },
-    {
-        "path": "p2p-webrtc/voice-agent",
-        "entryPoint": "server.py",
-        "runCommand": "uv run python server.py",
-        "skip": false
-    },
-    {
-        "path": "p2p-webrtc/video-transform/server",
-        "entryPoint": "server.py",
-        "runCommand": "uv run python server.py",
-        "skip": false
-    },
-    {
-        "path": "p2p-webrtc/daily-interop-bridge",
-        "entryPoint": "server.py",
-        "runCommand": "uv run python server.py",
-        "skip": false
-    },
-    {
-        "path": "p2p-webrtc/pipecat-cloud",
-        "entryPoint": "bot.py",
-        "runCommand": "uv run bot.py",
-        "skip": false
-    },
-    {
-        "path": "word-wrangler-gemini-live/web-game/server",
-        "entryPoint": "bot.py",
-        "runCommand": "uv run bot.py -t daily",
-        "skip": false
-    },
-    {
-        "path": "ivr-navigation",
-        "entryPoint": "server.py",
-        "runCommand": "uv run server.py",
-        "skip": true,
-        "skipReason": "telephony - requires Daily PSTN dial-out phone number"
-    },
-    {
-        "path": "aws-agentcore/agents",
-        "entryPoint": "code_agent.py",
-        "runCommand": "uv run agentcore launch",
-        "skip": true,
-        "skipReason": "AgentCore agent deployment - not a standalone runnable"
-    },
-    {
-        "path": "whatsapp",
-        "entryPoint": "server.py",
-        "runCommand": "uv run python server.py",
-        "skip": true,
-        "skipReason": "telephony - requires WhatsApp Business API configuration"
-    },
-    {
-        "path": "p2p-webrtc/docker",
-        "entryPoint": "server.py",
-        "runCommand": "docker run",
-        "skip": true,
-        "skipReason": "Docker deployment example - requires docker build first"
-    },
-    {
-        "path": "deployment/flyio-example",
-        "entryPoint": "bot_runner.py",
-        "runCommand": "fly deploy",
-        "skip": true,
-        "skipReason": "deployment example - requires fly.io setup"
-    },
-    {
-        "path": "deployment/modal-example/server",
-        "entryPoint": "app.py",
-        "runCommand": "modal serve app.py",
-        "skip": true,
-        "skipReason": "deployment example - requires Modal.com setup"
-    },
-    {
-        "path": "deployment/aws-agentcore-webrtc",
-        "entryPoint": "scripts/configure.sh",
-        "runCommand": "./scripts/configure.sh",
-        "skip": true,
-        "skipReason": "deployment example - requires AWS AgentCore setup"
-    },
-    {
-        "path": "deployment/aws-agentcore-webrtc/agent",
-        "entryPoint": "pipecat-agent.py",
-        "runCommand": "uv run agentcore launch",
-        "skip": true,
-        "skipReason": "AgentCore agent deployment - requires AWS AgentCore setup"
-    },
-    {
-        "path": "deployment/aws-agentcore-websocket",
-        "entryPoint": "agent/agent.py",
-        "runCommand": "uv run agentcore configure",
-        "skip": true,
-        "skipReason": "deployment example - requires AWS AgentCore setup"
-    },
-    {
-        "path": "deployment/aws-agentcore-websocket/agent",
-        "entryPoint": "agent.py",
-        "runCommand": "uv run agentcore launch",
-        "skip": true,
-        "skipReason": "AgentCore agent deployment - requires AWS AgentCore setup"
-    },
-    {
-        "path": "deployment/aws-agentcore-websocket/server",
-        "entryPoint": "server.py",
-        "runCommand": "uv run python server.py",
-        "skip": true,
-        "skipReason": "deployment example - requires deployed AgentCore agent"
-    },
-    {
-        "path": "deployment/pipecat-cloud-daily-pstn-server/fastapi-webhook-server",
-        "entryPoint": "server.py",
-        "runCommand": "uv run python server.py",
-        "skip": true,
-        "skipReason": "telephony webhook server - requires PSTN phone number setup"
-    },
-    {
-        "path": "word-wrangler-gemini-live/phone-game",
-        "entryPoint": "bot.py",
-        "runCommand": "uv run bot.py",
-        "skip": true,
-        "skipReason": "telephony - requires Twilio phone setup"
-    },
-    {
-        "path": "vonage-audio-bot",
-        "entryPoint": "server.py",
-        "runCommand": "uv run python server.py",
-        "skip": true,
-        "skipReason": "telephony - Vonage audio bot"
-    },
-    {
-        "path": "phone-chatbot/daily-pstn-dial-in",
-        "entryPoint": "bot.py",
-        "runCommand": "uv run bot.py",
-        "skip": true,
-        "skipReason": "telephony - phone chatbot"
-    },
-    {
-        "path": "phone-chatbot/daily-pstn-dial-out",
-        "entryPoint": "bot.py",
-        "runCommand": "uv run bot.py",
-        "skip": true,
-        "skipReason": "telephony - phone chatbot"
-    },
-    {
-        "path": "phone-chatbot/daily-pstn-cold-transfer",
-        "entryPoint": "bot.py",
-        "runCommand": "uv run bot.py",
-        "skip": true,
-        "skipReason": "telephony - phone chatbot"
-    },
-    {
-        "path": "phone-chatbot/daily-twilio-sip-dial-in",
-        "entryPoint": "bot.py",
-        "runCommand": "uv run bot.py",
-        "skip": true,
-        "skipReason": "telephony - phone chatbot"
-    },
-    {
-        "path": "phone-chatbot/daily-twilio-sip-dial-out",
-        "entryPoint": "bot.py",
-        "runCommand": "uv run bot.py",
-        "skip": true,
-        "skipReason": "telephony - phone chatbot"
-    },
-    {
-        "path": "twilio-chatbot/inbound",
-        "entryPoint": "bot.py",
-        "runCommand": "uv run bot.py",
-        "skip": true,
-        "skipReason": "telephony - Twilio chatbot"
-    },
-    {
-        "path": "twilio-chatbot/outbound",
-        "entryPoint": "bot.py",
-        "runCommand": "uv run bot.py",
-        "skip": true,
-        "skipReason": "telephony - Twilio chatbot"
-    },
-    {
-        "path": "plivo-chatbot/inbound",
-        "entryPoint": "bot.py",
-        "runCommand": "uv run bot.py",
-        "skip": true,
-        "skipReason": "telephony - Plivo chatbot"
-    },
-    {
-        "path": "plivo-chatbot/outbound",
-        "entryPoint": "bot.py",
-        "runCommand": "uv run bot.py",
-        "skip": true,
-        "skipReason": "telephony - Plivo chatbot"
-    },
-    {
-        "path": "telnyx-chatbot/inbound",
-        "entryPoint": "bot.py",
-        "runCommand": "uv run bot.py",
-        "skip": true,
-        "skipReason": "telephony - Telnyx chatbot"
-    },
-    {
-        "path": "telnyx-chatbot/outbound",
-        "entryPoint": "bot.py",
-        "runCommand": "uv run bot.py",
-        "skip": true,
-        "skipReason": "telephony - Telnyx chatbot"
-    },
-    {
-        "path": "exotel-chatbot/inbound",
-        "entryPoint": "bot.py",
-        "runCommand": "uv run bot.py",
-        "skip": true,
-        "skipReason": "telephony - Exotel chatbot"
-    },
-    {
-        "path": "exotel-chatbot/outbound",
-        "entryPoint": "bot.py",
-        "runCommand": "uv run bot.py",
-        "skip": true,
-        "skipReason": "telephony - Exotel chatbot"
-    }
+  {
+    "path": "simple-chatbot/server",
+    "entryPoint": "bot-openai.py",
+    "runCommand": "uv run bot-openai.py --transport daily",
+    "skip": false
+  },
+  {
+    "path": "news-chatbot/server",
+    "entryPoint": "server.py",
+    "runCommand": "uv run python server.py",
+    "skip": false
+  },
+  {
+    "path": "storytelling-chatbot/server",
+    "entryPoint": "bot_runner.py",
+    "runCommand": "uv run python bot_runner.py --host localhost",
+    "skip": false
+  },
+  {
+    "path": "travel-companion/server",
+    "entryPoint": "src/server.py",
+    "runCommand": "uv run python src/server.py --host 127.0.0.1",
+    "skip": false
+  },
+  {
+    "path": "translation-chatbot",
+    "entryPoint": "server.py",
+    "runCommand": "uv run python server.py",
+    "skip": false
+  },
+  {
+    "path": "instant-voice/server",
+    "entryPoint": "src/server.py",
+    "runCommand": "uv run python src/server.py",
+    "skip": false
+  },
+  {
+    "path": "bot-ready-signalling/server",
+    "entryPoint": "server.py",
+    "runCommand": "uv run python server.py",
+    "skip": false
+  },
+  {
+    "path": "push-to-talk/server",
+    "entryPoint": "bot.py",
+    "runCommand": "uv run bot.py -t daily",
+    "skip": false
+  },
+  {
+    "path": "websocket/server",
+    "entryPoint": "server.py",
+    "runCommand": "uv run python server.py",
+    "skip": false
+  },
+  {
+    "path": "code-helper/server",
+    "entryPoint": "bot.py",
+    "runCommand": "uv run bot.py",
+    "skip": false
+  },
+  {
+    "path": "studypal",
+    "entryPoint": "studypal.py",
+    "runCommand": "uv run studypal.py -t daily",
+    "skip": false
+  },
+  {
+    "path": "freeze-test",
+    "entryPoint": "freeze_test_bot.py",
+    "runCommand": "uv run python freeze_test_bot.py",
+    "skip": false
+  },
+  {
+    "path": "daily-custom-tracks",
+    "entryPoint": "bot.py",
+    "runCommand": "uv run python bot.py -u https://example.daily.co/room",
+    "skip": false
+  },
+  {
+    "path": "daily-multi-translation",
+    "entryPoint": "bot.py",
+    "runCommand": "uv run bot.py -t daily",
+    "skip": false
+  },
+  {
+    "path": "local-input-select-stt",
+    "entryPoint": "bot.py",
+    "runCommand": "uv run python bot.py",
+    "skip": true,
+    "skipReason": "requires local audio device"
+  },
+  {
+    "path": "runner-examples",
+    "entryPoint": "01-single-transport-bot.py",
+    "runCommand": "uv run python 01-single-transport-bot.py -t daily",
+    "skip": false
+  },
+  {
+    "path": "aws-strands",
+    "entryPoint": "black-box.py",
+    "runCommand": "uv run python black-box.py",
+    "skip": false
+  },
+  {
+    "path": "aws-agentcore",
+    "entryPoint": "bot.py",
+    "runCommand": "uv run bot.py",
+    "skip": false
+  },
+  {
+    "path": "audio-recording-s3-multipart-upload",
+    "entryPoint": "bot.py",
+    "runCommand": "uv run python bot.py",
+    "skip": false
+  },
+  {
+    "path": "open-telemetry/langfuse",
+    "entryPoint": "bot.py",
+    "runCommand": "uv run bot.py",
+    "skip": false
+  },
+  {
+    "path": "open-telemetry/jaeger",
+    "entryPoint": "bot.py",
+    "runCommand": "uv run bot.py",
+    "skip": false
+  },
+  {
+    "path": "p2p-webrtc/voice-agent",
+    "entryPoint": "server.py",
+    "runCommand": "uv run python server.py",
+    "skip": false
+  },
+  {
+    "path": "p2p-webrtc/video-transform/server",
+    "entryPoint": "server.py",
+    "runCommand": "uv run python server.py",
+    "skip": false
+  },
+  {
+    "path": "p2p-webrtc/daily-interop-bridge",
+    "entryPoint": "server.py",
+    "runCommand": "uv run python server.py",
+    "skip": false
+  },
+  {
+    "path": "p2p-webrtc/pipecat-cloud",
+    "entryPoint": "bot.py",
+    "runCommand": "uv run bot.py",
+    "skip": false
+  },
+  {
+    "path": "word-wrangler-gemini-live/web-game/server",
+    "entryPoint": "bot.py",
+    "runCommand": "uv run bot.py -t daily",
+    "skip": false
+  },
+  {
+    "path": "ivr-navigation",
+    "entryPoint": "server.py",
+    "runCommand": "uv run server.py",
+    "skip": true,
+    "skipReason": "telephony - requires Daily PSTN dial-out phone number"
+  },
+  {
+    "path": "aws-agentcore/agents",
+    "entryPoint": "code_agent.py",
+    "runCommand": "uv run agentcore launch",
+    "skip": true,
+    "skipReason": "AgentCore agent deployment - not a standalone runnable"
+  },
+  {
+    "path": "whatsapp",
+    "entryPoint": "server.py",
+    "runCommand": "uv run python server.py",
+    "skip": true,
+    "skipReason": "telephony - requires WhatsApp Business API configuration"
+  },
+  {
+    "path": "p2p-webrtc/docker",
+    "entryPoint": "server.py",
+    "runCommand": "docker run",
+    "skip": true,
+    "skipReason": "Docker deployment example - requires docker build first"
+  },
+  {
+    "path": "deployment/flyio-example",
+    "entryPoint": "bot_runner.py",
+    "runCommand": "fly deploy",
+    "skip": true,
+    "skipReason": "deployment example - requires fly.io setup"
+  },
+  {
+    "path": "deployment/modal-example/server",
+    "entryPoint": "app.py",
+    "runCommand": "modal serve app.py",
+    "skip": true,
+    "skipReason": "deployment example - requires Modal.com setup"
+  },
+  {
+    "path": "deployment/aws-agentcore-webrtc",
+    "entryPoint": "scripts/configure.sh",
+    "runCommand": "./scripts/configure.sh",
+    "skip": true,
+    "skipReason": "deployment example - requires AWS AgentCore setup"
+  },
+  {
+    "path": "deployment/aws-agentcore-webrtc/agent",
+    "entryPoint": "pipecat-agent.py",
+    "runCommand": "uv run agentcore launch",
+    "skip": true,
+    "skipReason": "AgentCore agent deployment - requires AWS AgentCore setup"
+  },
+  {
+    "path": "deployment/aws-agentcore-websocket",
+    "entryPoint": "agent/agent.py",
+    "runCommand": "uv run agentcore configure",
+    "skip": true,
+    "skipReason": "deployment example - requires AWS AgentCore setup"
+  },
+  {
+    "path": "deployment/aws-agentcore-websocket/agent",
+    "entryPoint": "agent.py",
+    "runCommand": "uv run agentcore launch",
+    "skip": true,
+    "skipReason": "AgentCore agent deployment - requires AWS AgentCore setup"
+  },
+  {
+    "path": "deployment/aws-agentcore-websocket/server",
+    "entryPoint": "server.py",
+    "runCommand": "uv run python server.py",
+    "skip": true,
+    "skipReason": "deployment example - requires deployed AgentCore agent"
+  },
+  {
+    "path": "deployment/pipecat-cloud-daily-pstn-server/fastapi-webhook-server",
+    "entryPoint": "server.py",
+    "runCommand": "uv run python server.py",
+    "skip": true,
+    "skipReason": "telephony webhook server - requires PSTN phone number setup"
+  },
+  {
+    "path": "word-wrangler-gemini-live/phone-game",
+    "entryPoint": "bot.py",
+    "runCommand": "uv run bot.py",
+    "skip": true,
+    "skipReason": "telephony - requires Twilio phone setup"
+  },
+  {
+    "path": "vonage-audio-bot",
+    "entryPoint": "server.py",
+    "runCommand": "uv run python server.py",
+    "skip": true,
+    "skipReason": "telephony - Vonage audio bot"
+  },
+  {
+    "path": "phone-chatbot/daily-pstn-dial-in",
+    "entryPoint": "bot.py",
+    "runCommand": "uv run bot.py",
+    "skip": true,
+    "skipReason": "telephony - phone chatbot"
+  },
+  {
+    "path": "phone-chatbot/daily-pstn-dial-out",
+    "entryPoint": "bot.py",
+    "runCommand": "uv run bot.py",
+    "skip": true,
+    "skipReason": "telephony - phone chatbot"
+  },
+  {
+    "path": "phone-chatbot/daily-pstn-cold-transfer",
+    "entryPoint": "bot.py",
+    "runCommand": "uv run bot.py",
+    "skip": true,
+    "skipReason": "telephony - phone chatbot"
+  },
+  {
+    "path": "phone-chatbot/daily-twilio-sip-dial-in",
+    "entryPoint": "bot.py",
+    "runCommand": "uv run bot.py",
+    "skip": true,
+    "skipReason": "telephony - phone chatbot"
+  },
+  {
+    "path": "phone-chatbot/daily-twilio-sip-dial-out",
+    "entryPoint": "bot.py",
+    "runCommand": "uv run bot.py",
+    "skip": true,
+    "skipReason": "telephony - phone chatbot"
+  },
+  {
+    "path": "twilio-chatbot/inbound",
+    "entryPoint": "bot.py",
+    "runCommand": "uv run bot.py",
+    "skip": true,
+    "skipReason": "telephony - Twilio chatbot"
+  },
+  {
+    "path": "twilio-chatbot/outbound",
+    "entryPoint": "bot.py",
+    "runCommand": "uv run bot.py",
+    "skip": true,
+    "skipReason": "telephony - Twilio chatbot"
+  },
+  {
+    "path": "plivo-chatbot/inbound",
+    "entryPoint": "bot.py",
+    "runCommand": "uv run bot.py",
+    "skip": true,
+    "skipReason": "telephony - Plivo chatbot"
+  },
+  {
+    "path": "plivo-chatbot/outbound",
+    "entryPoint": "bot.py",
+    "runCommand": "uv run bot.py",
+    "skip": true,
+    "skipReason": "telephony - Plivo chatbot"
+  },
+  {
+    "path": "telnyx-chatbot/inbound",
+    "entryPoint": "bot.py",
+    "runCommand": "uv run bot.py",
+    "skip": true,
+    "skipReason": "telephony - Telnyx chatbot"
+  },
+  {
+    "path": "telnyx-chatbot/outbound",
+    "entryPoint": "bot.py",
+    "runCommand": "uv run bot.py",
+    "skip": true,
+    "skipReason": "telephony - Telnyx chatbot"
+  },
+  {
+    "path": "exotel-chatbot/inbound",
+    "entryPoint": "bot.py",
+    "runCommand": "uv run bot.py",
+    "skip": true,
+    "skipReason": "telephony - Exotel chatbot"
+  },
+  {
+    "path": "exotel-chatbot/outbound",
+    "entryPoint": "bot.py",
+    "runCommand": "uv run bot.py",
+    "skip": true,
+    "skipReason": "telephony - Exotel chatbot"
+  }
 ]

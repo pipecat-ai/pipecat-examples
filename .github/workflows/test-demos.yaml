@@ -54,8 +54,6 @@ jobs:
                         - 'translation-chatbot/**'
                       instant-voice-server:
                         - 'instant-voice/server/**'
-                      local-smart-turn-server:
-                        - 'local-smart-turn/server/**'
                       bot-ready-signalling-server:
                         - 'bot-ready-signalling/server/**'
                       push-to-talk-server:
@@ -123,9 +121,6 @@ jobs:
                     - name: instant-voice-server
                       path: instant-voice/server
                       filter: instant-voice-server
-                    - name: local-smart-turn-server
-                      path: local-smart-turn/server
-                      filter: local-smart-turn-server
                     - name: bot-ready-signalling-server
                       path: bot-ready-signalling/server
                       filter: bot-ready-signalling-server

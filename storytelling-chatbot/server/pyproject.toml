@@ -8,7 +8,6 @@ dependencies = [
     "fastapi",
     "uvicorn",
     "python-dotenv",
-    "aiohttp",
     "pipecat-ai[daily,silero,openai,cartesia,google,webrtc]>=0.0.99",
 ]
 
