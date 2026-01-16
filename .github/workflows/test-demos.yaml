@@ -1,0 +1,224 @@
+name: Test Demos
+
+on:
+    push:
+        branches: [main]
+    pull_request:
+        branches: ["*"]
+    workflow_dispatch:
+
+concurrency:
+    group: ${{ github.workflow }}-${{ github.ref }}
+    cancel-in-progress: true
+
+env:
+    # Mock API keys for smoke testing
+    DAILY_API_KEY: mock_daily_api_key
+    OPENAI_API_KEY: mock_openai_api_key
+    DEEPGRAM_API_KEY: mock_deepgram_api_key
+    CARTESIA_API_KEY: mock_cartesia_api_key
+    GOOGLE_API_KEY: mock_google_api_key
+    ELEVENLABS_API_KEY: mock_elevenlabs_api_key
+    ANTHROPIC_API_KEY: mock_anthropic_api_key
+    AWS_ACCESS_KEY_ID: mock_aws_access_key
+    AWS_SECRET_ACCESS_KEY: mock_aws_secret_key
+    AWS_REGION: us-east-1
+    LANGFUSE_PUBLIC_KEY: mock_langfuse_public_key
+    LANGFUSE_SECRET_KEY: mock_langfuse_secret_key
+    AZURE_SPEECH_API_KEY: mock_azure_speech_key
+    AZURE_SPEECH_REGION: eastus
+
+jobs:
+    # First job: determine which demos to test
+    detect-changes:
+        runs-on: ubuntu-latest
+        outputs:
+            demos: ${{ steps.filter.outputs.demos }}
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Get changed demos
+              id: filter
+              uses: dorny/paths-filter@v3
+              with:
+                  filters: |
+                      simple-chatbot-server:
+                        - 'simple-chatbot/server/**'
+                      news-chatbot-server:
+                        - 'news-chatbot/server/**'
+                      storytelling-chatbot-server:
+                        - 'storytelling-chatbot/server/**'
+                      travel-companion-server:
+                        - 'travel-companion/server/**'
+                      translation-chatbot:
+                        - 'translation-chatbot/**'
+                      instant-voice-server:
+                        - 'instant-voice/server/**'
+                      local-smart-turn-server:
+                        - 'local-smart-turn/server/**'
+                      bot-ready-signalling-server:
+                        - 'bot-ready-signalling/server/**'
+                      push-to-talk-server:
+                        - 'push-to-talk/server/**'
+                      websocket-server:
+                        - 'websocket/server/**'
+                      code-helper-server:
+                        - 'code-helper/server/**'
+                      studypal:
+                        - 'studypal/**'
+                      freeze-test:
+                        - 'freeze-test/**'
+                      daily-custom-tracks:
+                        - 'daily-custom-tracks/**'
+                      daily-multi-translation:
+                        - 'daily-multi-translation/**'
+                      runner-examples:
+                        - 'runner-examples/**'
+                      aws-strands:
+                        - 'aws-strands/**'
+                      aws-agentcore:
+                        - 'aws-agentcore/**'
+                        - '!aws-agentcore/agents/**'
+                      audio-recording-s3-multipart-upload:
+                        - 'audio-recording-s3-multipart-upload/**'
+                      open-telemetry-langfuse:
+                        - 'open-telemetry/langfuse/**'
+                      open-telemetry-jaeger:
+                        - 'open-telemetry/jaeger/**'
+                      p2p-webrtc-voice-agent:
+                        - 'p2p-webrtc/voice-agent/**'
+                      p2p-webrtc-video-transform-server:
+                        - 'p2p-webrtc/video-transform/server/**'
+                      p2p-webrtc-daily-interop-bridge:
+                        - 'p2p-webrtc/daily-interop-bridge/**'
+                      p2p-webrtc-pipecat-cloud:
+                        - 'p2p-webrtc/pipecat-cloud/**'
+                      word-wrangler-web-game-server:
+                        - 'word-wrangler-gemini-live/web-game/server/**'
+
+    # Test demos that changed
+    test-demos:
+        needs: detect-changes
+        runs-on: ubuntu-latest
+        strategy:
+            fail-fast: false
+            max-parallel: 10
+            matrix:
+                include:
+                    - name: simple-chatbot-server
+                      path: simple-chatbot/server
+                      filter: simple-chatbot-server
+                    - name: news-chatbot-server
+                      path: news-chatbot/server
+                      filter: news-chatbot-server
+                    - name: storytelling-chatbot-server
+                      path: storytelling-chatbot/server
+                      filter: storytelling-chatbot-server
+                    - name: travel-companion-server
+                      path: travel-companion/server
+                      filter: travel-companion-server
+                    - name: translation-chatbot
+                      path: translation-chatbot
+                      filter: translation-chatbot
+                    - name: instant-voice-server
+                      path: instant-voice/server
+                      filter: instant-voice-server
+                    - name: local-smart-turn-server
+                      path: local-smart-turn/server
+                      filter: local-smart-turn-server
+                    - name: bot-ready-signalling-server
+                      path: bot-ready-signalling/server
+                      filter: bot-ready-signalling-server
+                    - name: push-to-talk-server
+                      path: push-to-talk/server
+                      filter: push-to-talk-server
+                    - name: websocket-server
+                      path: websocket/server
+                      filter: websocket-server
+                    - name: code-helper-server
+                      path: code-helper/server
+                      filter: code-helper-server
+                    - name: studypal
+                      path: studypal
+                      filter: studypal
+                    - name: freeze-test
+                      path: freeze-test
+                      filter: freeze-test
+                    - name: daily-custom-tracks
+                      path: daily-custom-tracks
+                      filter: daily-custom-tracks
+                    - name: daily-multi-translation
+                      path: daily-multi-translation
+                      filter: daily-multi-translation
+                    - name: runner-examples
+                      path: runner-examples
+                      filter: runner-examples
+                    - name: aws-strands
+                      path: aws-strands
+                      filter: aws-strands
+                    - name: aws-agentcore
+                      path: aws-agentcore
+                      filter: aws-agentcore
+                    - name: audio-recording-s3-multipart-upload
+                      path: audio-recording-s3-multipart-upload
+                      filter: audio-recording-s3-multipart-upload
+                    - name: open-telemetry-langfuse
+                      path: open-telemetry/langfuse
+                      filter: open-telemetry-langfuse
+                    - name: open-telemetry-jaeger
+                      path: open-telemetry/jaeger
+                      filter: open-telemetry-jaeger
+                    - name: p2p-webrtc-voice-agent
+                      path: p2p-webrtc/voice-agent
+                      filter: p2p-webrtc-voice-agent
+                    - name: p2p-webrtc-video-transform-server
+                      path: p2p-webrtc/video-transform/server
+                      filter: p2p-webrtc-video-transform-server
+                    - name: p2p-webrtc-daily-interop-bridge
+                      path: p2p-webrtc/daily-interop-bridge
+                      filter: p2p-webrtc-daily-interop-bridge
+                    - name: p2p-webrtc-pipecat-cloud
+                      path: p2p-webrtc/pipecat-cloud
+                      filter: p2p-webrtc-pipecat-cloud
+                    - name: word-wrangler-web-game-server
+                      path: word-wrangler-gemini-live/web-game/server
+                      filter: word-wrangler-web-game-server
+
+        # Only run if the specific demo changed, or on main branch push, or manual trigger
+        if: |
+            github.event_name == 'push' && github.ref == 'refs/heads/main' ||
+            github.event_name == 'workflow_dispatch' ||
+            needs.detect-changes.outputs.demos != '{}'
+
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Check if demo changed
+              id: should-run
+              run: |
+                  if [[ "${{ github.event_name }}" == "push" && "${{ github.ref }}" == "refs/heads/main" ]]; then
+                    echo "run=true" >> $GITHUB_OUTPUT
+                    echo "Running on main branch push - testing all demos"
+                  elif [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+                    echo "run=true" >> $GITHUB_OUTPUT
+                    echo "Manual trigger - testing all demos"
+                  elif [[ "${{ needs.detect-changes.outputs[matrix.filter] }}" == "true" ]]; then
+                    echo "run=true" >> $GITHUB_OUTPUT
+                    echo "Demo ${{ matrix.name }} changed - will test"
+                  else
+                    echo "run=false" >> $GITHUB_OUTPUT
+                    echo "Demo ${{ matrix.name }} not changed - skipping"
+                  fi
+
+            - name: Install uv
+              if: steps.should-run.outputs.run == 'true'
+              uses: astral-sh/setup-uv@v4
+
+            - name: Set up Python
+              if: steps.should-run.outputs.run == 'true'
+              run: uv python install 3.12
+
+            - name: Run smoke test
+              if: steps.should-run.outputs.run == 'true'
+              run: |
+                  python scripts/smoke_test_demo.py "${{ matrix.path }}" --timeout 30
