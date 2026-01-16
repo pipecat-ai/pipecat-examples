@@ -18,12 +18,18 @@ from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineParams, PipelineTask
 from pipecat.processors.aggregators.llm_context import LLMContext
-from pipecat.processors.aggregators.llm_response_universal import LLMContextAggregatorPair
+from pipecat.processors.aggregators.llm_response_universal import (
+    LLMContextAggregatorPair,
+    LLMUserAggregatorParams,
+)
 from pipecat.runner.types import RunnerArguments
 from pipecat.services.cartesia.tts import CartesiaTTSService
 from pipecat.services.deepgram.stt import DeepgramSTTService
 from pipecat.services.openai.llm import OpenAILLMService
+from pipecat.transports.base_transport import BaseTransport
 from pipecat.transports.daily.transport import DailyParams, DailyTransport
+from pipecat.turns.user_stop import TurnAnalyzerUserTurnStopStrategy
+from pipecat.turns.user_turn_strategies import UserTurnStrategies
 
 from server_utils import AgentRequest, DialoutSettings
 
@@ -126,18 +132,25 @@ async def run_bot(
     ]
 
     context = LLMContext(messages)
-    context_aggregator = LLMContextAggregatorPair(context)
+    user_aggregator, assistant_aggregator = LLMContextAggregatorPair(
+        context,
+        user_params=LLMUserAggregatorParams(
+            user_turn_strategies=UserTurnStrategies(
+                stop=[TurnAnalyzerUserTurnStopStrategy(turn_analyzer=LocalSmartTurnAnalyzerV3())]
+            ),
+        ),
+    )
 
     # Build pipeline
     pipeline = Pipeline(
         [
             transport.input(),  # Transport user input
             stt,
-            context_aggregator.user(),  # User responses
+            user_aggregator,  # User responses
             llm,  # LLM
             tts,  # TTS
             transport.output(),  # Transport bot output
-            context_aggregator.assistant(),  # Assistant spoken responses
+            assistant_aggregator,  # Assistant spoken responses
         ]
     )
 
@@ -197,7 +210,6 @@ async def bot(runner_args: RunnerArguments):
                 audio_in_enabled=True,
                 audio_out_enabled=True,
                 vad_analyzer=SileroVADAnalyzer(params=VADParams(stop_secs=0.2)),
-                turn_analyzer=LocalSmartTurnAnalyzerV3(),
             ),
         )
 

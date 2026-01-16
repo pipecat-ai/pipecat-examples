@@ -108,7 +108,7 @@ async def bot_connect(request: Request) -> Dict[Any, Any]:
 
     # Start the bot process
     try:
-        bot_file = "news_bot"
+        bot_file = "bot"
         proc = subprocess.Popen(
             [f"python3 -m {bot_file} -u {room_url} -t {token}"],
             shell=True,

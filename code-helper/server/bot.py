@@ -39,7 +39,10 @@ from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineParams, PipelineTask
 from pipecat.processors.aggregators.llm_context import LLMContext
-from pipecat.processors.aggregators.llm_response_universal import LLMContextAggregatorPair
+from pipecat.processors.aggregators.llm_response_universal import (
+    LLMContextAggregatorPair,
+    LLMUserAggregatorParams,
+)
 from pipecat.processors.aggregators.llm_text_processor import LLMTextProcessor
 from pipecat.processors.frameworks.rtvi import RTVIObserver, RTVIProcessor
 from pipecat.processors.transcript_processor import TranscriptProcessor
@@ -50,6 +53,10 @@ from pipecat.services.deepgram.stt import DeepgramSTTService
 from pipecat.services.llm_service import FunctionCallParams
 from pipecat.services.openai.llm import OpenAILLMService
 from pipecat.transports.base_transport import BaseTransport, TransportParams
+from pipecat.turns.user_stop.turn_analyzer_user_turn_stop_strategy import (
+    TurnAnalyzerUserTurnStopStrategy,
+)
+from pipecat.turns.user_turn_strategies import UserTurnStrategies
 from pipecat.utils.text.pattern_pair_aggregator import MatchAction, PatternPairAggregator
 
 load_dotenv(override=True)
@@ -152,8 +159,13 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     )
     tools = ToolsSchema(standard_tools=[credit_card_function])
     context = LLMContext(messages, tools)
-    context_aggregator = LLMContextAggregatorPair(
-        context=context,
+    user_aggregator, assistant_aggregator = LLMContextAggregatorPair(
+        context,
+        user_params=LLMUserAggregatorParams(
+            user_turn_strategies=UserTurnStrategies(
+                stop=[TurnAnalyzerUserTurnStopStrategy(turn_analyzer=LocalSmartTurnAnalyzerV3())]
+            ),
+        ),
     )
 
     # Transcription processor
@@ -176,13 +188,13 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
             rtvi,
             stt,
             transcript_processor.user(),
-            context_aggregator.user(),
+            user_aggregator,
             llm,
             llm_text_processor,  # Pre-aggregate LLMTextFrames for custom segment handling
             tts,
             transport.output(),
             transcript_processor.assistant(),
-            context_aggregator.assistant(),
+            assistant_aggregator,
         ]
     )
 
@@ -235,7 +247,6 @@ async def bot(runner_args: RunnerArguments):
             audio_in_enabled=True,
             audio_out_enabled=True,
             vad_analyzer=SileroVADAnalyzer(params=VADParams(stop_secs=0.2)),
-            turn_analyzer=LocalSmartTurnAnalyzerV3(),
         ),
     }
 

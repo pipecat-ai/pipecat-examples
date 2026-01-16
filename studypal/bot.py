@@ -10,10 +10,8 @@ import os
 
 import aiohttp
 import tiktoken
-from bs4 import BeautifulSoup
 from dotenv import load_dotenv
 from loguru import logger
-from pipecat.audio.turn.smart_turn.base_smart_turn import SmartTurnParams
 from pipecat.audio.turn.smart_turn.local_smart_turn_v3 import LocalSmartTurnAnalyzerV3
 from pipecat.audio.vad.silero import SileroVADAnalyzer
 from pipecat.audio.vad.vad_analyzer import VADParams
@@ -22,7 +20,10 @@ from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineParams, PipelineTask
 from pipecat.processors.aggregators.llm_context import LLMContext
-from pipecat.processors.aggregators.llm_response_universal import LLMContextAggregatorPair
+from pipecat.processors.aggregators.llm_response_universal import (
+    LLMContextAggregatorPair,
+    LLMUserAggregatorParams,
+)
 from pipecat.runner.types import RunnerArguments
 from pipecat.runner.utils import create_transport
 from pipecat.services.cartesia.tts import CartesiaTTSService
@@ -31,6 +32,10 @@ from pipecat.services.openai.llm import OpenAILLMService
 from pipecat.transports.base_transport import BaseTransport, TransportParams
 from pipecat.transports.daily.transport import DailyParams
 from pipecat.transports.websocket.fastapi import FastAPIWebsocketParams
+from pipecat.turns.user_stop.turn_analyzer_user_turn_stop_strategy import (
+    TurnAnalyzerUserTurnStopStrategy,
+)
+from pipecat.turns.user_turn_strategies import UserTurnStrategies
 from pypdf import PdfReader
 
 load_dotenv(override=True)
@@ -43,19 +48,16 @@ transport_params = {
         audio_in_enabled=True,
         audio_out_enabled=True,
         vad_analyzer=SileroVADAnalyzer(params=VADParams(stop_secs=0.2)),
-        turn_analyzer=LocalSmartTurnAnalyzerV3(params=SmartTurnParams()),
     ),
     "twilio": lambda: FastAPIWebsocketParams(
         audio_in_enabled=True,
         audio_out_enabled=True,
         vad_analyzer=SileroVADAnalyzer(params=VADParams(stop_secs=0.2)),
-        turn_analyzer=LocalSmartTurnAnalyzerV3(params=SmartTurnParams()),
     ),
     "webrtc": lambda: TransportParams(
         audio_in_enabled=True,
         audio_out_enabled=True,
         vad_analyzer=SileroVADAnalyzer(params=VADParams(stop_secs=0.2)),
-        turn_analyzer=LocalSmartTurnAnalyzerV3(params=SmartTurnParams()),
     ),
 }
 
@@ -82,25 +84,51 @@ async def get_article_content(url: str, aiohttp_session: aiohttp.ClientSession):
         return await get_wikipedia_content(url, aiohttp_session)
 
 
-# Helper function to extract content from Wikipedia url (this is
-# technically agnostic to URL type but will work best with Wikipedia
-# articles)
+# Helper function to extract content from Wikipedia url using the Wikipedia API
 
 
 async def get_wikipedia_content(url: str, aiohttp_session: aiohttp.ClientSession):
-    async with aiohttp_session.get(url) as response:
-        if response.status != 200:
-            return "Failed to download Wikipedia article."
-
-        text = await response.text()
-        soup = BeautifulSoup(text, "html.parser")
-
-        content = soup.find("div", {"class": "mw-parser-output"})
-
-        if content:
-            return content.get_text()
+    # Extract the article title from the URL
+    # Example: https://en.wikipedia.org/wiki/Python_(programming_language) -> Python_(programming_language)
+    try:
+        title = url.split("/wiki/")[-1]
+        # Determine the language subdomain (default to 'en')
+        if "wikipedia.org" in url:
+            lang = url.split("://")[1].split(".")[0]
         else:
+            lang = "en"
+
+        # Use Wikipedia's API to get plain text content
+        api_url = f"https://{lang}.wikipedia.org/w/api.php"
+        params = {
+            "action": "query",
+            "format": "json",
+            "prop": "extracts",
+            "titles": title,
+            "explaintext": 1,
+            "exsectionformat": "plain",
+        }
+
+        async with aiohttp_session.get(api_url, params=params) as response:
+            if response.status != 200:
+                return "Failed to download Wikipedia article."
+
+            data = await response.json()
+            pages = data.get("query", {}).get("pages", {})
+
+            for page_id, page_data in pages.items():
+                if page_id == "-1":
+                    return "Wikipedia article not found."
+                extract = page_data.get("extract", "")
+                if extract:
+                    return extract
+                else:
+                    return "Failed to extract Wikipedia article content."
+
             return "Failed to extract Wikipedia article content."
+    except Exception as e:
+        logger.error(f"Error extracting Wikipedia content: {e}")
+        return f"Failed to extract Wikipedia article: {str(e)}"
 
 
 # Helper function to extract content from arXiv url
@@ -130,7 +158,12 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
 
     url = input("Enter the URL of the article you would like to talk about: ")
 
-    async with aiohttp.ClientSession() as session:
+    # Set up headers with User-Agent for all requests
+    headers = {
+        "User-Agent": "StudyPal/1.0 (Educational bot; https://github.com/pipecat-ai/pipecat-examples)"
+    }
+
+    async with aiohttp.ClientSession(headers=headers) as session:
         article_content = await get_article_content(url, session)
         article_content = truncate_content(article_content, model_name="gpt-4o-mini")
 
@@ -157,17 +190,26 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
         ]
 
         context = LLMContext(messages)
-        context_aggregator = LLMContextAggregatorPair(context)
+        user_aggregator, assistant_aggregator = LLMContextAggregatorPair(
+            context,
+            user_params=LLMUserAggregatorParams(
+                user_turn_strategies=UserTurnStrategies(
+                    stop=[
+                        TurnAnalyzerUserTurnStopStrategy(turn_analyzer=LocalSmartTurnAnalyzerV3())
+                    ]
+                )
+            ),
+        )
 
         pipeline = Pipeline(
             [
                 transport.input(),  # Transport user input
                 stt,
-                context_aggregator.user(),  # User responses
+                user_aggregator,  # User responses
                 llm,  # LLM
                 tts,  # TTS
                 transport.output(),  # Transport bot output
-                context_aggregator.assistant(),  # Assistant spoken responses
+                assistant_aggregator,  # Assistant spoken responses
             ]
         )
 

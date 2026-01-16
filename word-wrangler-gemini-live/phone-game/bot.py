@@ -20,7 +20,6 @@ from typing import Any, Mapping, Optional
 from dotenv import load_dotenv
 from loguru import logger
 from pipecat.audio.resamplers.soxr_resampler import SOXRAudioResampler
-from pipecat.audio.turn.smart_turn.base_smart_turn import SmartTurnParams
 from pipecat.audio.turn.smart_turn.local_smart_turn_v3 import LocalSmartTurnAnalyzerV3
 from pipecat.audio.vad.silero import SileroVADAnalyzer
 from pipecat.audio.vad.vad_analyzer import VADParams
@@ -43,9 +42,11 @@ from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineParams, PipelineTask
 from pipecat.processors.aggregators.llm_context import LLMContext
-from pipecat.processors.aggregators.llm_response_universal import LLMContextAggregatorPair
+from pipecat.processors.aggregators.llm_response_universal import (
+    LLMContextAggregatorPair,
+    LLMUserAggregatorParams,
+)
 from pipecat.processors.consumer_processor import ConsumerProcessor
-from pipecat.processors.filters.stt_mute_filter import STTMuteConfig, STTMuteFilter, STTMuteStrategy
 from pipecat.processors.frame_processor import FrameDirection, FrameProcessor, FrameProcessorSetup
 from pipecat.processors.producer_processor import ProducerProcessor
 from pipecat.runner.types import RunnerArguments
@@ -56,12 +57,19 @@ from pipecat.services.google.gemini_live.llm import (
     InputParams,
 )
 from pipecat.services.google.tts import GoogleTTSService
-from pipecat.sync.base_notifier import BaseNotifier
-from pipecat.sync.event_notifier import EventNotifier
 from pipecat.transports.base_transport import BaseTransport, TransportParams
 from pipecat.transports.websocket.fastapi import (
     FastAPIWebsocketParams,
 )
+from pipecat.turns.mute.mute_until_first_bot_complete_user_mute_strategy import (
+    MuteUntilFirstBotCompleteUserMuteStrategy,
+)
+from pipecat.turns.user_stop.turn_analyzer_user_turn_stop_strategy import (
+    TurnAnalyzerUserTurnStopStrategy,
+)
+from pipecat.turns.user_turn_strategies import UserTurnStrategies
+from pipecat.utils.sync.base_notifier import BaseNotifier
+from pipecat.utils.sync.event_notifier import EventNotifier
 from pipecat.utils.text.base_text_filter import BaseTextFilter
 
 from word_list import generate_game_words
@@ -589,11 +597,6 @@ Important guidelines:
 
     intro_message = """Start with this exact brief introduction: "Welcome to Word Wrangler! I'll give you words to describe, and the A.I. player will try to guess them. Remember, don't say any part of the word itself. Here's your first word: [word]." """
 
-    # Create the STT mute filter if we have strategies to apply
-    stt_mute_filter = STTMuteFilter(
-        config=STTMuteConfig(strategies={STTMuteStrategy.MUTE_UNTIL_FIRST_BOT_COMPLETE})
-    )
-
     host_llm = GeminiLiveLLMService(
         api_key=os.getenv("GOOGLE_API_KEY"),
         system_instruction=host_instruction,
@@ -647,13 +650,22 @@ Important guidelines:
     # one here to be able to push the context frame to the PipelineTask. This is
     # what initiates the conversation.
     context = LLMContext(messages)
-    context_aggregator = LLMContextAggregatorPair(context)
+    user_aggregator, assistant_aggregator = LLMContextAggregatorPair(
+        context,
+        user_params=LLMUserAggregatorParams(
+            user_turn_strategies=UserTurnStrategies(
+                stop=[TurnAnalyzerUserTurnStopStrategy(turn_analyzer=LocalSmartTurnAnalyzerV3())]
+            ),
+            user_mute_strategies=[
+                MuteUntilFirstBotCompleteUserMuteStrategy(),
+            ],
+        ),
+    )
 
     pipeline = Pipeline(
         [
             transport.input(),  # Receive audio/video from Daily call
-            stt_mute_filter,  # Filter out speech during the bot's initial turn
-            context_aggregator.user(),
+            user_aggregator,
             ParallelPipeline(
                 # Host branch: manages the game and provides words
                 [
@@ -671,7 +683,7 @@ Important guidelines:
                 ],
             ),
             transport.output(),  # Send audio/video back to Daily call
-            context_aggregator.assistant(),
+            assistant_aggregator,
         ]
     )
 
@@ -728,14 +740,12 @@ async def bot(runner_args: RunnerArguments):
             audio_in_filter=krisp_filter,
             audio_out_enabled=True,
             vad_analyzer=SileroVADAnalyzer(params=VADParams(stop_secs=0.2)),
-            turn_analyzer=LocalSmartTurnAnalyzerV3(params=SmartTurnParams()),
         ),
         "twilio": lambda: FastAPIWebsocketParams(
             audio_in_enabled=True,
             audio_in_filter=krisp_filter,
             audio_out_enabled=True,
             vad_analyzer=SileroVADAnalyzer(params=VADParams(stop_secs=0.2)),
-            turn_analyzer=LocalSmartTurnAnalyzerV3(params=SmartTurnParams()),
         ),
     }
 

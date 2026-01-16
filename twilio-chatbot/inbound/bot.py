@@ -14,13 +14,18 @@ import aiofiles
 import aiohttp
 from dotenv import load_dotenv
 from loguru import logger
+from pipecat.audio.turn.smart_turn.local_smart_turn_v3 import LocalSmartTurnAnalyzerV3
 from pipecat.audio.vad.silero import SileroVADAnalyzer
+from pipecat.audio.vad.vad_analyzer import VADParams
 from pipecat.frames.frames import LLMRunFrame
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineParams, PipelineTask
 from pipecat.processors.aggregators.llm_context import LLMContext
-from pipecat.processors.aggregators.llm_response_universal import LLMContextAggregatorPair
+from pipecat.processors.aggregators.llm_response_universal import (
+    LLMContextAggregatorPair,
+    LLMUserAggregatorParams,
+)
 from pipecat.processors.audio.audio_buffer_processor import AudioBufferProcessor
 from pipecat.runner.types import RunnerArguments
 from pipecat.runner.utils import parse_telephony_websocket
@@ -33,6 +38,8 @@ from pipecat.transports.websocket.fastapi import (
     FastAPIWebsocketParams,
     FastAPIWebsocketTransport,
 )
+from pipecat.turns.user_stop import TurnAnalyzerUserTurnStopStrategy
+from pipecat.turns.user_turn_strategies import UserTurnStrategies
 
 load_dotenv(override=True)
 
@@ -115,7 +122,14 @@ async def run_bot(transport: BaseTransport, handle_sigint: bool, testing: bool):
     ]
 
     context = LLMContext(messages)
-    context_aggregator = LLMContextAggregatorPair(context)
+    user_aggregator, assistant_aggregator = LLMContextAggregatorPair(
+        context,
+        user_params=LLMUserAggregatorParams(
+            user_turn_strategies=UserTurnStrategies(
+                stop=[TurnAnalyzerUserTurnStopStrategy(turn_analyzer=LocalSmartTurnAnalyzerV3())]
+            ),
+        ),
+    )
 
     # NOTE: Watch out! This will save all the conversation in memory. You can
     # pass `buffer_size` to get periodic callbacks.
@@ -125,12 +139,12 @@ async def run_bot(transport: BaseTransport, handle_sigint: bool, testing: bool):
         [
             transport.input(),  # Websocket input from client
             stt,  # Speech-To-Text
-            context_aggregator.user(),
+            user_aggregator,
             llm,  # LLM
             tts,  # Text-To-Speech
             transport.output(),  # Websocket output to client
             audiobuffer,  # Used to buffer the audio in the pipeline
-            context_aggregator.assistant(),
+            assistant_aggregator,
         ]
     )
 
@@ -194,7 +208,7 @@ async def bot(runner_args: RunnerArguments, testing: Optional[bool] = False):
             audio_in_enabled=True,
             audio_out_enabled=True,
             add_wav_header=False,
-            vad_analyzer=SileroVADAnalyzer(),
+            vad_analyzer=SileroVADAnalyzer(params=VADParams(stop_secs=0.2)),
             serializer=serializer,
         ),
     )

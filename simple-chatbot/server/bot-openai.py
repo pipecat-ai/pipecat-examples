@@ -45,7 +45,10 @@ from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineParams, PipelineTask
 from pipecat.processors.aggregators.llm_context import LLMContext
-from pipecat.processors.aggregators.llm_response_universal import LLMContextAggregatorPair
+from pipecat.processors.aggregators.llm_response_universal import (
+    LLMContextAggregatorPair,
+    LLMUserAggregatorParams,
+)
 from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
 from pipecat.processors.frameworks.rtvi import RTVIObserver, RTVIProcessor
 from pipecat.runner.types import DailyRunnerArguments, RunnerArguments, SmallWebRTCRunnerArguments
@@ -56,6 +59,10 @@ from pipecat.transports.base_transport import BaseTransport, TransportParams
 from pipecat.transports.daily.transport import DailyParams, DailyTransport
 from pipecat.transports.smallwebrtc.connection import SmallWebRTCConnection
 from pipecat.transports.smallwebrtc.transport import SmallWebRTCTransport
+from pipecat.turns.user_stop.turn_analyzer_user_turn_stop_strategy import (
+    TurnAnalyzerUserTurnStopStrategy,
+)
+from pipecat.turns.user_turn_strategies import UserTurnStrategies
 
 load_dotenv(override=True)
 
@@ -138,7 +145,14 @@ async def run_bot(transport: BaseTransport):
     # Set up conversation context and management
     # The context_aggregator will automatically collect conversation context
     context = LLMContext(messages)
-    context_aggregator = LLMContextAggregatorPair(context)
+    user_aggregator, assistant_aggregator = LLMContextAggregatorPair(
+        context,
+        user_params=LLMUserAggregatorParams(
+            user_turn_strategies=UserTurnStrategies(
+                stop=[TurnAnalyzerUserTurnStopStrategy(turn_analyzer=LocalSmartTurnAnalyzerV3())]
+            )
+        ),
+    )
 
     rtvi = RTVIProcessor()
 
@@ -150,12 +164,12 @@ async def run_bot(transport: BaseTransport):
             transport.input(),
             rtvi,
             stt,
-            context_aggregator.user(),
+            user_aggregator,
             llm,
             tts,
             ta,
             transport.output(),
-            context_aggregator.assistant(),
+            assistant_aggregator,
         ]
     )
 
@@ -211,7 +225,6 @@ async def bot(runner_args: RunnerArguments):
                     video_out_width=1024,
                     video_out_height=576,
                     vad_analyzer=SileroVADAnalyzer(params=VADParams(stop_secs=0.2)),
-                    turn_analyzer=LocalSmartTurnAnalyzerV3(),
                 ),
             )
         case SmallWebRTCRunnerArguments():
@@ -226,7 +239,6 @@ async def bot(runner_args: RunnerArguments):
                     video_out_width=1024,
                     video_out_height=576,
                     vad_analyzer=SileroVADAnalyzer(params=VADParams(stop_secs=0.2)),
-                    turn_analyzer=LocalSmartTurnAnalyzerV3(),
                 ),
             )
         case _:

@@ -50,10 +50,8 @@ Open `.env` and add your API keys and configuration details.
 Start the server with the following command:
 
 ```bash
-uv run src/server.py --host YOUR_IP
+uv run bot.py -t daily
 ```
-
-Replace `YOUR_IP` with your desired host IP address.
 
 ---
 

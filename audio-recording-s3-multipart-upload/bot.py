@@ -86,7 +86,7 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     ]
 
     tools = ToolsSchema(standard_tools=[terminate_function])
-    context = LLMContext(messages)
+    context = LLMContext(messages, tools)
     user_aggregator, assistant_aggregator = LLMContextAggregatorPair(context)
 
     audio_buffer = AudioBufferProcessor(buffer_size=audio_buffer_size)
