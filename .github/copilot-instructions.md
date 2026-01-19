@@ -96,6 +96,33 @@ async def on_client_connected(transport, client):
 - **Imports**: Use `ruff` for sorting (line-length: 100, select: ["I"])
 - **Environment**: Always `load_dotenv(override=True)` at module level
 - **API keys**: Access via `os.getenv("KEY_NAME")`, never hardcode
+- **Type annotations**: All code must pass pyright strict mode type checking
+
+## Type Checking
+
+This repository enforces **strict static type checking** with pyright. All Python code must be fully typed.
+
+### Configuration
+- Root `pyproject.toml` contains the shared pyright config
+- Mode: `strict` with `reportUnknown*` rules set to `warning`
+- Python version: 3.10 minimum
+
+### Running Type Checks
+```bash
+# From repo root - install dev dependencies
+uv sync --group dev
+
+# Type check a specific example
+cd simple-chatbot/server
+uv sync  # Install example dependencies first
+pyright --project ../../pyproject.toml .
+
+# Or from repo root
+uv run pyright --project pyproject.toml simple-chatbot/server
+```
+
+### CI Integration
+Type checking runs automatically on PRs via `.github/workflows/typecheck.yaml`. Only changed examples are checked on PRs; all examples are checked on main branch pushes.
 
 ## Common Services
 

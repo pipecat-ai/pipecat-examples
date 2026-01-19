@@ -1,0 +1,123 @@
+name: Type Check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: ["*"]
+  workflow_dispatch:
+
+concurrency:
+  group: typecheck-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Generate matrix from demos.json
+  generate-matrix:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+      changed_files: ${{ steps.changed-files.outputs.all_changed_files }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get changed files
+        id: changed-files
+        uses: tj-actions/changed-files@v45
+        with:
+          separator: ","
+
+      - name: Generate matrix from demos.json
+        id: set-matrix
+        run: |
+          python3 << 'EOF'
+          import json
+          import os
+
+          # Load demos.json
+          with open('scripts/demos.json') as f:
+              demos = json.load(f)
+
+          # Get unique paths (some demos have multiple run commands)
+          seen_paths = set()
+          testable_demos = []
+          for demo in demos:
+              path = demo['path']
+              if path not in seen_paths:
+                  seen_paths.add(path)
+                  testable_demos.append({
+                      'name': path.replace('/', '-'),
+                      'path': path
+                  })
+
+          # Output matrix
+          matrix = {'include': testable_demos}
+          print(f"Generated {len(testable_demos)} unique demo paths")
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+              f.write(f"matrix={json.dumps(matrix)}\n")
+          EOF
+
+  # Type check demos
+  typecheck:
+    needs: generate-matrix
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      max-parallel: 10
+      matrix: ${{ fromJson(needs.generate-matrix.outputs.matrix) }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check if demo changed
+        id: should-run
+        run: |
+          # Always run on main branch push or manual trigger
+          if [[ "${{ github.event_name }}" == "push" && "${{ github.ref }}" == "refs/heads/main" ]]; then
+            echo "run=true" >> $GITHUB_OUTPUT
+            echo "Running on main branch push - type checking all demos"
+            exit 0
+          elif [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "run=true" >> $GITHUB_OUTPUT
+            echo "Manual trigger - type checking all demos"
+            exit 0
+          fi
+
+          # For PRs, check if this demo's files changed
+          CHANGED_FILES="${{ needs.generate-matrix.outputs.changed_files }}"
+          DEMO_PATH="${{ matrix.path }}"
+
+          # Check if any changed file starts with the demo path
+          if echo "$CHANGED_FILES" | grep -qE "(^|,)$DEMO_PATH/"; then
+            echo "run=true" >> $GITHUB_OUTPUT
+            echo "Demo $DEMO_PATH changed - will type check"
+          else
+            echo "run=false" >> $GITHUB_OUTPUT
+            echo "Demo $DEMO_PATH not changed - skipping"
+          fi
+
+      - name: Install uv
+        if: steps.should-run.outputs.run == 'true'
+        uses: astral-sh/setup-uv@v4
+
+      - name: Set up Python
+        if: steps.should-run.outputs.run == 'true'
+        run: uv python install 3.12
+
+      - name: Install demo dependencies
+        if: steps.should-run.outputs.run == 'true'
+        working-directory: ${{ matrix.path }}
+        run: uv sync
+
+      - name: Install pyright
+        if: steps.should-run.outputs.run == 'true'
+        run: uv tool install pyright
+
+      - name: Run pyright
+        if: steps.should-run.outputs.run == 'true'
+        working-directory: ${{ matrix.path }}
+        run: |
+          # Run pyright with the root config, targeting this directory
+          pyright --project ${{ github.workspace }}/pyproject.toml .
