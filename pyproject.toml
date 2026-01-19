@@ -32,3 +32,5 @@ reportUnknownLambdaType = "warning"
 reportUnknownParameterType = "warning"
 # Missing type stubs as warning
 reportMissingTypeStubs = "warning"
+# Event handlers registered via decorators appear unused to static analysis
+reportUnusedFunction = "warning"
