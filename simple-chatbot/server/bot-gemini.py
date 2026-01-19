@@ -23,9 +23,11 @@ Run the bot using::
 """
 
 import os
+from typing import Any, cast
 
 from dotenv import load_dotenv
 from loguru import logger
+from openai.types.chat import ChatCompletionUserMessageParam
 from PIL import Image
 from pipecat.audio.turn.smart_turn.local_smart_turn_v3 import LocalSmartTurnAnalyzerV3
 from pipecat.audio.vad.silero import SileroVADAnalyzer
@@ -41,14 +43,18 @@ from pipecat.frames.frames import (
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineParams, PipelineTask
-from pipecat.processors.aggregators.llm_context import LLMContext
+from pipecat.processors.aggregators.llm_context import LLMContext, LLMContextMessage
 from pipecat.processors.aggregators.llm_response_universal import (
     LLMContextAggregatorPair,
     LLMUserAggregatorParams,
 )
 from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
 from pipecat.processors.frameworks.rtvi import RTVIObserver, RTVIProcessor
-from pipecat.runner.types import DailyRunnerArguments, RunnerArguments, SmallWebRTCRunnerArguments
+from pipecat.runner.types import (
+    DailyRunnerArguments,
+    RunnerArguments,
+    SmallWebRTCRunnerArguments,
+)
 from pipecat.services.google.gemini_live.llm import GeminiLiveLLMService
 from pipecat.transports.base_transport import BaseTransport, TransportParams
 from pipecat.transports.daily.transport import DailyParams, DailyTransport
@@ -61,7 +67,7 @@ from pipecat.turns.user_turn_strategies import UserTurnStrategies
 
 load_dotenv(override=True)
 
-sprites = []
+sprites: list[OutputImageRawFrame] = []
 script_dir = os.path.dirname(__file__)
 
 # Load sequential animation frames
@@ -71,15 +77,19 @@ for i in range(1, 26):
     # Get the filename without the extension to use as the dictionary key
     # Open the image and convert it to bytes
     with Image.open(full_path) as img:
-        sprites.append(OutputImageRawFrame(image=img.tobytes(), size=img.size, format=img.format))
+        sprites.append(
+            OutputImageRawFrame(image=img.tobytes(), size=img.size, format=img.format)
+        )
 
 # Create a smooth animation by adding reversed frames
-flipped = sprites[::-1]
+flipped: list[OutputImageRawFrame] = sprites[::-1]
 sprites.extend(flipped)
 
 # Define static and animated states
-quiet_frame = sprites[0]  # Static frame for when bot is listening
-talking_frame = SpriteFrame(images=sprites)  # Animation sequence for when bot is talking
+quiet_frame: OutputImageRawFrame = sprites[0]  # Static frame for when bot is listening
+talking_frame = SpriteFrame(
+    images=sprites
+)  # Animation sequence for when bot is talking
 
 
 class TalkingAnimation(FrameProcessor):
@@ -127,11 +137,11 @@ async def run_bot(transport: BaseTransport):
 
     # Initialize the Gemini Live model
     llm = GeminiLiveLLMService(
-        api_key=os.getenv("GOOGLE_API_KEY"),
+        api_key=os.getenv("GOOGLE_API_KEY") or "",
         voice_id="Charon",  # Aoede, Charon, Fenrir, Kore, Puck
     )
 
-    messages = [
+    messages: list[ChatCompletionUserMessageParam] = [
         {
             "role": "user",
             "content": "You are Chatbot, a friendly, helpful robot. Your goal is to demonstrate your capabilities in a succinct way. Your output will be converted to audio so don't include special characters in your answers. Respond to what the user said in a creative and helpful way, but keep your responses brief. Start by introducing yourself.",
@@ -140,12 +150,16 @@ async def run_bot(transport: BaseTransport):
 
     # Set up conversation context and management
     # The context_aggregator will automatically collect conversation context
-    context = LLMContext(messages)
+    context = LLMContext(cast(list[LLMContextMessage], messages))
     user_aggregator, assistant_aggregator = LLMContextAggregatorPair(
         context,
         user_params=LLMUserAggregatorParams(
             user_turn_strategies=UserTurnStrategies(
-                stop=[TurnAnalyzerUserTurnStopStrategy(turn_analyzer=LocalSmartTurnAnalyzerV3())]
+                stop=[
+                    TurnAnalyzerUserTurnStopStrategy(
+                        turn_analyzer=LocalSmartTurnAnalyzerV3()
+                    )
+                ]
             )
         ),
     )
@@ -182,17 +196,17 @@ async def run_bot(transport: BaseTransport):
     await task.queue_frame(quiet_frame)
 
     @rtvi.event_handler("on_client_ready")
-    async def on_client_ready(rtvi):
+    async def on_client_ready(rtvi: RTVIProcessor) -> None:
         await rtvi.set_bot_ready()
         # Kick off the conversation
         await task.queue_frames([LLMRunFrame()])
 
     @transport.event_handler("on_client_connected")
-    async def on_client_connected(transport, client):
+    async def on_client_connected(transport: Any, client: Any) -> None:
         logger.info("Client connected")
 
     @transport.event_handler("on_client_disconnected")
-    async def on_client_disconnected(transport, client):
+    async def on_client_disconnected(transport: Any, client: Any) -> None:
         logger.info("Client disconnected")
         await task.cancel()
 
@@ -242,6 +256,10 @@ async def bot(runner_args: RunnerArguments):
     await run_bot(transport)
 
 
+if __name__ == "__main__":
+    from pipecat.runner.run import main
+
+    main()
 if __name__ == "__main__":
     from pipecat.runner.run import main
 
