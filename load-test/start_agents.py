@@ -20,6 +20,7 @@ import argparse
 import asyncio
 import os
 import time
+from typing import Any, List, Optional
 from urllib.parse import urlparse
 
 import httpx
@@ -94,7 +95,7 @@ async def start_agent(
     daily_api_key: str,
     room_url: str,
     agent_num: int,
-):
+) -> Optional[dict[str, Any]]:
     """Start a single agent and have it join the room."""
     print(f"Starting agent {agent_num}...")
 
@@ -134,7 +135,7 @@ async def start_agent(
         return None
 
 
-async def main(num_agents: int):
+async def main(num_agents: int) -> None:
     pipecat_api_key = os.getenv("PIPECAT_API_KEY") or os.getenv("PIPECAT_CLOUD_API_KEY")
     daily_api_key = os.getenv("DAILY_API_KEY")
     room_url = os.getenv("DAILY_ROOM_URL")
