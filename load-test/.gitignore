@@ -1,0 +1,11 @@
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+.ruff_cache/
+
+# UV lock file (generated locally)
+uv.lock
+
+# Environment file
+.env
