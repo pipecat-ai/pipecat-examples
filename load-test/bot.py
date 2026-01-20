@@ -4,18 +4,17 @@
 # SPDX-License-Identifier: BSD 2-Clause License
 #
 
-"""Load test bot that generates video and audio frames on loop.
+"""Load test bot that plays a video file on loop.
 
 This bot is designed for load testing and doesn't require any external API services.
-It generates numbered/colored video frames and audio beeps programmatically.
+It plays the daily.y4m video file in a continuous loop.
 """
 
 import asyncio
+import os
 
-import numpy as np
 from dotenv import load_dotenv
 from loguru import logger
-from PIL import Image, ImageDraw, ImageFont
 from pipecat.frames.frames import Frame, OutputAudioRawFrame, OutputImageRawFrame
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
@@ -31,26 +30,33 @@ from pipecat.transports.base_transport import BaseTransport, TransportParams
 load_dotenv(override=True)
 
 
-class FrameGeneratorProcessor(FrameProcessor):
-    """Generates video frames with numbers and colors continuously."""
+class Y4MVideoPlayer(FrameProcessor):
+    """Plays a Y4M video file on loop."""
 
-    def __init__(self, width: int = 640, height: int = 480, fps: int = 30):
+    def __init__(self, video_path: str, fps: int = 30):
         super().__init__()
-        self._width = width
-        self._height = height
+        self._video_path = video_path
         self._fps = fps
-        self._frame_count = 0
         self._running = False
         self._task = None
+        self._width = None
+        self._height = None
+        self._frame_data = []
 
     async def start(self, frame: Frame):
-        """Start generating frames."""
+        """Start playing video."""
         await super().start(frame)
+        # Load video file
+        if not os.path.exists(self._video_path):
+            logger.error(f"Video file not found: {self._video_path}")
+            return
+
+        self._load_y4m_file()
         self._running = True
-        self._task = asyncio.create_task(self._generate_frames())
+        self._task = asyncio.create_task(self._play_video())
 
     async def stop(self, frame: Frame):
-        """Stop generating frames."""
+        """Stop playing video."""
         self._running = False
         if self._task:
             self._task.cancel()
@@ -60,159 +66,150 @@ class FrameGeneratorProcessor(FrameProcessor):
                 pass
         await super().stop(frame)
 
-    async def _generate_frames(self):
-        """Generate frames continuously."""
-        colors = [
-            (255, 0, 0),  # Red
-            (0, 255, 0),  # Green
-            (0, 0, 255),  # Blue
-            (255, 255, 0),  # Yellow
-            (255, 0, 255),  # Magenta
-            (0, 255, 255),  # Cyan
-        ]
+    def _load_y4m_file(self):
+        """Load Y4M video file and parse frames."""
+        try:
+            with open(self._video_path, "rb") as f:
+                # Read Y4M header
+                header = b""
+                while True:
+                    char = f.read(1)
+                    if char == b"\n":
+                        break
+                    header += char
 
+                # Parse header
+                header_str = header.decode("ascii")
+                parts = header_str.split()
+
+                # Parse dimensions from header (e.g., "YUV4MPEG2 W640 H480 F30:1 Ip A0:0")
+                for part in parts:
+                    if part.startswith("W"):
+                        self._width = int(part[1:])
+                    elif part.startswith("H"):
+                        self._height = int(part[1:])
+                    elif part.startswith("F"):
+                        # Parse framerate if needed
+                        pass
+
+                logger.info(f"Loaded Y4M video: {self._width}x{self._height}")
+
+                # Read all frames
+                while True:
+                    # Read frame header
+                    frame_header = f.read(6)  # "FRAME\n"
+                    if len(frame_header) < 6 or not frame_header.startswith(b"FRAME"):
+                        break
+
+                    # Calculate frame size (YUV420 format)
+                    y_size = self._width * self._height
+                    uv_size = y_size // 4
+                    frame_size = y_size + uv_size * 2
+
+                    # Read frame data
+                    frame_data = f.read(frame_size)
+                    if len(frame_data) < frame_size:
+                        break
+
+                    self._frame_data.append(frame_data)
+
+                logger.info(f"Loaded {len(self._frame_data)} frames from video")
+
+        except Exception as e:
+            logger.error(f"Error loading Y4M file: {e}")
+            self._frame_data = []
+
+    def _yuv420_to_rgb(self, yuv_data):
+        """Convert YUV420 frame data to RGB."""
+        try:
+            y_size = self._width * self._height
+            uv_size = y_size // 4
+
+            # Extract Y, U, V planes
+            y_plane = yuv_data[:y_size]
+            u_plane = yuv_data[y_size : y_size + uv_size]
+            v_plane = yuv_data[y_size + uv_size :]
+
+            # Convert to RGB (simplified conversion)
+            import numpy as np
+
+            # Reshape planes
+            y = np.frombuffer(y_plane, dtype=np.uint8).reshape(self._height, self._width)
+            u = np.frombuffer(u_plane, dtype=np.uint8).reshape(self._height // 2, self._width // 2)
+            v = np.frombuffer(v_plane, dtype=np.uint8).reshape(self._height // 2, self._width // 2)
+
+            # Upsample U and V
+            u = np.repeat(np.repeat(u, 2, axis=0), 2, axis=1)
+            v = np.repeat(np.repeat(v, 2, axis=0), 2, axis=1)
+
+            # YUV to RGB conversion
+            r = np.clip(y + 1.402 * (v - 128), 0, 255).astype(np.uint8)
+            g = np.clip(y - 0.344136 * (u - 128) - 0.714136 * (v - 128), 0, 255).astype(np.uint8)
+            b = np.clip(y + 1.772 * (u - 128), 0, 255).astype(np.uint8)
+
+            # Stack RGB channels
+            rgb = np.dstack((r, g, b))
+
+            return rgb.tobytes()
+
+        except Exception as e:
+            logger.error(f"Error converting YUV to RGB: {e}")
+            # Return black frame
+            import numpy as np
+
+            black = np.zeros((self._height, self._width, 3), dtype=np.uint8)
+            return black.tobytes()
+
+    async def _play_video(self):
+        """Play video frames in a loop."""
+        if not self._frame_data:
+            logger.error("No video frames loaded")
+            return
+
+        frame_index = 0
         while self._running:
             try:
-                # Create image with colored background
-                color = colors[self._frame_count % len(colors)]
-                img = Image.new("RGB", (self._width, self._height), color=color)
-                draw = ImageDraw.Draw(img)
+                # Get current frame
+                yuv_data = self._frame_data[frame_index]
 
-                # Draw frame number
-                try:
-                    # Try to use a default font, fall back to basic if not available
-                    font = ImageFont.truetype(
-                        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 100
-                    )
-                except Exception:
-                    font = ImageFont.load_default()
+                # Convert to RGB
+                rgb_data = self._yuv420_to_rgb(yuv_data)
 
-                text = str(self._frame_count)
-                # Get text bounding box for centering
-                bbox = draw.textbbox((0, 0), text, font=font)
-                text_width = bbox[2] - bbox[0]
-                text_height = bbox[3] - bbox[1]
-                x = (self._width - text_width) // 2
-                y = (self._height - text_height) // 2
-
-                # Draw text with black outline for visibility
-                outline_color = (0, 0, 0)
-                for adj_x in [-2, 0, 2]:
-                    for adj_y in [-2, 0, 2]:
-                        draw.text((x + adj_x, y + adj_y), text, font=font, fill=outline_color)
-                draw.text((x, y), text, font=font, fill=(255, 255, 255))
-
-                # Create frame
-                frame = OutputImageRawFrame(
-                    image=img.tobytes(), size=(self._width, self._height), format="RGB"
+                # Create output frame
+                output_frame = OutputImageRawFrame(
+                    image=rgb_data, size=(self._width, self._height), format="RGB"
                 )
-                await self.push_frame(frame)
+                await self.push_frame(output_frame)
 
-                self._frame_count += 1
+                # Move to next frame (loop)
+                frame_index = (frame_index + 1) % len(self._frame_data)
 
-                # Wait for next frame (30 fps)
+                # Wait for next frame time
                 await asyncio.sleep(1.0 / self._fps)
 
             except asyncio.CancelledError:
                 break
             except Exception as e:
-                logger.error(f"Error generating frame: {e}")
-                await asyncio.sleep(1.0)
-
-
-class AudioGeneratorProcessor(FrameProcessor):
-    """Generates audio beeps continuously."""
-
-    def __init__(self, sample_rate: int = 16000, beep_interval: float = 2.0):
-        super().__init__()
-        self._sample_rate = sample_rate
-        self._beep_interval = beep_interval
-        self._running = False
-        self._task = None
-
-    async def start(self, frame: Frame):
-        """Start generating audio."""
-        await super().start(frame)
-        self._running = True
-        self._task = asyncio.create_task(self._generate_audio())
-
-    async def stop(self, frame: Frame):
-        """Stop generating audio."""
-        self._running = False
-        if self._task:
-            self._task.cancel()
-            try:
-                await self._task
-            except asyncio.CancelledError:
-                pass
-        await super().stop(frame)
-
-    def _generate_beep(self, duration: float = 0.2, frequency: float = 440.0):
-        """Generate a beep sound using numpy.
-
-        Args:
-            duration: Duration of the beep in seconds
-            frequency: Frequency of the beep in Hz (default: A4 = 440 Hz)
-
-        Returns:
-            bytes: WAV audio data
-        """
-        # Generate time array
-        t = np.linspace(0, duration, int(self._sample_rate * duration))
-
-        # Generate sine wave
-        audio_signal = np.sin(2 * np.pi * frequency * t)
-
-        # Apply fade in/out to avoid clicks
-        fade_samples = int(0.01 * self._sample_rate)  # 10ms fade
-        fade_in = np.linspace(0, 1, fade_samples)
-        fade_out = np.linspace(1, 0, fade_samples)
-        audio_signal[:fade_samples] *= fade_in
-        audio_signal[-fade_samples:] *= fade_out
-
-        # Convert to 16-bit PCM
-        audio_signal = (audio_signal * 32767).astype(np.int16)
-
-        return audio_signal.tobytes()
-
-    async def _generate_audio(self):
-        """Generate beeps continuously."""
-        while self._running:
-            try:
-                # Generate beep
-                beep_audio = self._generate_beep()
-
-                # Create audio frame
-                frame = OutputAudioRawFrame(
-                    audio=beep_audio, sample_rate=self._sample_rate, num_channels=1
-                )
-                await self.push_frame(frame)
-
-                # Wait before next beep
-                await asyncio.sleep(self._beep_interval)
-
-            except asyncio.CancelledError:
-                break
-            except Exception as e:
-                logger.error(f"Error generating audio: {e}")
+                logger.error(f"Error playing video frame: {e}")
                 await asyncio.sleep(1.0)
 
 
 async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
-    """Main bot logic that generates frames on loop."""
+    """Main bot logic that plays video on loop."""
     logger.info("Starting load test bot")
 
-    # Create frame generators
-    video_generator = FrameGeneratorProcessor(width=640, height=480, fps=30)
-    audio_generator = AudioGeneratorProcessor(sample_rate=16000, beep_interval=2.0)
+    # Path to video file
+    video_path = os.path.join(os.path.dirname(__file__), "daily.y4m")
+
+    # Create video player
+    video_player = Y4MVideoPlayer(video_path=video_path, fps=30)
 
     # Create pipeline
-    pipeline = Pipeline([video_generator, audio_generator, transport.output()])
+    pipeline = Pipeline([video_player, transport.output()])
 
     task = PipelineTask(
         pipeline,
         params=PipelineParams(
-            audio_out_sample_rate=16000,
             enable_metrics=True,
             enable_usage_metrics=True,
         ),
@@ -221,7 +218,7 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
 
     @transport.event_handler("on_client_connected")
     async def on_client_connected(transport, client):
-        logger.info("Client connected - starting frame generation")
+        logger.info("Client connected - starting video playback")
 
     @transport.event_handler("on_client_disconnected")
     async def on_client_disconnected(transport, client):

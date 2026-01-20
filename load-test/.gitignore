@@ -9,3 +9,7 @@ uv.lock
 
 # Environment file
 .env
+
+# Video files (downloaded locally)
+*.y4m
+*.y4m.zip

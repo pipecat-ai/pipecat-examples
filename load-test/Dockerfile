@@ -12,5 +12,6 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
     uv sync --locked --no-install-project --no-dev
 
-# Copy the application code
+# Copy the application code and video file
 COPY ./bot.py bot.py
+COPY ./daily.y4m daily.y4m
