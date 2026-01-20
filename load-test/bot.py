@@ -13,6 +13,7 @@ It plays the daily.y4m video file in a continuous loop.
 import asyncio
 import os
 
+import numpy as np
 from dotenv import load_dotenv
 from loguru import logger
 from pipecat.frames.frames import Frame, OutputAudioRawFrame, OutputImageRawFrame
@@ -52,6 +53,10 @@ class Y4MVideoPlayer(FrameProcessor):
             return
 
         self._load_y4m_file()
+        if not self._frame_data:
+            logger.error("No frames loaded from video file")
+            return
+
         self._running = True
         self._task = asyncio.create_task(self._play_video())
 
@@ -130,9 +135,6 @@ class Y4MVideoPlayer(FrameProcessor):
             u_plane = yuv_data[y_size : y_size + uv_size]
             v_plane = yuv_data[y_size + uv_size :]
 
-            # Convert to RGB (simplified conversion)
-            import numpy as np
-
             # Reshape planes
             y = np.frombuffer(y_plane, dtype=np.uint8).reshape(self._height, self._width)
             u = np.frombuffer(u_plane, dtype=np.uint8).reshape(self._height // 2, self._width // 2)
@@ -155,8 +157,6 @@ class Y4MVideoPlayer(FrameProcessor):
         except Exception as e:
             logger.error(f"Error converting YUV to RGB: {e}")
             # Return black frame
-            import numpy as np
-
             black = np.zeros((self._height, self._width, 3), dtype=np.uint8)
             return black.tobytes()
 
@@ -243,7 +243,7 @@ async def bot(runner_args: RunnerArguments):
             runner_args.token,
             "LoadTestBot",
             params=DailyParams(
-                audio_out_enabled=True,
+                audio_out_enabled=False,
                 video_out_enabled=True,
                 video_out_width=640,
                 video_out_height=480,
@@ -255,7 +255,7 @@ async def bot(runner_args: RunnerArguments):
 
         transport = SmallWebRTCTransport(
             params=TransportParams(
-                audio_out_enabled=True,
+                audio_out_enabled=False,
                 video_out_enabled=True,
                 video_out_width=640,
                 video_out_height=480,
