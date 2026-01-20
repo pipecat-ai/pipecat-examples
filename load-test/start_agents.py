@@ -16,6 +16,7 @@ Required environment variables:
 - DAILY_API_KEY: Daily API key (for generating meeting tokens)
 """
 
+import argparse
 import asyncio
 import os
 import time
@@ -31,7 +32,7 @@ load_dotenv(override=True)
 PIPECAT_CLOUD_API_URL = "https://api.pipecat.daily.co/v1"
 DAILY_API_URL = "https://api.daily.co/v1"
 AGENT_NAME = "load-test"
-NUM_AGENTS = 5
+DEFAULT_NUM_AGENTS = 5
 
 
 class RateLimitError(Exception):
@@ -133,7 +134,7 @@ async def start_agent(
         return None
 
 
-async def main():
+async def main(num_agents: int):
     pipecat_api_key = os.getenv("PIPECAT_API_KEY") or os.getenv("PIPECAT_CLOUD_API_KEY")
     daily_api_key = os.getenv("DAILY_API_KEY")
     room_url = os.getenv("DAILY_ROOM_URL")
@@ -158,20 +159,29 @@ async def main():
         print("Error: DAILY_ROOM_URL environment variable is required")
         return
 
-    print(f"Starting {NUM_AGENTS} agents to join room: {room_url}")
+    print(f"Starting {num_agents} agents to join room: {room_url}")
     print("-" * 60)
 
     async with httpx.AsyncClient(timeout=30.0) as client:
         tasks = [
             start_agent(client, pipecat_api_key, daily_api_key, room_url, i + 1)
-            for i in range(NUM_AGENTS)
+            for i in range(num_agents)
         ]
         results = await asyncio.gather(*tasks)
 
     successful = sum(1 for r in results if r is not None)
     print("-" * 60)
-    print(f"Started {successful}/{NUM_AGENTS} agents successfully")
+    print(f"Started {successful}/{num_agents} agents successfully")
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    parser = argparse.ArgumentParser(description="Start multiple load test agents")
+    parser.add_argument(
+        "-n",
+        "--num-agents",
+        type=int,
+        default=DEFAULT_NUM_AGENTS,
+        help=f"Number of agents to start (default: {DEFAULT_NUM_AGENTS})",
+    )
+    args = parser.parse_args()
+    asyncio.run(main(args.num_agents))

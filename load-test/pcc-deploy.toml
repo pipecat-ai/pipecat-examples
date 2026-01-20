@@ -6,4 +6,4 @@ agent_profile = "agent-2x" # Use this profile for video agents
 
 
 [scaling]
-	min_agents = 5
+	min_agents = 0
