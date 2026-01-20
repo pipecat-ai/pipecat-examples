@@ -11,8 +11,6 @@ It generates numbered/colored video frames and audio beeps programmatically.
 """
 
 import asyncio
-import io
-import wave
 
 import numpy as np
 from dotenv import load_dotenv
@@ -22,7 +20,7 @@ from pipecat.frames.frames import Frame, OutputAudioRawFrame, OutputImageRawFram
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineParams, PipelineTask
-from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
+from pipecat.processors.frame_processor import FrameProcessor
 from pipecat.runner.types import (
     DailyRunnerArguments,
     RunnerArguments,

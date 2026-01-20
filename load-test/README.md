@@ -17,6 +17,8 @@ A Pipecat bot designed for load testing that generates video and audio frames pr
 uv sync
 ```
 
+This will create a `uv.lock` file required for Docker builds.
+
 2. Create environment file (no API keys needed):
 
 ```bash
@@ -38,7 +40,7 @@ The bot will:
 
 ## Deployment to Pipecat Cloud
 
-1. Build and tag the Docker image:
+1. Generate the lock file and build the Docker image:
 
 ```bash
 uv sync
@@ -58,6 +60,8 @@ docker push your_username/load-test:0.1
 ```bash
 pcc deploy
 ```
+
+**Note**: The `uv.lock` file is required for Docker builds but is not committed to the repository. Always run `uv sync` before building the Docker image.
 
 ## Configuration
 
