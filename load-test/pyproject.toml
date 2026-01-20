@@ -1,0 +1,22 @@
+[project]
+name = "load-test"
+version = "0.1.0"
+description = "Load test bot that plays video and audio on loop"
+requires-python = ">=3.10"
+dependencies = [
+    "pipecat-ai[daily,webrtc,runner]>=0.0.99",
+    "pipecatcloud>=0.2.7",
+    "numpy>=1.24.0",
+    "pillow>=10.0.0",
+]
+
+[dependency-groups]
+dev = [
+    "pyright>=1.1.404,<2",
+    "ruff>=0.12.11,<1",
+]
+
+[tool.ruff]
+line-length = 100
+[tool.ruff.lint]
+select = ["I"]
