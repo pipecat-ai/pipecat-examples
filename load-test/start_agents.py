@@ -1,6 +1,6 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run
 #
-# Copyright (c) 2024–2025, Daily
+# Copyright (c) 2026, Daily
 #
 # SPDX-License-Identifier: BSD 2-Clause License
 #
