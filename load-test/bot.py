@@ -33,11 +33,11 @@ async def bot(runner_args: RunnerArguments):
             - token: Daily meeting token
             - bot_name: (optional) Display name for the bot, defaults to "LoadTestBot"
     """
-    body = runner_args.body or {"room_url": None, "token": None, "bot_name": "LoadTestBot"}
+    body: dict[str, str] = runner_args.body or {}
     # Check body first, then fall back to environment variables
-    room_url = body.get("room_url") or os.getenv("DAILY_ROOM_URL", "")
-    token = body.get("token") or os.getenv("DAILY_TOKEN", "")
-    bot_name = body.get("bot_name", "LoadTestBot")
+    room_url = str(body.get("room_url") or os.getenv("DAILY_ROOM_URL", ""))
+    token = str(body.get("token") or os.getenv("DAILY_TOKEN", ""))
+    bot_name = str(body.get("bot_name", "LoadTestBot"))
 
     logger.info(f"Runner args body: {body}")
 
