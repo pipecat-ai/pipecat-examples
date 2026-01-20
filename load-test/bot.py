@@ -23,10 +23,12 @@ from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineParams, PipelineTask
 from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
-from pipecat.runner.types import RunnerArguments
+from pipecat.runner.types import (
+    DailyRunnerArguments,
+    RunnerArguments,
+    SmallWebRTCRunnerArguments,
+)
 from pipecat.transports.base_transport import BaseTransport, TransportParams
-from pipecat.transports.daily.transport import DailyParams
-from pipecat.transports.smallwebrtc.transport import SmallWebRTCTransport
 
 load_dotenv(override=True)
 
@@ -81,7 +83,9 @@ class FrameGeneratorProcessor(FrameProcessor):
                 # Draw frame number
                 try:
                     # Try to use a default font, fall back to basic if not available
-                    font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 100)
+                    font = ImageFont.truetype(
+                        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 100
+                    )
                 except Exception:
                     font = ImageFont.load_default()
 
@@ -147,30 +151,30 @@ class AudioGeneratorProcessor(FrameProcessor):
 
     def _generate_beep(self, duration: float = 0.2, frequency: float = 440.0):
         """Generate a beep sound using numpy.
-        
+
         Args:
             duration: Duration of the beep in seconds
             frequency: Frequency of the beep in Hz (default: A4 = 440 Hz)
-        
+
         Returns:
             bytes: WAV audio data
         """
         # Generate time array
         t = np.linspace(0, duration, int(self._sample_rate * duration))
-        
+
         # Generate sine wave
         audio_signal = np.sin(2 * np.pi * frequency * t)
-        
+
         # Apply fade in/out to avoid clicks
         fade_samples = int(0.01 * self._sample_rate)  # 10ms fade
         fade_in = np.linspace(0, 1, fade_samples)
         fade_out = np.linspace(1, 0, fade_samples)
         audio_signal[:fade_samples] *= fade_in
         audio_signal[-fade_samples:] *= fade_out
-        
+
         # Convert to 16-bit PCM
         audio_signal = (audio_signal * 32767).astype(np.int16)
-        
+
         return audio_signal.tobytes()
 
     async def _generate_audio(self):
@@ -196,7 +200,7 @@ class AudioGeneratorProcessor(FrameProcessor):
                 await asyncio.sleep(1.0)
 
 
-async def run_bot(transport: BaseTransport):
+async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     """Main bot logic that generates frames on loop."""
     logger.info("Starting load test bot")
 
@@ -214,6 +218,7 @@ async def run_bot(transport: BaseTransport):
             enable_metrics=True,
             enable_usage_metrics=True,
         ),
+        idle_timeout_secs=runner_args.pipeline_idle_timeout_secs,
     )
 
     @transport.event_handler("on_client_connected")
@@ -225,16 +230,34 @@ async def run_bot(transport: BaseTransport):
         logger.info("Client disconnected")
         await task.cancel()
 
-    runner = PipelineRunner(handle_sigint=False)
+    runner = PipelineRunner(handle_sigint=runner_args.handle_sigint)
+
     await runner.run(task)
 
 
 async def bot(runner_args: RunnerArguments):
     """Main bot entry point compatible with Pipecat Cloud."""
 
-    # Determine transport based on runner_args
-    if hasattr(runner_args, "webrtc_connection") and runner_args.webrtc_connection:
-        # WebRTC transport
+    transport = None
+
+    if isinstance(runner_args, DailyRunnerArguments):
+        from pipecat.transports.daily.transport import DailyParams, DailyTransport
+
+        transport = DailyTransport(
+            runner_args.room_url,
+            runner_args.token,
+            "LoadTestBot",
+            params=DailyParams(
+                audio_out_enabled=True,
+                video_out_enabled=True,
+                video_out_width=640,
+                video_out_height=480,
+            ),
+        )
+
+    elif isinstance(runner_args, SmallWebRTCRunnerArguments):
+        from pipecat.transports.smallwebrtc.transport import SmallWebRTCTransport
+
         transport = SmallWebRTCTransport(
             params=TransportParams(
                 audio_out_enabled=True,
@@ -245,26 +268,14 @@ async def bot(runner_args: RunnerArguments):
             webrtc_connection=runner_args.webrtc_connection,
         )
     else:
-        # Daily transport (for Pipecat Cloud)
-        from pipecat.transports.daily.transport import DailyTransport
+        logger.error(f"Unsupported runner arguments type: {type(runner_args)}")
+        return
 
-        # Get Daily room info from runner_args
-        room_url = getattr(runner_args, "room_url", None)
-        token = getattr(runner_args, "token", None)
+    if transport is None:
+        logger.error("Failed to create transport")
+        return
 
-        transport = DailyTransport(
-            room_url,
-            token,
-            "LoadTestBot",
-            DailyParams(
-                audio_out_enabled=True,
-                video_out_enabled=True,
-                video_out_width=640,
-                video_out_height=480,
-            ),
-        )
-
-    await run_bot(transport)
+    await run_bot(transport, runner_args)
 
 
 if __name__ == "__main__":
