@@ -1,0 +1,6 @@
+agent_name = "openinference-tracing"
+image = "your_username/openinference-tracing:0.1"
+secret_set = "openinference-tracing-secrets"
+
+[scaling]
+	min_agents = 1

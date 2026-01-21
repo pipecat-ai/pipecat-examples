@@ -1,0 +1,26 @@
+[project]
+name = "pipecat-open-inference-tracing"
+version = "0.1.0"
+description = "A Pipecat example using OpenInference tracing"
+requires-python = ">=3.10"
+dependencies = [
+    "arize-otel>=0.11.0",
+    "openinference-instrumentation>=0.1.42",
+    "openinference-instrumentation-pipecat>=0.1.0",
+    "pipecat-ai[cartesia,daily,deepgram,google,local-smart-turn-v3,runner,silero,webrtc,websocket]>=0.0.100",
+    "pipecatcloud>=0.2.18",
+]
+
+[dependency-groups]
+dev = [
+    "ruff~=0.12.1",
+]
+
+phoenix = [
+    "arize-phoenix>=12.30.0",
+]
+
+[tool.ruff]
+line-length = 100
+[tool.ruff.lint]
+select = ["I"]
