@@ -5,5 +5,5 @@ secret_set = "1000-concurrent-agents-secrets"
 agent_profile = "agent-1x"
 
 [scaling]
-	min_agents = 0
-    max_agents = 200
+	min_agents = 1000
+    max_agents = 1000
