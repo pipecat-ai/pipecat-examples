@@ -60,6 +60,7 @@ class DialoutManager:
     ):
         self._transport = transport
         self._phone_number = dialout_settings.phone_number
+        self._caller_id = dialout_settings.caller_id
         self._max_retries = max_retries
         self._attempt_count = 0
         self._is_successful = False
@@ -89,7 +90,13 @@ class DialoutManager:
             f"Attempting dialout (attempt {self._attempt_count}/{self._max_retries}) to: {self._phone_number}"
         )
 
-        await self._transport.start_dialout({"phoneNumber": self._phone_number})
+        # Build dialout settings with phone number and optional caller ID
+        dialout_params = {"phoneNumber": self._phone_number}
+        if self._caller_id:
+            dialout_params["callerId"] = self._caller_id
+            logger.info(f"Using caller ID: {self._caller_id}")
+
+        await self._transport.start_dialout(dialout_params)
         return True
 
     def mark_successful(self):

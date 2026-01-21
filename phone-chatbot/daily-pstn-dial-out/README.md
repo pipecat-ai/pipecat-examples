@@ -130,6 +130,8 @@ You'll need two terminal windows open:
 
    The server will create a room, start the bot, and the bot will call the specified number. Answer the call to speak with the bot.
 
+   > Optionally, include `caller_id` with the `uuid` of a phone number owned by your Daily account to display a specific number when calling.
+
 ## Production Deployment
 
 You can deploy your bot to Pipecat Cloud and server to your infrastructure to run this bot in a production environment.

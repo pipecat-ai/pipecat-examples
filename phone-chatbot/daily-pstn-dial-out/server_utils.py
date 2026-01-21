@@ -25,8 +25,11 @@ class DialoutSettings(BaseModel):
     """Settings for outbound call.
 
     Attributes:
-        phone_number: The phone number to dial
-        caller_id: Optional caller ID to display (if not provided, uses your Daily number)
+        phone_number: The phone number to dial (E.164 format, e.g., "+15551234567")
+        caller_id: Optional caller ID - the UUID of a purchased Daily phone number
+            to use as the outbound caller ID. If not provided, Daily uses a random
+            number from your account. You must purchase phone numbers via Daily's API
+            to use them as caller IDs.
     """
 
     phone_number: str
