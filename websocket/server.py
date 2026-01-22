@@ -4,20 +4,18 @@
 # SPDX-License-Identifier: BSD 2-Clause License
 #
 import asyncio
-import os
 from contextlib import asynccontextmanager
-from typing import Any, Dict
 
 import uvicorn
 from dotenv import load_dotenv
 from fastapi import FastAPI, Request, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
+from pipecat.runner.types import WebSocketRunnerArguments
 
 # Load environment variables
 load_dotenv(override=True)
 
-from bot_fast_api import run_bot
-from bot_websocket_server import run_bot_websocket_server
+from bot import bot
 
 
 @asynccontextmanager
@@ -39,33 +37,22 @@ app.add_middleware(
 )
 
 
-@app.websocket("/ws")
+@app.websocket("/ws/generic")
 async def websocket_endpoint(websocket: WebSocket):
+    service_host = websocket.query_params.get("serviceHost")
+    print(f"WebSocket connection received for service host path: {service_host}")
     await websocket.accept()
     print("WebSocket connection accepted")
     try:
-        await run_bot(websocket)
+        runner_args = WebSocketRunnerArguments(websocket=websocket)
+        await bot(runner_args)
     except Exception as e:
         print(f"Exception in run_bot: {e}")
 
 
-@app.post("/connect")
-async def bot_connect(request: Request) -> Dict[Any, Any]:
-    server_mode = os.getenv("WEBSOCKET_SERVER", "fast_api")
-    if server_mode == "websocket_server":
-        ws_url = "ws://localhost:8765"
-    else:
-        ws_url = "ws://localhost:7860/ws"
-    return {"ws_url": ws_url}
-
-
 async def main():
-    server_mode = os.getenv("WEBSOCKET_SERVER", "fast_api")
     tasks = []
     try:
-        if server_mode == "websocket_server":
-            tasks.append(run_bot_websocket_server())
-
         config = uvicorn.Config(app, host="0.0.0.0", port=7860)
         server = uvicorn.Server(config)
         tasks.append(server.serve())
