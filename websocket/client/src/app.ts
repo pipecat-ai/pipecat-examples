@@ -28,15 +28,23 @@ class WebsocketClientApp {
   private debugLog: HTMLElement | null = null;
   private botAudio: HTMLAudioElement;
 
+  private declare baseUrl: string;
+  private declare startUrl: string;
+  private declare apiKey: string;
+
   constructor() {
-    console.log('WebsocketClientApp');
     this.botAudio = document.createElement('audio');
     this.botAudio.autoplay = true;
-    //this.botAudio.playsInline = true;
     document.body.appendChild(this.botAudio);
-
+    this.setupEnvironmentVariables();
     this.setupDOMElements();
     this.setupEventListeners();
+  }
+
+  private setupEnvironmentVariables() {
+    this.baseUrl = import.meta.env.VITE_PIPECAT_BASE_URL
+    this.startUrl = `${this.baseUrl}/start`
+    this.apiKey = import.meta.env.VITE_PIPECAT_PUBLIC_API;
   }
 
   /**
