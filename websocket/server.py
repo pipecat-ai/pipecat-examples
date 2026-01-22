@@ -11,12 +11,11 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, Request, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 from pipecat.runner.types import WebSocketRunnerArguments
-from typing import Optional
 
 # Load environment variables
 load_dotenv(override=True)
 
-from bot_fast_api import bot
+from bot import bot
 
 
 @asynccontextmanager
