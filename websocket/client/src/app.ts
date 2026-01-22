@@ -28,8 +28,7 @@ class WebsocketClientApp {
   private debugLog: HTMLElement | null = null;
   private botAudio: HTMLAudioElement;
 
-  private declare baseUrl: string;
-  private declare startUrl: string;
+  private declare wsUrl: string;
   private declare apiKey: string;
 
   constructor() {
@@ -42,8 +41,7 @@ class WebsocketClientApp {
   }
 
   private setupEnvironmentVariables() {
-    this.baseUrl = import.meta.env.VITE_PIPECAT_BASE_URL
-    this.startUrl = `${this.baseUrl}/start`
+    this.wsUrl = import.meta.env.VITE_PIPECAT_WS_URL
     this.apiKey = import.meta.env.VITE_PIPECAT_PUBLIC_API;
   }
 
@@ -195,9 +193,8 @@ class WebsocketClientApp {
       await this.pcClient.initDevices();
 
       this.log('Connecting to bot...');
-      await this.pcClient.startBotAndConnect({
-        // The baseURL and endpoint of your bot server that the client will connect to
-        endpoint: 'http://localhost:7860/connect',
+      await this.pcClient.connect({
+        ws_url: this.wsUrl,
       });
 
       const timeTaken = Date.now() - startTime;
