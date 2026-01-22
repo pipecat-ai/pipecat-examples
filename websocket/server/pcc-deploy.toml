@@ -1,0 +1,10 @@
+agent_name = "websocket"
+image = "your_username/pipecat-websocket:latest"
+#For private image pulls.
+#More details: https://docs.pipecat.ai/deployment/pipecat-cloud/fundamentals/secrets#image-pull-secrets
+image_credentials = "websocket-pull-secret"
+secret_set = "websocket-secrets"
+enable_krisp = true
+
+[scaling]
+	min_agents = 1

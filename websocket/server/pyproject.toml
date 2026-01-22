@@ -1,12 +1,13 @@
 [project]
-name = "server"
+name = "websocket-example"
 version = "0.1.0"
-description = "Pipecat example - server"
+description = "Example for building voice AI bots with Pipecat built using Websocket"
 requires-python = ">=3.10"
 dependencies = [
     "python-dotenv",
     "uvicorn",
-    "pipecat-ai[silero,websocket,google]>=0.0.99",
+    "pipecat-ai[runner,silero,websocket,google]>=0.0.99",
+    "pipecatcloud>=0.2.10",
 ]
 
 [dependency-groups]
