@@ -156,9 +156,11 @@ async def run_bot(transport: BaseTransport):
         ),
     )
 
+    rtvi = RTVIProcessor()
     pipeline = Pipeline(
         [
             transport.input(),
+            rtvi,
             stt,
             user_aggregator,
             llm,
@@ -176,6 +178,7 @@ async def run_bot(transport: BaseTransport):
         ),
         # Optionally, add a conversation ID for session tracking
         conversation_id=conversation_id,
+        observers=[RTVIObserver(rtvi)],
     )
 
     @transport.event_handler("on_client_connected")
