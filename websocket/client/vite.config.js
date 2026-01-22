@@ -6,12 +6,5 @@ export default defineConfig({
     plugins: [react()],
     server: {
         allowedHosts: true, // Allows external connections like ngrok
-        proxy: {
-            // Proxy /api requests to the backend server
-            '/connect': {
-                target: 'http://0.0.0.0:7860', // Replace with your backend URL
-                changeOrigin: true,
-            },
-        },
     },
 });
