@@ -4,10 +4,10 @@
 # SPDX-License-Identifier: BSD 2-Clause License
 #
 
-"""Load test bot that generates video using GStreamer.
+"""Load test bot that plays a video file on loop.
 
 This bot is designed for load testing and doesn't require any external API services.
-It generates a continuous video test pattern using GStreamer's videotestsrc.
+It plays the daily.y4m video file in a continuous loop using GStreamer.
 
 Pass room_url and token in body to join an existing Daily room.
 """
@@ -50,7 +50,7 @@ async def bot(runner_args: RunnerArguments):
         return
 
     logger.info(f"Joining room: {room_url}")
-    logger.info("Starting load test bot with GStreamer video test source")
+    logger.info("Starting load test bot with Y4M video playback")
 
     transport = DailyTransport(
         room_url,
@@ -60,18 +60,21 @@ async def bot(runner_args: RunnerArguments):
             audio_out_enabled=False,
             video_out_enabled=True,
             video_out_is_live=True,
-            video_out_width=1280,
-            video_out_height=720,
+            video_out_width=640,
+            video_out_height=480,
         ),
     )
 
-    # Create GStreamer video source with test pattern
-    # videotestsrc generates a bouncing ball pattern for load testing
+    # Path to video file
+    video_path = os.path.join(os.path.dirname(__file__), "daily.y4m")
+
+    # Create GStreamer pipeline to play Y4M video on loop
+    # multifilesrc with loop=-1 loops the file indefinitely
     gst = GStreamerPipelineSource(
-        pipeline='videotestsrc pattern=ball ! capsfilter caps="video/x-raw,width=1280,height=720,framerate=30/1"',
+        pipeline=f'multifilesrc location="{video_path}" loop=-1 ! decodebin ! videoconvert ! videoscale ! capsfilter caps="video/x-raw,width=640,height=480,framerate=30/1"',
         out_params=GStreamerPipelineSource.OutputParams(
-            video_width=1280,
-            video_height=720,
+            video_width=640,
+            video_height=480,
             clock_sync=True,
         ),
     )
