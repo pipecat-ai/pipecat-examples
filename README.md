@@ -65,7 +65,6 @@ Ready to explore more? These are two of the most useful examples for common use 
 
 ### **Translation & Localization**
 
-- **[translation-chatbot](translation-chatbot/)** - Real-time language translation
 - **[daily-multi-translation](daily-multi-translation/)** - Multi-language conference calls
 
 ### **Support, Educational & Specialized**

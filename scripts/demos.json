@@ -239,11 +239,6 @@
     "skip": false
   },
   {
-    "path": "translation-chatbot",
-    "runCommand": "uv run bot.py -t daily",
-    "skip": false
-  },
-  {
     "path": "travel-companion/server",
     "runCommand": "uv run bot.py -t daily",
     "skip": false
