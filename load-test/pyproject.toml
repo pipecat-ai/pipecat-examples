@@ -1,7 +1,7 @@
 [project]
 name = "load-test"
 version = "0.1.0"
-description = "Load test bot that plays a video on loop using GStreamer"
+description = "Load test bot that plays a Y4M video on loop using GStreamer"
 requires-python = ">=3.10"
 dependencies = [
     "httpx>=0.28.1",
