@@ -1,0 +1,19 @@
+[project]
+name = "pipecat-gemini-live"
+version = "0.1.0"
+description = "Gemini Live + Twilio example for building voice AI bots with Pipecat"
+requires-python = ">=3.10"
+dependencies = [
+    "pipecat-ai[webrtc,websocket,silero,google,local-smart-turn-v3,runner]>=0.0.99",
+    "pipecatcloud>=0.2.18"
+]
+
+[dependency-groups]
+dev = [
+    "ruff~=0.12.1",
+]
+
+[tool.ruff]
+line-length = 100
+[tool.ruff.lint]
+select = ["I"]
