@@ -1,4 +1,4 @@
-# Openinference Tracing for Pipecat with Arize
+# OpenInference Tracing for Pipecat with Arize
 
 This demo showcases [Arize](https://arize.com/) tracing integration for Pipecat services via [OpenInference](https://arize-ai.github.io/openinference/), instrumentation compatible with OpenTelemetry. It allows you to visualize service calls, performance metrics, and dependencies with a focus on LLM observability.
 
