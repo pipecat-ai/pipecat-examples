@@ -1,0 +1,8 @@
+agent_name = "gemini-screen-ui-kit"
+image = "cstuffdaily/gemini-screen-ui-kit:0.1"
+secret_set = "gemini-screen-ui-kit-secrets"
+agent_profile = "agent-2x"
+enable_krisp = true
+
+[scaling]
+	min_agents = 1
