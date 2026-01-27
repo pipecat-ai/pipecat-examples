@@ -139,9 +139,9 @@ async def bot(runner_args: RunnerArguments):
 
     # Krisp is available when deployed to Pipecat Cloud
     if os.environ.get("ENV") != "local":
-        from pipecat.audio.filters.krisp_filter import KrispFilter
+        from pipecat.audio.filters.krisp_viva_filter import KrispVivaFilter
 
-        krisp_filter = KrispFilter()
+        krisp_filter = KrispVivaFilter()
     else:
         krisp_filter = None
 
