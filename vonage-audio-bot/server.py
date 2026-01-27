@@ -51,6 +51,7 @@ async def connect_audio_connector(
     ws_uri: str,
     audio_rate: int,
     api_base: str,
+    use_application_auth: bool,
     application_id: str,
     private_key: str,
 ) -> Any:
@@ -105,7 +106,7 @@ async def connect_audio_connector(
 
     loop = asyncio.get_running_loop()
     # Choose which connector to call based on the flag
-    if application_id:
+    if use_application_auth:
         return await loop.run_in_executor(None, _call_vonage_connect)
     else:
         return await loop.run_in_executor(None, _call_opentok_connect)
@@ -146,7 +147,7 @@ async def connect(request: Request) -> JSONResponse:
     api_secret = os.getenv("OPENTOK_API_SECRET")
 
     # Determine API base and set the flag indicating application-based auth
-    if application_id and private_key:
+    if application_id and private_key and not application_id.startswith("YOUR_"):
         # Vonage application auth path uses Vonage Video API host
         api_base = os.getenv("API_URL", "api.vonage.com")
         use_application_auth = True
@@ -172,6 +173,7 @@ async def connect(request: Request) -> JSONResponse:
             ws_uri=ws_uri,
             audio_rate=audio_rate,
             api_base=api_base,
+            use_application_auth=use_application_auth,
             application_id=application_id,
             private_key=private_key,
         )
