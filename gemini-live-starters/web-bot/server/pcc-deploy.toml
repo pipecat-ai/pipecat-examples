@@ -1,8 +1,11 @@
 agent_name = "gemini-screen-ui-kit"
-image = "cstuffdaily/gemini-screen-ui-kit:0.1"
+image = "your_username/gemini-screen-ui-kit:0.1"
+image_credentials = "your_dockerhub_pull_secret"
 secret_set = "gemini-screen-ui-kit-secrets"
 agent_profile = "agent-2x"
-enable_krisp = true
+
+[krisp_viva]
+	audio_filter = "tel"
 
 [scaling]
 	min_agents = 1
