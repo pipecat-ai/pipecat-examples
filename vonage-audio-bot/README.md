@@ -8,8 +8,8 @@ It enables real-time bidirectional audio streaming between a Vonage Video API se
 
 When you want to stream audio from Vonage Session into your bot:
  
-1. **Vonage Tokbox Account is needed:** User needs account on Vonage Tokbox and create the project along with API Key and Secret - [Vonage Tokbox](https://tokbox.com/account/#/)
-2. **Vonage session created:**: A Vonage Video API session already exists. Session can be created using [playground](https://tokbox.com/developer/tools/playground/)
+1. **Vonage Credentials:** Configure **either** a Vonage Video Application (Application ID + Private Key) **or** OpenTok API Key + Secret
+2. **Vonage session created:**: A routed Vonage Video API session already exists (e.g., created via Playground or Video API SDKs)
 3. **Trigger audio bridge:** Send POST `/connect` to attach the Audio Connector
 4. **Audio Connector connects:** Vonage opens a WebSocket connection to `/ws`
 5. **Bot starts processing:** Incoming audio is fed into the Pipecat pipeline on Websocket Server
@@ -43,29 +43,32 @@ Receives and sends raw PCM audio frames to/from Pipecat.
 
 ## Prerequisites
 
-### Vonage (Opentok / Video API)
+### Vonage Video API (choose one credential option)
 
-- A Vonage (Opentok / Video API) account with:
-- A Vonage Video API project with either:
-  - Vonage account credentials
-    - Project Application ID
-    - Project Private Key file
-  - Opentok / Nexmo account credentials
-    - Project API Key
-    - Project Secret
-- A routed Vonage session
-- Session can be created via:
-  - TokBox Playground
-  - Vonage Video API SDKs
+This project supports **two** ways to authenticate with Vonage Video API. Configure **either** Option A **or** Option B in your `.env`.
+
+#### Option A — Vonage Video Application (recommended)
+Use a Vonage Video Application (Application ID + Private Key):
+
+- `VONAGE_APPLICATION_ID`
+- `VONAGE_PRIVATE_KEY`
+
+#### Option B — OpenTok Project credentials (legacy)
+Use OpenTok API Key + Secret:
+
+- `OPENTOK_API_KEY`
+- `OPENTOK_API_SECRET`
+
+### Session
+- `VONAGE_SESSION_ID`
+- Session can be created using:
+  - [Unified Video environment](https://tools.vonage.com/video/playground)
+  - [Opentok environment](https://tokbox.com/developer/tools/playground/)
 
 ### AI Services
-
-- OpenAI API key for the LLM inference
-- OpenAI API key for speech-to-text
-- OpenAI API key for text-to-speech
+- `OPENAI_API_KEY` (used for STT, LLM inference and TTS in this example)
 
 ### System
-
 - Python 3.10+
 - `uv` package manager
 - ngrok (for local development)
@@ -78,23 +81,24 @@ Receives and sends raw PCM audio frames to/from Pipecat.
 uv sync
 ```
 
-2. Get your Vonage (TokBox) credentials:
+2. Get your Vonage credentials (choose one):
 
-From your **Opentok (TokBox) dashboard:**
-- Project API Key and Secret
-  - Select your project on [Vonage Opentok](https://tokbox.com/account/#/)
-OR
-From your **Vonage Video API dashboard:**
-- Project Application ID and Private Key file
-  - Select your project on [Vonage Video API](https://developer.vonage.com/en/video/getting-started)
+**Option A — Vonage Video Application**
+- Create/select a Vonage Video Application
+- Copy:
+  - Application ID → `VONAGE_APPLICATION_ID`
+  - Private Key → `VONAGE_PRIVATE_KEY`
 
-- Session ID
-  - Create a routed session using:
-    - TokBox Playground
-    - or Vonage Video API SDKs
+**Option B — OpenTok Project**
+- From your OpenTok project:
+  - API Key → `OPENTOK_API_KEY`
+  - API Secret → `OPENTOK_API_SECRET`
 
-**Note:** This project assumes the session already exists.
-The server does not create sessions automatically.
+**Session ID**
+- Create a **routed** session and set:
+  - `VONAGE_SESSION_ID`
+
+**Note:** This project assumes the session already exists. The server does not create sessions automatically.
 
 3. Set up environment variables:
 
