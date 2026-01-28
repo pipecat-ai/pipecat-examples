@@ -1,0 +1,9 @@
+agent_name = "load-test"
+image = "your-username/load-test:0.7"
+image_credentials = "my-image-pull-secret"
+secret_set = "load-test-secrets"
+agent_profile = "agent-2x" # Use this profile for video agents
+
+
+[scaling]
+	min_agents = 0

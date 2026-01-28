@@ -113,6 +113,11 @@
     "skipReason": "requires local audio device"
   },
   {
+    "path": "load-test",
+    "runCommand": "uv run bot.py",
+    "skip": false
+  },
+  {
     "path": "news-chatbot/server",
     "runCommand": "uv run server.py",
     "skip": false
