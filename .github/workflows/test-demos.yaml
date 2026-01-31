@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches: ['*']
+    branches: ["*"]
   workflow_dispatch:
 
 concurrency:
@@ -21,6 +21,8 @@ env:
   AZURE_SPEECH_REGION: eastus
   CARTESIA_API_KEY: mock_cartesia_api_key
   DAILY_API_KEY: mock_daily_api_key
+  DAILY_ROOM_URL: https://mock.daily.co/mock-room
+  DAILY_TOKEN: mock_daily_token
   DEEPGRAM_API_KEY: mock_deepgram_api_key
   ELEVENLABS_API_KEY: mock_elevenlabs_api_key
   GOOGLE_API_KEY: mock_google_api_key
@@ -47,7 +49,7 @@ jobs:
         id: changed-files
         uses: tj-actions/changed-files@v45
         with:
-          separator: ','
+          separator: ","
 
       - name: Generate matrix from demos.json
         id: set-matrix
@@ -124,6 +126,21 @@ jobs:
       - name: Set up Python
         if: steps.should-run.outputs.run == 'true'
         run: uv python install 3.12
+
+      - name: Install GStreamer (for load-test)
+        if: steps.should-run.outputs.run == 'true' && matrix.path == 'load-test'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libgstreamer1.0-dev \
+            libgstreamer-plugins-base1.0-dev \
+            gstreamer1.0-plugins-base \
+            gstreamer1.0-plugins-good \
+            gstreamer1.0-plugins-bad \
+            gstreamer1.0-plugins-ugly \
+            libcairo2-dev \
+            libgirepository1.0-dev \
+            gir1.2-gstreamer-1.0
 
       - name: Run smoke test
         if: steps.should-run.outputs.run == 'true'
