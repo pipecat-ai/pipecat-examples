@@ -24,11 +24,10 @@ from pipecat.processors.aggregators.llm_response_universal import (
     LLMUserAggregatorParams,
 )
 from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
-from pipecat.processors.frameworks.rtvi import RTVIConfig, RTVIProcessor
 from pipecat.services.cartesia.tts import CartesiaTTSService
 from pipecat.services.deepgram.stt import DeepgramSTTService
 from pipecat.services.google.llm import GoogleLLMService, LLMSearchResponseFrame
-from pipecat.services.google.rtvi import GoogleRTVIObserver
+from pipecat.services.google.rtvi import GoogleRTVIProcessor
 from pipecat.transports.daily.transport import DailyParams, DailyTransport
 from pipecat.utils.text.markdown_text_filter import MarkdownTextFilter
 
@@ -127,16 +126,10 @@ async def main():
 
         llm_search_logger = LLMSearchLoggerProcessor()
 
-        #
-        # RTVI events for Pipecat client UI
-        #
-        rtvi = RTVIProcessor(config=RTVIConfig(config=[]))
-
         pipeline = Pipeline(
             [
                 transport.input(),
                 stt,
-                rtvi,
                 user_aggregator,
                 llm,
                 llm_search_logger,
@@ -152,16 +145,13 @@ async def main():
                 enable_metrics=True,
                 enable_usage_metrics=True,
             ),
-            # TODO: Remove this once exposing RTVI instance is supported via
-            # the built-in RTVI processor.
-            enable_rtvi=False,
-            observers=[GoogleRTVIObserver(rtvi)],
+            # Use GoogleRTVIProcessor which creates GoogleRTVIObserver automatically
+            rtvi_processor=GoogleRTVIProcessor(),
         )
 
-        @rtvi.event_handler("on_client_ready")
+        @task.rtvi.event_handler("on_client_ready")
         async def on_client_ready(rtvi):
-            await rtvi.set_bot_ready()
-            # Kick off the conversation
+            # Kick off the conversation (set_bot_ready is called automatically)
             await task.queue_frames([LLMRunFrame()])
 
         @transport.event_handler("on_first_participant_joined")

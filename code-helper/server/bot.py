@@ -46,7 +46,7 @@ from pipecat.processors.aggregators.llm_response_universal import (
     UserTurnStoppedMessage,
 )
 from pipecat.processors.aggregators.llm_text_processor import LLMTextProcessor
-from pipecat.processors.frameworks.rtvi import RTVIObserver, RTVIProcessor
+from pipecat.processors.frameworks.rtvi import RTVIObserverParams
 from pipecat.runner.types import RunnerArguments
 from pipecat.runner.utils import create_transport
 from pipecat.services.cartesia.tts import CartesiaTTSService
@@ -144,6 +144,10 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     llm = OpenAILLMService(api_key=os.getenv("OPENAI_API_KEY"))
     llm.register_function("get_credit_card_info", fetch_credit_card_info)
 
+    # RTVI text transformer to obfuscate credit card numbers in the bot's output.
+    async def obfuscate_credit_card(text: str, type: str) -> str:
+        return "XXXX-XXXX-XXXX-" + text[-4:]
+
     # LLM aggregator context
     messages = [
         {
@@ -170,21 +174,11 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
         ),
     )
 
-    # RTVI processor and observer with a text transformer to obfuscate
-    # credit card numbers in the bot's output.
-    async def obfuscate_credit_card(text: str, type: str) -> str:
-        return "XXXX-XXXX-XXXX-" + text[-4:]
-
-    rtvi = RTVIProcessor()
-    rtvi_observer = RTVIObserver(rtvi)
-    rtvi_observer.add_bot_output_transformer(obfuscate_credit_card, "credit_card")
-
     # Pipeline - The following pipeline is typical for a STT->LLM->TTS bot + RTVI
     #            with the addition of the LLMTextProcessor to handle special text segments.
     pipeline = Pipeline(
         [
             transport.input(),
-            rtvi,
             stt,
             user_aggregator,
             llm,
@@ -201,10 +195,10 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
             enable_metrics=True,
             enable_usage_metrics=True,
         ),
-        # TODO: Remove this once add_bot_output_transformer is supported via
-        # the built-in RTVI processor.
-        enable_rtvi=False,
-        observers=[rtvi_observer],
+        # Configure RTVI observer to obfuscate credit card numbers
+        rtvi_observer_params=RTVIObserverParams(
+            bot_output_transforms=[("credit_card", obfuscate_credit_card)]
+        ),
     )
 
     @transport.event_handler("on_client_connected")
@@ -231,7 +225,7 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
         line = f"{timestamp}assistant: {message.content}"
         logger.info(f"Transcript: {line}")
 
-    @rtvi.event_handler("on_client_message")
+    @task.rtvi.event_handler("on_client_message")
     async def on_message(rtvi, msg):
         logger.info(f"Received unknown message from client: {msg.type} | {msg.data}")
 
