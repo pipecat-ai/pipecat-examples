@@ -8,7 +8,7 @@ dependencies = [
     "openinference-instrumentation>=0.1.42",
     "openinference-instrumentation-pipecat>=0.1.0",
     "pipecat-ai[cartesia,daily,deepgram,google,local-smart-turn-v3,runner,silero,webrtc,websocket]>=0.0.100",
-    "pipecatcloud>=0.2.18",
+    "pipecatcloud>=0.2.19",
 ]
 
 [dependency-groups]

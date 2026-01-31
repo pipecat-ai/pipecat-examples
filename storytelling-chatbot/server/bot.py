@@ -13,12 +13,16 @@ import aiohttp
 from dotenv import load_dotenv
 from loguru import logger
 from pipecat.audio.vad.silero import SileroVADAnalyzer
+from pipecat.audio.vad.vad_analyzer import VADParams
 from pipecat.frames.frames import EndFrame, LLMRunFrame
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineParams, PipelineTask
 from pipecat.processors.aggregators.llm_context import LLMContext
-from pipecat.processors.aggregators.llm_response_universal import LLMContextAggregatorPair
+from pipecat.processors.aggregators.llm_response_universal import (
+    LLMContextAggregatorPair,
+    LLMUserAggregatorParams,
+)
 from pipecat.services.elevenlabs.tts import ElevenLabsTTSService
 from pipecat.services.google.image import GoogleImageGenService
 from pipecat.services.google.llm import GoogleLLMService
@@ -56,7 +60,6 @@ async def main(room_url, token=None):
                 video_out_width=1024,
                 video_out_height=1024,
                 transcription_enabled=True,
-                vad_analyzer=SileroVADAnalyzer(),
             ),
         )
 
@@ -79,7 +82,12 @@ async def main(room_url, token=None):
 
         # We need aggregators to keep track of user and LLM responses
         context = LLMContext(message_history)
-        context_aggregator = LLMContextAggregatorPair(context)
+        user_aggregator, assistant_aggregator = LLMContextAggregatorPair(
+            context,
+            user_params=LLMUserAggregatorParams(
+                vad_analyzer=SileroVADAnalyzer(params=VADParams(stop_secs=0.2)),
+            ),
+        )
 
         # -------------- Processors ------------- #
 
@@ -94,13 +102,13 @@ async def main(room_url, token=None):
         main_pipeline = Pipeline(
             [
                 transport.input(),
-                context_aggregator.user(),
+                user_aggregator,
                 llm_service,
                 story_processor,
                 image_processor,
                 tts_service,
                 transport.output(),
-                context_aggregator.assistant(),
+                assistant_aggregator,
             ]
         )
 

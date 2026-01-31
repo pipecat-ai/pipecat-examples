@@ -239,3 +239,6 @@ twilio-chatbot/server*.wav
 
 # Examples
 credentials.json
+
+# Pipecat
+whisker_setup.py

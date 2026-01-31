@@ -34,18 +34,19 @@ from pipecat.adapters.schemas.tools_schema import ToolsSchema
 from pipecat.audio.turn.smart_turn.local_smart_turn_v3 import LocalSmartTurnAnalyzerV3
 from pipecat.audio.vad.silero import SileroVADAnalyzer
 from pipecat.audio.vad.vad_analyzer import VADParams
-from pipecat.frames.frames import LLMRunFrame, TranscriptionMessage, TranscriptionUpdateFrame
+from pipecat.frames.frames import LLMRunFrame
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineParams, PipelineTask
 from pipecat.processors.aggregators.llm_context import LLMContext
 from pipecat.processors.aggregators.llm_response_universal import (
+    AssistantTurnStoppedMessage,
     LLMContextAggregatorPair,
     LLMUserAggregatorParams,
+    UserTurnStoppedMessage,
 )
 from pipecat.processors.aggregators.llm_text_processor import LLMTextProcessor
 from pipecat.processors.frameworks.rtvi import RTVIObserver, RTVIProcessor
-from pipecat.processors.transcript_processor import TranscriptProcessor
 from pipecat.runner.types import RunnerArguments
 from pipecat.runner.utils import create_transport
 from pipecat.services.cartesia.tts import CartesiaTTSService
@@ -165,11 +166,9 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
             user_turn_strategies=UserTurnStrategies(
                 stop=[TurnAnalyzerUserTurnStopStrategy(turn_analyzer=LocalSmartTurnAnalyzerV3())]
             ),
+            vad_analyzer=SileroVADAnalyzer(params=VADParams(stop_secs=0.2)),
         ),
     )
-
-    # Transcription processor
-    transcript_processor = TranscriptProcessor()
 
     # RTVI processor and observer with a text transformer to obfuscate
     # credit card numbers in the bot's output.
@@ -187,13 +186,11 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
             transport.input(),
             rtvi,
             stt,
-            transcript_processor.user(),
             user_aggregator,
             llm,
             llm_text_processor,  # Pre-aggregate LLMTextFrames for custom segment handling
             tts,
             transport.output(),
-            transcript_processor.assistant(),
             assistant_aggregator,
         ]
     )
@@ -204,6 +201,9 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
             enable_metrics=True,
             enable_usage_metrics=True,
         ),
+        # TODO: Remove this once add_bot_output_transformer is supported via
+        # the built-in RTVI processor.
+        enable_rtvi=False,
         observers=[rtvi_observer],
     )
 
@@ -219,13 +219,17 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
         logger.info("Client disconnected")
         await task.cancel()
 
-    @transcript_processor.event_handler("on_transcript_update")
-    async def on_transcript_update(processor: TranscriptProcessor, frame: TranscriptionUpdateFrame):
-        for msg in frame.messages:
-            if isinstance(msg, TranscriptionMessage):
-                timestamp = f"[{msg.timestamp}] " if msg.timestamp else ""
-                line = f"{timestamp}{msg.role}: {msg.content}"
-                logger.info(f"Transcript: {line}")
+    @user_aggregator.event_handler("on_user_turn_stopped")
+    async def on_user_turn_stopped(aggregator, strategy, message: UserTurnStoppedMessage):
+        timestamp = f"[{message.timestamp}] " if message.timestamp else ""
+        line = f"{timestamp}user: {message.content}"
+        logger.info(f"Transcript: {line}")
+
+    @assistant_aggregator.event_handler("on_assistant_turn_stopped")
+    async def on_assistant_turn_stopped(aggregator, message: AssistantTurnStoppedMessage):
+        timestamp = f"[{message.timestamp}] " if message.timestamp else ""
+        line = f"{timestamp}assistant: {message.content}"
+        logger.info(f"Transcript: {line}")
 
     @rtvi.event_handler("on_client_message")
     async def on_message(rtvi, msg):
@@ -246,7 +250,6 @@ async def bot(runner_args: RunnerArguments):
         "webrtc": lambda: TransportParams(
             audio_in_enabled=True,
             audio_out_enabled=True,
-            vad_analyzer=SileroVADAnalyzer(params=VADParams(stop_secs=0.2)),
         ),
     }
 

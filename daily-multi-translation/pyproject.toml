@@ -5,7 +5,7 @@ description = "Daily Multitranslation bot"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
-  "pipecat-ai[daily,webrtc,websocket,cartesia,google,silero,deepgram,runner,local-smart-turn-v3,soundfile]>=0.0.99",
-  "pipecatcloud>=0.2.7",
+  "pipecat-ai[daily,webrtc,websocket,cartesia,google,silero,deepgram,runner,local-smart-turn-v3,soundfile]>=0.0.101",
+  "pipecatcloud>=0.2.19",
   "aiofiles"
 ]

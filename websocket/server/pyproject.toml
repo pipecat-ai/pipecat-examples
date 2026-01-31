@@ -6,7 +6,7 @@ requires-python = ">=3.10"
 dependencies = [
     "python-dotenv",
     "uvicorn",
-    "pipecat-ai[silero,websocket,google]>=0.0.99",
+    "pipecat-ai[silero,websocket,google]>=0.0.101",
 ]
 
 [dependency-groups]

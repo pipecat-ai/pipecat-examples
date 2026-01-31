@@ -36,9 +36,11 @@ from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineParams, PipelineTask
 from pipecat.processors.aggregators.llm_context import LLMContext
-from pipecat.processors.aggregators.llm_response_universal import LLMContextAggregatorPair
+from pipecat.processors.aggregators.llm_response_universal import (
+    LLMContextAggregatorPair,
+    LLMUserAggregatorParams,
+)
 from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
-from pipecat.processors.frameworks.rtvi import RTVIConfig, RTVIObserver, RTVIProcessor
 from pipecat.services.google.gemini_live.llm import GeminiLiveLLMService
 from pipecat.transports.daily.transport import DailyParams, DailyTransport
 
@@ -120,13 +122,11 @@ async def run_bot(room_url: str, token: str):
         token,
         "Chatbot",
         DailyParams(
+            audio_in_enabled=True,
             audio_out_enabled=True,
-            camera_out_enabled=True,
-            camera_out_width=1024,
-            camera_out_height=576,
-            vad_enabled=True,
-            vad_audio_passthrough=True,
-            vad_analyzer=SileroVADAnalyzer(params=VADParams(stop_secs=0.5)),
+            video_out_enabled=True,
+            video_out_width=1024,
+            video_out_height=576,
         ),
     )
 
@@ -134,7 +134,6 @@ async def run_bot(room_url: str, token: str):
     llm = GeminiLiveLLMService(
         api_key=os.getenv("GOOGLE_API_KEY"),
         voice_id="Puck",  # Aoede, Charon, Fenrir, Kore, Puck
-        transcribe_user_audio=True,
     )
 
     messages = [
@@ -147,24 +146,23 @@ async def run_bot(room_url: str, token: str):
     # Set up conversation context and management
     # The context_aggregator will automatically collect conversation context
     context = LLMContext(messages)
-    context_aggregator = LLMContextAggregatorPair(context)
+    user_aggregator, assistant_aggregator = LLMContextAggregatorPair(
+        context,
+        user_params=LLMUserAggregatorParams(
+            vad_analyzer=SileroVADAnalyzer(params=VADParams(stop_secs=0.2)),
+        ),
+    )
 
     ta = TalkingAnimation()
-
-    #
-    # RTVI events for Pipecat client UI
-    #
-    rtvi = RTVIProcessor(config=RTVIConfig(config=[]))
 
     pipeline = Pipeline(
         [
             transport.input(),
-            rtvi,
-            context_aggregator.user(),
+            user_aggregator,
             llm,
             ta,
             transport.output(),
-            context_aggregator.assistant(),
+            assistant_aggregator,
         ]
     )
 
@@ -174,13 +172,11 @@ async def run_bot(room_url: str, token: str):
             enable_metrics=True,
             enable_usage_metrics=True,
         ),
-        observers=[RTVIObserver(rtvi)],
     )
     await task.queue_frame(quiet_frame)
 
-    @rtvi.event_handler("on_client_ready")
+    @task.rtvi.event_handler("on_client_ready")
     async def on_client_ready(rtvi):
-        await rtvi.set_bot_ready()
         # Kick off the conversation
         await task.queue_frames([LLMRunFrame()])
 

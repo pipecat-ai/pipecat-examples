@@ -11,13 +11,16 @@ import sys
 from dotenv import load_dotenv
 from loguru import logger
 from pipecat.audio.vad.silero import SileroVADAnalyzer
+from pipecat.audio.vad.vad_analyzer import VADParams
 from pipecat.frames.frames import LLMRunFrame
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineParams, PipelineTask
 from pipecat.processors.aggregators.llm_context import LLMContext
-from pipecat.processors.aggregators.llm_response_universal import LLMContextAggregatorPair
-from pipecat.processors.frameworks.rtvi import RTVIConfig, RTVIObserver, RTVIProcessor
+from pipecat.processors.aggregators.llm_response_universal import (
+    LLMContextAggregatorPair,
+    LLMUserAggregatorParams,
+)
 from pipecat.services.google.gemini_live.llm import GeminiLiveLLMService
 from pipecat.transports.daily.transport import DailyParams, DailyTransport
 
@@ -55,38 +58,37 @@ async def main():
     room_url, token = extract_arguments()
     print(f"room_url: {room_url}")
 
-    daily_transport = DailyTransport(
+    transport = DailyTransport(
         room_url,
         token,
         "Instant voice Chatbot",
         DailyParams(
             audio_in_enabled=True,
             audio_out_enabled=True,
-            vad_analyzer=SileroVADAnalyzer(),
         ),
     )
 
     llm = GeminiLiveLLMService(
         api_key=os.getenv("GOOGLE_API_KEY"),
         voice_id="Puck",  # Aoede, Charon, Fenrir, Kore, Puck
-        transcribe_user_audio=True,
         system_instruction=SYSTEM_INSTRUCTION,
     )
 
     context = LLMContext()
-    context_aggregator = LLMContextAggregatorPair(context)
-
-    # RTVI events for Pipecat client UI
-    rtvi = RTVIProcessor(config=RTVIConfig(config=[]), transport=daily_transport)
+    user_aggregator, assistant_aggregator = LLMContextAggregatorPair(
+        context,
+        user_params=LLMUserAggregatorParams(
+            vad_analyzer=SileroVADAnalyzer(params=VADParams(stop_secs=0.2)),
+        ),
+    )
 
     pipeline = Pipeline(
         [
-            daily_transport.input(),
-            context_aggregator.user(),
-            rtvi,
+            transport.input(),
+            user_aggregator,
             llm,  # LLM
-            daily_transport.output(),
-            context_aggregator.assistant(),
+            transport.output(),
+            assistant_aggregator,
         ]
     )
 
@@ -96,22 +98,20 @@ async def main():
             enable_metrics=True,
             enable_usage_metrics=True,
         ),
-        observers=[RTVIObserver(rtvi)],
     )
 
-    @rtvi.event_handler("on_client_ready")
+    @task.rtvi.event_handler("on_client_ready")
     async def on_client_ready(rtvi):
-        await rtvi.set_bot_ready()
         # Kick off the conversation
         await task.queue_frames([LLMRunFrame()])
 
-    @daily_transport.event_handler("on_first_participant_joined")
-    async def on_first_participant_joined(transport, participant):
-        logger.debug("First participant joined: {}", participant["id"])
+    @transport.event_handler("on_client_connected")
+    async def on_client_connected(transport, client):
+        logger.info(f"Client connected")
 
-    @daily_transport.event_handler("on_participant_left")
-    async def on_participant_left(transport, participant, reason):
-        logger.debug(f"Participant left: {participant}")
+    @transport.event_handler("on_client_disconnected")
+    async def on_client_disconnected(transport, client):
+        logger.info(f"Client disconnected")
         await task.cancel()
 
     runner = PipelineRunner(handle_sigint=False)

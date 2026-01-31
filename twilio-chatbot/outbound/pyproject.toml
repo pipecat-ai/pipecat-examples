@@ -5,7 +5,7 @@ description = "Twilio dial-out example for Pipecat"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
-  "pipecat-ai[websocket,cartesia,google,silero,deepgram,runner,local-smart-turn-v3]>=0.0.99",
-  "pipecatcloud>=0.2.7",
+  "pipecat-ai[websocket,cartesia,google,silero,deepgram,runner,local-smart-turn-v3]>=0.0.101",
+  "pipecatcloud>=0.2.19",
   "twilio"
 ]
