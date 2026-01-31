@@ -21,7 +21,6 @@ from pipecat.processors.aggregators.llm_response_universal import (
     LLMContextAggregatorPair,
     LLMUserAggregatorParams,
 )
-from pipecat.processors.frameworks.rtvi import RTVIObserver, RTVIProcessor
 from pipecat.runner.types import RunnerArguments
 from pipecat.runner.utils import create_transport
 from pipecat.services.google.gemini_live.llm import GeminiLiveLLMService
@@ -119,16 +118,13 @@ Important guidelines:
             user_mute_strategies=[
                 MuteUntilFirstBotCompleteUserMuteStrategy(),
             ],
+            vad_analyzer=SileroVADAnalyzer(params=VADParams(stop_secs=0.2)),
         ),
     )
-
-    # RTVI events for Pipecat client UI
-    rtvi = RTVIProcessor()
 
     pipeline = Pipeline(
         [
             transport.input(),
-            rtvi,
             user_aggregator,
             llm,
             transport.output(),
@@ -142,13 +138,11 @@ Important guidelines:
             enable_metrics=True,
             enable_usage_metrics=True,
         ),
-        observers=[RTVIObserver(rtvi)],
     )
 
-    @rtvi.event_handler("on_client_ready")
+    @task.rtvi.event_handler("on_client_ready")
     async def on_client_ready(rtvi):
         logger.debug("Client ready event received")
-        await rtvi.set_bot_ready()
         # Kick off the conversation
         await task.queue_frames([LLMRunFrame()])
 
@@ -169,9 +163,9 @@ Important guidelines:
 async def bot(runner_args: RunnerArguments):
     """Main bot entry point compatible with the FastAPI route handler."""
     if os.environ.get("ENV") != "local":
-        from pipecat.audio.filters.krisp_filter import KrispFilter
+        from pipecat.audio.filters.krisp_viva_filter import KrispVivaFilter
 
-        krisp_filter = KrispFilter()
+        krisp_filter = KrispVivaFilter()
     else:
         krisp_filter = None
 
@@ -183,7 +177,6 @@ async def bot(runner_args: RunnerArguments):
             audio_in_enabled=True,
             audio_in_filter=krisp_filter,
             audio_out_enabled=True,
-            vad_analyzer=SileroVADAnalyzer(params=VADParams(stop_secs=0.2)),
         )
     }
 

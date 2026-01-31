@@ -19,6 +19,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
 from pipecat.audio.mixers.soundfile_mixer import SoundfileMixer
 from pipecat.audio.vad.silero import SileroVADAnalyzer
+from pipecat.audio.vad.vad_analyzer import VADParams
 from pipecat.frames.frames import (
     CancelFrame,
     EndFrame,
@@ -41,9 +42,11 @@ from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineParams, PipelineTask
 from pipecat.processors.aggregators.llm_context import LLMContext
-from pipecat.processors.aggregators.llm_response_universal import LLMContextAggregatorPair
+from pipecat.processors.aggregators.llm_response_universal import (
+    LLMContextAggregatorPair,
+    LLMUserAggregatorParams,
+)
 from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
-from pipecat.processors.frameworks.rtvi import RTVIConfig, RTVIProcessor
 from pipecat.processors.metrics.sentry import SentryMetrics
 from pipecat.processors.user_idle_processor import UserIdleProcessor
 from pipecat.serializers.protobuf import ProtobufFrameSerializer
@@ -173,7 +176,6 @@ async def run_example(websocket_client):
             audio_in_enabled=True,
             audio_out_enabled=True,
             add_wav_header=False,
-            vad_analyzer=SileroVADAnalyzer(),
             serializer=ProtobufFrameSerializer(),
             audio_out_mixer=SoundfileMixer(
                 sound_files={"office": OFFICE_SOUND_FILE},
@@ -230,8 +232,6 @@ async def run_example(websocket_client):
         metrics=SentryMetrics(),
     )
 
-    rtvi = RTVIProcessor(config=RTVIConfig(config=[]))
-
     messages = [
         {
             "role": "system",
@@ -240,7 +240,12 @@ async def run_example(websocket_client):
     ]
 
     context = LLMContext(messages)
-    context_aggregator = LLMContextAggregatorPair(context)
+    user_aggregator, assistant_aggregator = LLMContextAggregatorPair(
+        context,
+        user_params=LLMUserAggregatorParams(
+            vad_analyzer=SileroVADAnalyzer(params=VADParams(stop_secs=0.2)),
+        ),
+    )
 
     pipeline = Pipeline(
         [
@@ -254,19 +259,17 @@ async def run_example(websocket_client):
                 ],
             ),
             user_idle,
-            rtvi,
-            context_aggregator.user(),  # User responses
+            user_aggregator,  # User responses
             llm,  # LLM
             tts,  # TTS
             transport.output(),  # Transport bot output
-            context_aggregator.assistant(),  # Assistant spoken responses
+            assistant_aggregator,  # Assistant spoken responses
         ]
     )
 
     task = PipelineTask(
         pipeline,
         params=PipelineParams(
-            allow_interruptions=True,
             enable_metrics=True,
             enable_usage_metrics=True,
             report_only_initial_ttfb=True,
@@ -303,10 +306,9 @@ async def run_example(websocket_client):
     async def on_client_connected(transport, client):
         logger.info(f"Client connected")
 
-    @rtvi.event_handler("on_client_ready")
+    @task.rtvi.event_handler("on_client_ready")
     async def on_client_ready(rtvi):
         logger.info(f"Client ready")
-        await rtvi.set_bot_ready()
         # Kick off the conversation.
         # messages.append({"role": "system", "content": "Please introduce yourself to the user."})
         # await task.queue_frames([LLMRunFrame()])

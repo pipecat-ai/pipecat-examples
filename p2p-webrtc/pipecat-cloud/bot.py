@@ -9,13 +9,16 @@ import os
 from dotenv import load_dotenv
 from loguru import logger
 from pipecat.audio.vad.silero import SileroVADAnalyzer
+from pipecat.audio.vad.vad_analyzer import VADParams
 from pipecat.frames.frames import LLMRunFrame
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineParams, PipelineTask
 from pipecat.processors.aggregators.llm_context import NOT_GIVEN, LLMContext
-from pipecat.processors.aggregators.llm_response_universal import LLMContextAggregatorPair
-from pipecat.processors.frameworks.rtvi import RTVIConfig, RTVIObserver, RTVIProcessor
+from pipecat.processors.aggregators.llm_response_universal import (
+    LLMContextAggregatorPair,
+    LLMUserAggregatorParams,
+)
 from pipecat.runner.types import RunnerArguments
 from pipecat.services.cartesia.tts import CartesiaTTSService
 from pipecat.services.deepgram.stt import DeepgramSTTService
@@ -59,40 +62,38 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
 
     # This sets up the LLM context by providing messages and tools
     context = LLMContext(messages, tools)
-    context_aggregator = LLMContextAggregatorPair(context)
-
-    # RTVI events for Pipecat client UI
-    rtvi = RTVIProcessor(config=RTVIConfig(config=[]))
+    user_aggregator, assistant_aggregator = LLMContextAggregatorPair(
+        context,
+        user_params=LLMUserAggregatorParams(
+            vad_analyzer=SileroVADAnalyzer(params=VADParams(stop_secs=0.2)),
+        ),
+    )
 
     # A core voice AI pipeline
     # Add additional processors to customize the bot's behavior
     pipeline = Pipeline(
         [
             transport.input(),
-            rtvi,
             stt,
-            context_aggregator.user(),
+            user_aggregator,
             llm,
             tts,
             transport.output(),
-            context_aggregator.assistant(),
+            assistant_aggregator,
         ]
     )
 
     task = PipelineTask(
         pipeline,
         params=PipelineParams(
-            allow_interruptions=True,
             enable_metrics=True,
             enable_usage_metrics=True,
         ),
-        observers=[RTVIObserver(rtvi)],
     )
 
-    @rtvi.event_handler("on_client_ready")
+    @task.rtvi.event_handler("on_client_ready")
     async def on_client_ready(rtvi):
         logger.debug("Client ready event received")
-        await rtvi.set_bot_ready()
 
     @transport.event_handler("on_client_connected")
     async def on_client_connected(transport, client):
@@ -116,9 +117,9 @@ async def bot(runner_args: RunnerArguments):
     webrtc_connection: SmallWebRTCConnection = runner_args.webrtc_connection
     try:
         if os.environ.get("ENV") != "local":
-            from pipecat.audio.filters.krisp_filter import KrispFilter
+            from pipecat.audio.filters.krisp_viva_filter import KrispVivaFilter
 
-            krisp_filter = KrispFilter()
+            krisp_filter = KrispVivaFilter()
         else:
             krisp_filter = None
 
@@ -128,7 +129,6 @@ async def bot(runner_args: RunnerArguments):
                 audio_in_enabled=True,
                 audio_in_filter=krisp_filter,
                 audio_out_enabled=True,
-                vad_analyzer=SileroVADAnalyzer(),
             ),
         )
 

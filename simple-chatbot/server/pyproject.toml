@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Simple chatbot built with Pipecat"
 requires-python = ">=3.10"
 dependencies = [
-    "pipecat-ai[daily,deepgram,elevenlabs,google,local-smart-turn-v3,openai,runner,silero,webrtc]>=0.0.99",
+    "pipecat-ai[daily,deepgram,elevenlabs,google,local-smart-turn-v3,openai,runner,silero,webrtc]>=0.0.101",
     "pipecatcloud",
 ]
 

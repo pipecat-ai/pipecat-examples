@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Example for building voice AI bots with Pipecat and Daily custom tracks"
 requires-python = ">=3.12"
 dependencies = [
-    "pipecat-ai[daily,runner]>=0.0.99",
+    "pipecat-ai[daily,runner]>=0.0.101",
     "pydub",
 ]
 

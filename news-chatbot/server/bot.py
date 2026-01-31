@@ -13,12 +13,16 @@ import aiohttp
 from dotenv import load_dotenv
 from loguru import logger
 from pipecat.audio.vad.silero import SileroVADAnalyzer
+from pipecat.audio.vad.vad_analyzer import VADParams
 from pipecat.frames.frames import Frame, LLMRunFrame
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineParams, PipelineTask
 from pipecat.processors.aggregators.llm_context import LLMContext
-from pipecat.processors.aggregators.llm_response_universal import LLMContextAggregatorPair
+from pipecat.processors.aggregators.llm_response_universal import (
+    LLMContextAggregatorPair,
+    LLMUserAggregatorParams,
+)
 from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
 from pipecat.processors.frameworks.rtvi import RTVIConfig, RTVIProcessor
 from pipecat.services.cartesia.tts import CartesiaTTSService
@@ -88,7 +92,6 @@ async def main():
             DailyParams(
                 audio_in_enabled=True,
                 audio_out_enabled=True,
-                vad_analyzer=SileroVADAnalyzer(),
             ),
         )
 
@@ -115,7 +118,12 @@ async def main():
                 }
             ],
         )
-        context_aggregator = LLMContextAggregatorPair(context)
+        user_aggregator, assistant_aggregator = LLMContextAggregatorPair(
+            context,
+            user_params=LLMUserAggregatorParams(
+                vad_analyzer=SileroVADAnalyzer(params=VADParams(stop_secs=0.2)),
+            ),
+        )
 
         llm_search_logger = LLMSearchLoggerProcessor()
 
@@ -129,12 +137,12 @@ async def main():
                 transport.input(),
                 stt,
                 rtvi,
-                context_aggregator.user(),
+                user_aggregator,
                 llm,
                 llm_search_logger,
                 tts,
                 transport.output(),
-                context_aggregator.assistant(),
+                assistant_aggregator,
             ]
         )
 
@@ -144,6 +152,9 @@ async def main():
                 enable_metrics=True,
                 enable_usage_metrics=True,
             ),
+            # TODO: Remove this once exposing RTVI instance is supported via
+            # the built-in RTVI processor.
+            enable_rtvi=False,
             observers=[GoogleRTVIObserver(rtvi)],
         )
 

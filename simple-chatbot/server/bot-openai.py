@@ -50,7 +50,6 @@ from pipecat.processors.aggregators.llm_response_universal import (
     LLMUserAggregatorParams,
 )
 from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
-from pipecat.processors.frameworks.rtvi import RTVIObserver, RTVIProcessor
 from pipecat.runner.types import DailyRunnerArguments, RunnerArguments, SmallWebRTCRunnerArguments
 from pipecat.services.deepgram.stt import DeepgramSTTService
 from pipecat.services.elevenlabs.tts import ElevenLabsTTSService
@@ -150,11 +149,10 @@ async def run_bot(transport: BaseTransport):
         user_params=LLMUserAggregatorParams(
             user_turn_strategies=UserTurnStrategies(
                 stop=[TurnAnalyzerUserTurnStopStrategy(turn_analyzer=LocalSmartTurnAnalyzerV3())]
-            )
+            ),
+            vad_analyzer=SileroVADAnalyzer(params=VADParams(stop_secs=0.2)),
         ),
     )
-
-    rtvi = RTVIProcessor()
 
     ta = TalkingAnimation()
 
@@ -162,7 +160,6 @@ async def run_bot(transport: BaseTransport):
     pipeline = Pipeline(
         [
             transport.input(),
-            rtvi,
             stt,
             user_aggregator,
             llm,
@@ -179,17 +176,14 @@ async def run_bot(transport: BaseTransport):
             enable_metrics=True,
             enable_usage_metrics=True,
         ),
-        observers=[
-            RTVIObserver(rtvi),
-        ],
     )
 
     # Queue initial static frame so video starts immediately
     await task.queue_frame(quiet_frame)
 
-    @rtvi.event_handler("on_client_ready")
+    @task.rtvi.event_handler("on_client_ready")
     async def on_client_ready(rtvi):
-        await rtvi.set_bot_ready()
+        logger.info("Client ready event received")
         # Kick off the conversation
         await task.queue_frames([LLMRunFrame()])
 
@@ -224,7 +218,6 @@ async def bot(runner_args: RunnerArguments):
                     video_out_enabled=True,
                     video_out_width=1024,
                     video_out_height=576,
-                    vad_analyzer=SileroVADAnalyzer(params=VADParams(stop_secs=0.2)),
                 ),
             )
         case SmallWebRTCRunnerArguments():
@@ -238,7 +231,6 @@ async def bot(runner_args: RunnerArguments):
                     video_out_enabled=True,
                     video_out_width=1024,
                     video_out_height=576,
-                    vad_analyzer=SileroVADAnalyzer(params=VADParams(stop_secs=0.2)),
                 ),
             )
         case _:

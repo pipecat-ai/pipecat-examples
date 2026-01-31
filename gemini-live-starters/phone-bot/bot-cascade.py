@@ -41,7 +41,6 @@ from pipecat.processors.aggregators.llm_response_universal import (
     UserTurnStoppedMessage,
 )
 from pipecat.processors.frame_processor import FrameDirection
-from pipecat.processors.frameworks.rtvi import RTVIObserver, RTVIProcessor
 from pipecat.runner.types import RunnerArguments
 from pipecat.runner.utils import create_transport
 from pipecat.services.google.llm import GoogleLLMService
@@ -171,18 +170,13 @@ Remember: Present the pre-written statements exactly as shown, keep your comment
             user_turn_strategies=UserTurnStrategies(
                 stop=[TurnAnalyzerUserTurnStopStrategy(turn_analyzer=LocalSmartTurnAnalyzerV3())]
             ),
+            vad_analyzer=SileroVADAnalyzer(params=VADParams(stop_secs=0.2)),
         ),
     )
-
-    # Add RTVI to the pipeline to receive events for the SmallWebRTC Prebuilt UI
-    # Only needed for client/server messaging and events
-    # You can remove RTVI processors and observers for Twilio/phone use cases
-    rtvi = RTVIProcessor()
 
     pipeline = Pipeline(
         [
             transport.input(),  # Transport user input
-            rtvi,
             stt,  # STT
             user_aggregator,  # User respones
             llm,  # LLM
@@ -199,7 +193,6 @@ Remember: Present the pre-written statements exactly as shown, keep your comment
             enable_usage_metrics=True,
         ),
         idle_timeout_secs=runner_args.pipeline_idle_timeout_secs,
-        observers=[RTVIObserver(rtvi)],
     )
 
     @transport.event_handler("on_client_connected")
@@ -248,13 +241,11 @@ async def bot(runner_args: RunnerArguments):
             audio_in_enabled=True,
             audio_in_filter=krisp_filter,
             audio_out_enabled=True,
-            vad_analyzer=SileroVADAnalyzer(params=VADParams(stop_secs=0.2)),
         ),
         "webrtc": lambda: TransportParams(
             audio_in_enabled=True,
             audio_in_filter=krisp_filter,
             audio_out_enabled=True,
-            vad_analyzer=SileroVADAnalyzer(params=VADParams(stop_secs=0.2)),
         ),
     }
     transport = await create_transport(runner_args, transport_params)

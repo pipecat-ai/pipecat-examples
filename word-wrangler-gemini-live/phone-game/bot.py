@@ -61,7 +61,7 @@ from pipecat.transports.base_transport import BaseTransport, TransportParams
 from pipecat.transports.websocket.fastapi import (
     FastAPIWebsocketParams,
 )
-from pipecat.turns.mute.mute_until_first_bot_complete_user_mute_strategy import (
+from pipecat.turns.user_mute import (
     MuteUntilFirstBotCompleteUserMuteStrategy,
 )
 from pipecat.turns.user_stop.turn_analyzer_user_turn_stop_strategy import (
@@ -659,6 +659,7 @@ Important guidelines:
             user_mute_strategies=[
                 MuteUntilFirstBotCompleteUserMuteStrategy(),
             ],
+            vad_analyzer=SileroVADAnalyzer(params=VADParams(stop_secs=0.2)),
         ),
     )
 
@@ -725,9 +726,9 @@ Important guidelines:
 async def bot(runner_args: RunnerArguments):
     """Main bot entry point compatible with Pipecat Cloud."""
     if os.environ.get("ENV") != "local":
-        from pipecat.audio.filters.krisp_filter import KrispFilter
+        from pipecat.audio.filters.krisp_viva_filter import KrispVivaFilter
 
-        krisp_filter = KrispFilter()
+        krisp_filter = KrispVivaFilter()
     else:
         krisp_filter = None
 
@@ -739,13 +740,11 @@ async def bot(runner_args: RunnerArguments):
             audio_in_enabled=True,
             audio_in_filter=krisp_filter,
             audio_out_enabled=True,
-            vad_analyzer=SileroVADAnalyzer(params=VADParams(stop_secs=0.2)),
         ),
         "twilio": lambda: FastAPIWebsocketParams(
             audio_in_enabled=True,
             audio_in_filter=krisp_filter,
             audio_out_enabled=True,
-            vad_analyzer=SileroVADAnalyzer(params=VADParams(stop_secs=0.2)),
         ),
     }
 

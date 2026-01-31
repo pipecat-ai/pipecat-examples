@@ -12,6 +12,7 @@ from loguru import logger
 from pipecat.adapters.schemas.function_schema import FunctionSchema
 from pipecat.adapters.schemas.tools_schema import ToolsSchema
 from pipecat.audio.vad.silero import SileroVADAnalyzer
+from pipecat.audio.vad.vad_analyzer import VADParams
 from pipecat.frames.frames import (
     EndTaskFrame,
     LLMRunFrame,
@@ -23,10 +24,10 @@ from pipecat.pipeline.task import PipelineParams, PipelineTask
 from pipecat.processors.aggregators.llm_context import LLMContext
 from pipecat.processors.aggregators.llm_response_universal import (
     LLMContextAggregatorPair,
+    LLMUserAggregatorParams,
 )
 from pipecat.processors.audio.audio_buffer_processor import AudioBufferProcessor
 from pipecat.processors.frame_processor import FrameDirection
-from pipecat.processors.frameworks.rtvi import RTVIObserver, RTVIProcessor
 from pipecat.runner.types import RunnerArguments
 from pipecat.runner.utils import create_transport
 from pipecat.services.cartesia.tts import CartesiaTTSService
@@ -87,7 +88,12 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
 
     tools = ToolsSchema(standard_tools=[terminate_function])
     context = LLMContext(messages, tools)
-    user_aggregator, assistant_aggregator = LLMContextAggregatorPair(context)
+    user_aggregator, assistant_aggregator = LLMContextAggregatorPair(
+        context,
+        user_params=LLMUserAggregatorParams(
+            vad_analyzer=SileroVADAnalyzer(params=VADParams(stop_secs=0.2)),
+        ),
+    )
 
     audio_buffer = AudioBufferProcessor(buffer_size=audio_buffer_size)
 
@@ -96,13 +102,9 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
         conversation_id, audio_buffer_size, "000000000000_test_conversations"
     )
 
-    # RTVI events for Pipecat client UI
-    rtvi = RTVIProcessor()
-
     pipeline = Pipeline(
         [
             transport.input(),  # Transport user input
-            rtvi,
             stt,  # STT
             user_aggregator,  # User responses
             llm,  # LLM
@@ -120,7 +122,6 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
             enable_usage_metrics=True,
         ),
         idle_timeout_secs=idle_timeout_secs,
-        observers=[RTVIObserver(rtvi)],
     )
 
     #############################
@@ -147,9 +148,9 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
 
     #############################
 
-    @rtvi.event_handler("on_client_ready")
+    @task.rtvi.event_handler("on_client_ready")
     async def on_client_ready(rtvi):
-        await rtvi.set_bot_ready()
+        logger.info(f"Client ready")
 
     @transport.event_handler("on_client_connected")
     async def on_client_connected(transport, client):
@@ -180,12 +181,10 @@ async def bot(runner_args: RunnerArguments):
         "daily": lambda: DailyParams(
             audio_in_enabled=True,
             audio_out_enabled=True,
-            vad_analyzer=SileroVADAnalyzer(),
         ),
         "webrtc": lambda: TransportParams(
             audio_in_enabled=True,
             audio_out_enabled=True,
-            vad_analyzer=SileroVADAnalyzer(),
         ),
     }
 

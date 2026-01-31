@@ -10,14 +10,17 @@ import numpy as np
 from dotenv import load_dotenv
 from loguru import logger
 from pipecat.audio.vad.silero import SileroVADAnalyzer
+from pipecat.audio.vad.vad_analyzer import VADParams
 from pipecat.frames.frames import Frame, InputImageRawFrame, LLMRunFrame, OutputImageRawFrame
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineParams, PipelineTask
 from pipecat.processors.aggregators.llm_context import LLMContext
-from pipecat.processors.aggregators.llm_response_universal import LLMContextAggregatorPair
+from pipecat.processors.aggregators.llm_response_universal import (
+    LLMContextAggregatorPair,
+    LLMUserAggregatorParams,
+)
 from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
-from pipecat.processors.frameworks.rtvi import RTVIObserver, RTVIProcessor
 from pipecat.services.google.gemini_live.llm import GeminiLiveLLMService
 from pipecat.transports.base_transport import TransportParams
 from pipecat.transports.smallwebrtc.transport import SmallWebRTCTransport
@@ -78,7 +81,6 @@ async def run_bot(webrtc_connection):
         video_in_enabled=True,
         video_out_enabled=True,
         video_out_is_live=True,
-        vad_analyzer=SileroVADAnalyzer(),
     )
 
     pipecat_transport = SmallWebRTCTransport(
@@ -88,7 +90,6 @@ async def run_bot(webrtc_connection):
     llm = GeminiLiveLLMService(
         api_key=os.getenv("GOOGLE_API_KEY"),
         voice_id="Puck",  # Aoede, Charon, Fenrir, Kore, Puck
-        transcribe_user_audio=True,
         system_instruction=SYSTEM_INSTRUCTION,
     )
 
@@ -100,22 +101,23 @@ async def run_bot(webrtc_connection):
     ]
 
     context = LLMContext(messages)
-    context_aggregator = LLMContextAggregatorPair(context)
-
-    # RTVI events for Pipecat client UI
-    rtvi = RTVIProcessor()
+    user_aggregator, assistant_aggregator = LLMContextAggregatorPair(
+        context,
+        user_params=LLMUserAggregatorParams(
+            vad_analyzer=SileroVADAnalyzer(params=VADParams(stop_secs=0.2)),
+        ),
+    )
 
     pipeline = Pipeline(
         [
             pipecat_transport.input(),
-            context_aggregator.user(),
-            rtvi,
+            user_aggregator,
             llm,  # LLM
             EdgeDetectionProcessor(
                 transport_params.video_out_width, transport_params.video_out_height
             ),  # Sending the video back to the user
             pipecat_transport.output(),
-            context_aggregator.assistant(),
+            assistant_aggregator,
         ]
     )
 
@@ -125,13 +127,11 @@ async def run_bot(webrtc_connection):
             enable_metrics=True,
             enable_usage_metrics=True,
         ),
-        observers=[RTVIObserver(rtvi)],
     )
 
-    @rtvi.event_handler("on_client_ready")
+    @task.rtvi.event_handler("on_client_ready")
     async def on_client_ready(rtvi):
         logger.info("Pipecat client ready.")
-        await rtvi.set_bot_ready()
         # Kick off the conversation.
         await task.queue_frames([LLMRunFrame()])
 
