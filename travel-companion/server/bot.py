@@ -33,7 +33,7 @@ from pipecat.processors.aggregators.llm_response_universal import (
     LLMContextAggregatorPair,
     LLMUserAggregatorParams,
 )
-from pipecat.processors.frameworks.rtvi import RTVIObserver, RTVIProcessor
+from pipecat.processors.frameworks.rtvi import RTVIProcessor
 from pipecat.runner.types import RunnerArguments
 from pipecat.runner.utils import create_transport
 from pipecat.services.google.gemini_live.llm import GeminiLiveLLMService
@@ -142,9 +142,8 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
         ),
     )
 
-    #
-    # RTVI events for Pipecat client UI
-    #
+    # RTVI processor for Pipecat client UI
+    # Created separately so we can register function calls before task creation
     rtvi = RTVIProcessor()
 
     # Registering the functions to be invoked by RTVI
@@ -153,7 +152,6 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     pipeline = Pipeline(
         [
             transport.input(),
-            rtvi,
             user_aggregator,
             llm,
             transport.output(),
@@ -167,16 +165,12 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
             enable_metrics=True,
             enable_usage_metrics=True,
         ),
-        # TODO: Remove this once exposing RTVI instance is supported via
-        # the built-in RTVI processor.
-        enable_rtvi=False,
-        observers=[RTVIObserver(rtvi)],
+        rtvi_processor=rtvi,
     )
 
-    @rtvi.event_handler("on_client_ready")
+    @task.rtvi.event_handler("on_client_ready")
     async def on_client_ready(rtvi):
-        await rtvi.set_bot_ready()
-        # Kick off the conversation
+        # Kick off the conversation (set_bot_ready is called automatically)
         await task.queue_frames([LLMRunFrame()])
 
     @transport.event_handler("on_client_disconnected")
@@ -184,7 +178,7 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
         logger.info(f"Client disconnected")
         await task.cancel()
 
-    @rtvi.event_handler("on_client_message")
+    @task.rtvi.event_handler("on_client_message")
     async def on_client_message(rtvi, msg):
         print("RTVI client message:", msg.type, msg.data)
         # Sample message to show how it works
