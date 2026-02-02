@@ -61,7 +61,6 @@ Ready to explore more? These are two of the most useful examples for common use 
 ### **Multimodal & Creative**
 
 - **[storytelling-chatbot](storytelling-chatbot/)** - Interactive storytelling experiences
-- **[news-chatbot](news-chatbot/)** - AI news reader and discussion bot
 
 ### **Translation & Localization**
 
