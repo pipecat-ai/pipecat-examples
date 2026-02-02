@@ -10,6 +10,9 @@ dependencies = [
     "pipecat-ai[google,silero,webrtc]>=0.0.101",
 ]
 
+[tool.setuptools]
+py-modules = ["server", "bot"]
+
 [dependency-groups]
 dev = [
     "pyright>=1.1.404,<2",
