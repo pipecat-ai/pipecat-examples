@@ -10,11 +10,16 @@ RUN apt-get update && apt-get install -y \
     libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
+COPY pyproject.toml ./
+
+# Upgrade pip and install build tooling
+RUN pip install --upgrade pip setuptools wheel
+
+# Install the project and its dependencies
+RUN pip install --no-cache-dir .
+
 # Copy the current directory contents into the container
 COPY . .
-
-# Install any needed packages specified in requirements.txt
-RUN pip install --no-cache-dir -r requirements.txt
 
 # Expose the desired port
 EXPOSE 7860
