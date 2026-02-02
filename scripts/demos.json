@@ -113,11 +113,6 @@
     "skipReason": "requires local audio device"
   },
   {
-    "path": "news-chatbot/server",
-    "runCommand": "uv run server.py",
-    "skip": false
-  },
-  {
     "path": "open-telemetry/jaeger",
     "runCommand": "uv run bot.py",
     "skip": false
