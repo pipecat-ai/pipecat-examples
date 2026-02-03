@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2024–2025, Daily
+# Copyright (c) 2024–2026, Daily
 #
 # SPDX-License-Identifier: BSD 2-Clause License
 #
@@ -33,7 +33,6 @@ from pipecat.processors.aggregators.llm_response_universal import (
     LLMContextAggregatorPair,
     LLMUserAggregatorParams,
 )
-from pipecat.processors.frameworks.rtvi import RTVIProcessor
 from pipecat.runner.types import RunnerArguments
 from pipecat.runner.utils import create_transport
 from pipecat.services.google.gemini_live.llm import GeminiLiveLLMService
@@ -100,7 +99,7 @@ You are a travel companion, and your responses will be converted to audio, so ke
 You can:
 - Use get_my_current_location to determine the user's current location. Once retrieved, inform the user of the city they are in, rather than providing coordinates.
 - Use google_search to check the weather and share it with the user. Describe the temperature in Celsius and Fahrenheit.
-- Use google_search to recommend restaurants that are nearby to the user's location, less than 10km. 
+- Use google_search to recommend restaurants that are nearby to the user's location, less than 10km.
 - Use set_restaurant_location to share the location of a selected restaurant with the user. Also check on google_search first for the precise location.
 - Use google_search to provide recent and relevant news from the user's current location.
 
@@ -142,13 +141,6 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
         ),
     )
 
-    # RTVI processor for Pipecat client UI
-    # Created separately so we can register function calls before task creation
-    rtvi = RTVIProcessor()
-
-    # Registering the functions to be invoked by RTVI
-    llm.register_function(None, rtvi.handle_function_call)
-
     pipeline = Pipeline(
         [
             transport.input(),
@@ -165,18 +157,15 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
             enable_metrics=True,
             enable_usage_metrics=True,
         ),
-        rtvi_processor=rtvi,
     )
+
+    # Registering the functions to be invoked by RTVI
+    llm.register_function(None, task.rtvi.handle_function_call)
 
     @task.rtvi.event_handler("on_client_ready")
     async def on_client_ready(rtvi):
-        # Kick off the conversation (set_bot_ready is called automatically)
+        # Kick off the conversation
         await task.queue_frames([LLMRunFrame()])
-
-    @transport.event_handler("on_client_disconnected")
-    async def on_client_disconnected(transport, client):
-        logger.info(f"Client disconnected")
-        await task.cancel()
 
     @task.rtvi.event_handler("on_client_message")
     async def on_client_message(rtvi, msg):
@@ -184,6 +173,11 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
         # Sample message to show how it works
         if msg.type == "get-llm-vendor":
             await rtvi.send_server_response(msg, "Google")
+
+    @transport.event_handler("on_client_disconnected")
+    async def on_client_disconnected(transport, client):
+        logger.info(f"Client disconnected")
+        await task.cancel()
 
     runner = PipelineRunner(handle_sigint=False)
 
