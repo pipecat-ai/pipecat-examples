@@ -1,8 +1,10 @@
 #
-# Copyright (c) 2024-2025, Daily
+# Copyright (c) 2024-2026, Daily
 #
 # SPDX-License-Identifier: BSD 2-Clause License
 #
+
+# pyright: reportUnusedFunction=false
 
 """Daily PSTN Warm Transfer Bot.
 
@@ -20,10 +22,10 @@ import sys
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
+from typing import Any
 
 from dotenv import load_dotenv
 from loguru import logger
-from pipecat.adapters.schemas.function_schema import FunctionSchema
 from pipecat.adapters.schemas.tools_schema import ToolsSchema
 from pipecat.audio.mixers.soundfile_mixer import SoundfileMixer
 from pipecat.audio.turn.smart_turn.local_smart_turn_v3 import LocalSmartTurnAnalyzerV3
@@ -32,7 +34,6 @@ from pipecat.audio.vad.vad_analyzer import VADParams
 from pipecat.frames.frames import (
     BotStoppedSpeakingFrame,
     ControlFrame,
-    EndFrame,
     EndTaskFrame,
     Frame,
     InputAudioRawFrame,
@@ -40,15 +41,13 @@ from pipecat.frames.frames import (
     LLMMessagesAppendFrame,
     LLMRunFrame,
     MixerEnableFrame,
-    OutputAudioRawFrame,
     STTMuteFrame,
-    TTSAudioRawFrame,
     UserStartedSpeakingFrame,
 )
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineParams, PipelineTask
-from pipecat.processors.aggregators.llm_context import LLMContext
+from pipecat.processors.aggregators.llm_context import LLMContext, LLMContextMessage
 from pipecat.processors.aggregators.llm_response_universal import (
     LLMContextAggregatorPair,
     LLMUserAggregatorParams,
@@ -59,7 +58,6 @@ from pipecat.services.cartesia.tts import CartesiaTTSService
 from pipecat.services.deepgram.stt import DeepgramSTTService
 from pipecat.services.llm_service import FunctionCallParams
 from pipecat.services.openai.llm import OpenAILLMService
-from pipecat.transports.base_transport import BaseTransport
 from pipecat.transports.daily.transport import DailyDialinSettings, DailyParams, DailyTransport
 from pipecat.turns.user_stop import TurnAnalyzerUserTurnStopStrategy
 from pipecat.turns.user_turn_strategies import UserTurnStrategies
@@ -68,7 +66,12 @@ from models import AgentRequest, TransferTarget, WarmTransferConfig
 
 load_dotenv(override=True)
 
-logger.remove(0)
+# Remove default handler if it exists (may not exist on Pipecat Cloud)
+try:
+    logger.remove(0)
+except ValueError:
+    # Handler with ID 0 does not exist (e.g., on Pipecat Cloud); safe to ignore.
+    pass
 logger.add(sys.stderr, level="DEBUG")
 
 
@@ -103,6 +106,34 @@ class StartTransferFrame(ControlFrame):
     summary: str
 
 
+@dataclass
+class DialoutAnsweredFrame(ControlFrame):
+    """Agent answered the dialout call."""
+
+    pass
+
+
+@dataclass
+class DialoutStoppedFrame(ControlFrame):
+    """Dialout stopped - agent hung up or call failed."""
+
+    pass
+
+
+@dataclass
+class DialoutErrorFrame(ControlFrame):
+    """Dialout error occurred."""
+
+    pass
+
+
+@dataclass
+class ParticipantLeftFrame(ControlFrame):
+    """A participant left the call."""
+
+    pass
+
+
 # ------------ FRAME PROCESSORS ------------
 
 
@@ -113,11 +144,11 @@ class CustomerHoldGate(FrameProcessor):
     When on hold, suppresses customer audio input and mutes STT.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
         self._on_hold = False
 
-    async def process_frame(self, frame: Frame, direction: FrameDirection):
+    async def process_frame(self, frame: Frame, direction: FrameDirection) -> None:
         await super().process_frame(frame, direction)
 
         # Listen for hold control frame
@@ -144,54 +175,28 @@ class CustomerHoldGate(FrameProcessor):
         await self.push_frame(frame, direction)
 
 
-class BotAudioGate(FrameProcessor):
-    """Routes bot audio output when on hold.
-
-    Listens for CustomerHoldFrame to toggle hold state.
-    When on hold, routes bot audio to agent track only and enables hold music.
-    """
-
-    def __init__(self):
-        super().__init__()
-        self._on_hold = False
-
-    async def process_frame(self, frame: Frame, direction: FrameDirection):
-        await super().process_frame(frame, direction)
-
-        # Listen for hold control frame
-        if isinstance(frame, CustomerHoldFrame):
-            self._on_hold = frame.on_hold
-            # Control hold music mixer
-            await self.push_frame(MixerEnableFrame(frame.on_hold))
-            await self.push_frame(frame, direction)
-            return
-
-        # When on hold, route bot audio to agent track only
-        if self._on_hold and isinstance(frame, (TTSAudioRawFrame, OutputAudioRawFrame)):
-            frame.transport_destination = "agent"
-
-        await self.push_frame(frame, direction)
-
-
 class TransferCoordinator(FrameProcessor):
     """Coordinates the warm transfer flow using frame-based control.
 
-    Listens for StartTransferFrame to begin transfer, waits for
-    BotStoppedSpeakingFrame to know when hold message is complete,
-    then activates hold and dials the agent.
+    All transfer state management happens here via frames:
+    - StartTransferFrame: Begin transfer, wait for hold message to finish
+    - BotStoppedSpeakingFrame: Hold message done, activate hold and dial agent
+    - DialoutAnsweredFrame: Agent answered, connect customer
+    - DialoutStoppedFrame: Agent hung up or call failed
+    - DialoutErrorFrame: Dialout error, return to customer
+    - ParticipantLeftFrame: Participant left, end call if customer
     """
 
-    def __init__(self, transport: BaseTransport, config: WarmTransferConfig):
+    def __init__(self, transport: DailyTransport, config: WarmTransferConfig) -> None:
         super().__init__()
         self._transport = transport
         self._config = config
         self._state = TransferState.TALKING_TO_CUSTOMER
         self._awaiting_hold_message_completion = False
-        self._awaiting_briefing_completion = False
         self._transfer_target: TransferTarget | None = None
         self._transfer_summary: str | None = None
 
-    async def process_frame(self, frame: Frame, direction: FrameDirection):
+    async def process_frame(self, frame: Frame, direction: FrameDirection) -> None:
         await super().process_frame(frame, direction)
 
         # Listen for transfer initiation
@@ -213,57 +218,85 @@ class TransferCoordinator(FrameProcessor):
             self._awaiting_hold_message_completion = False
             logger.info("Hold message complete, activating hold and dialing agent")
 
-            # Push CustomerHoldFrame to activate hold (processed by other gates)
-            await self.push_frame(CustomerHoldFrame(on_hold=True))
+            # Enable hold music
+            await self.push_frame(MixerEnableFrame(True))
+
+            # Push CustomerHoldFrame UPSTREAM to reach CustomerHoldGate
+            await self.push_frame(CustomerHoldFrame(on_hold=True), FrameDirection.UPSTREAM)
 
             # Dial the agent
             if self._transfer_target:
                 dialout_params = {"phoneNumber": self._transfer_target.phone_number}
                 logger.info(f"Dialing agent: {self._transfer_target.phone_number}")
-                await self._transport.start_dialout(dialout_params)
+                try:
+                    await self._transport.start_dialout(dialout_params)
+                except Exception as e:
+                    logger.error(f"Failed to start dialout: {e}")
+                    await self._handle_dialout_error()
 
-        # Detect when agent briefing finishes speaking
-        if (
-            self._awaiting_briefing_completion
-            and isinstance(frame, BotStoppedSpeakingFrame)
-            and self._state == TransferState.TALKING_TO_AGENT
-        ):
-            self._awaiting_briefing_completion = False
-            logger.info("Agent briefing complete, connecting customer")
-
-            # Take customer off hold
-            await self.push_frame(CustomerHoldFrame(on_hold=False))
+        # Agent answered the dialout call
+        elif isinstance(frame, DialoutAnsweredFrame):
+            logger.info("Agent answered, connecting customer")
             self._state = TransferState.CONNECTED
+
+            # Take customer off hold (hold music already stopped in on_dialout_connected)
+            await self.push_frame(CustomerHoldFrame(on_hold=False), FrameDirection.UPSTREAM)
+
+            # Brief the agent (customer will also hear this)
+            briefing = (
+                "A customer is on hold waiting to speak with you. "
+                f"Here's what they need help with:\n\n{self._transfer_summary}\n\n"
+                f"{self._config.transfer_messages.connecting_message}"
+            )
+            message = {"role": "system", "content": briefing}
+            await self.push_frame(
+                LLMMessagesAppendFrame([message], run_llm=True), FrameDirection.UPSTREAM
+            )
+            return
+
+        # Dialout stopped - could be success (agent hung up) or failure
+        elif isinstance(frame, DialoutStoppedFrame):
+            if self._state == TransferState.CONNECTED:
+                logger.info("Agent hung up after successful transfer, ending call")
+                await self.push_frame(EndTaskFrame(), FrameDirection.UPSTREAM)
+            else:
+                logger.info("Dialout failed before agent answered, returning to customer")
+                await self._handle_dialout_error()
+            return
+
+        # Dialout error
+        elif isinstance(frame, DialoutErrorFrame):
+            await self._handle_dialout_error()
+            return
+
+        # Participant left
+        elif isinstance(frame, ParticipantLeftFrame):
+            if self._state == TransferState.TALKING_TO_CUSTOMER:
+                logger.info("Customer left, ending call")
+                await self.push_frame(EndTaskFrame(), FrameDirection.UPSTREAM)
+            return
 
         await self.push_frame(frame, direction)
 
-    async def handle_dialout_answered(self, task: PipelineTask):
-        """Called when agent answers the call."""
-        logger.info("Agent answered, briefing them on customer issue")
-        self._state = TransferState.TALKING_TO_AGENT
-        self._awaiting_briefing_completion = True
-
-        # Brief the agent
-        briefing = f"""A customer is on hold waiting to speak with you. Here's what they need help with:
-
-{self._transfer_summary}
-
-{self._config.transfer_messages.connecting_message}"""
-
-        message = {"role": "system", "content": briefing}
-        await task.queue_frames([LLMMessagesAppendFrame([message], run_llm=True)])
-
-    async def handle_dialout_error(self, task: PipelineTask):
-        """Called when dialout fails."""
+    async def _handle_dialout_error(self):
+        """Handle dialout failure - return to customer."""
         logger.error("Dialout failed, returning to customer")
         self._state = TransferState.TRANSFER_FAILED
 
+        # Disable hold music
+        await self.push_frame(MixerEnableFrame(False))
+
         # Take customer off hold
-        await self.push_frame(CustomerHoldFrame(on_hold=False))
+        await self.push_frame(CustomerHoldFrame(on_hold=False), FrameDirection.UPSTREAM)
 
         # Notify customer
-        message = {"role": "system", "content": self._config.transfer_messages.transfer_failed_message}
-        await task.queue_frames([LLMMessagesAppendFrame([message], run_llm=True)])
+        message = {
+            "role": "system",
+            "content": self._config.transfer_messages.transfer_failed_message,
+        }
+        await self.push_frame(
+            LLMMessagesAppendFrame([message], run_llm=True), FrameDirection.UPSTREAM
+        )
 
         # Reset for potential retry
         self._state = TransferState.TALKING_TO_CUSTOMER
@@ -315,61 +348,23 @@ When you call `initiate_warm_transfer`:
 """
 
 
-# ------------ FUNCTION HANDLERS ------------
-
-
-async def terminate_call(params: FunctionCallParams):
-    """Function the bot can call to terminate the call."""
-    await params.llm.queue_frame(EndTaskFrame(), FrameDirection.UPSTREAM)
-
-
-async def initiate_warm_transfer(
-    transport: BaseTransport,
-    task: PipelineTask,
-    config: WarmTransferConfig,
-    transfer_coordinator: TransferCoordinator,
-    params: FunctionCallParams,
-):
-    """Function the bot can call to initiate a warm transfer."""
-    target_name = params.arguments.get("target_name", "")
-    summary = params.arguments.get("summary", "")
-
-    # Find the target
-    target = next(
-        (t for t in config.transfer_targets if t.name.lower() == target_name.lower()),
-        None,
-    )
-
-    if not target:
-        # Target not found - inform bot
-        available = ", ".join(t.name for t in config.transfer_targets)
-        message = {
-            "role": "system",
-            "content": f"Transfer target '{target_name}' not found. Available targets are: {available}. Please try again with a valid target name.",
-        }
-        await params.llm.push_frame(LLMMessagesAppendFrame([message], run_llm=True))
-        return
-
-    logger.info(f"Initiating warm transfer to {target.name}")
-
-    # Speak hold message to customer
-    hold_message = {"role": "system", "content": config.transfer_messages.hold_message}
-    await params.llm.push_frame(LLMMessagesAppendFrame([hold_message], run_llm=True))
-
-    # Push StartTransferFrame to begin the transfer flow
-    # TransferCoordinator will handle the rest after BotStoppedSpeakingFrame
-    await task.queue_frames([StartTransferFrame(target=target, summary=summary)])
-
-
 # ------------ MAIN BOT LOGIC ------------
 
 
-async def run_bot(transport: BaseTransport, config: WarmTransferConfig, handle_sigint: bool) -> None:
-    """Run the warm transfer voice bot."""
+async def run_bot(
+    transport: DailyTransport, config: WarmTransferConfig, handle_sigint: bool
+) -> None:
+    """Run the warm transfer voice bot.
+
+    Participant join order:
+    1. Bot joins first
+    2. Customer joins second (triggers on_first_participant_joined)
+    3. Agent joins third via dialout (triggers on_participant_joined after dialout)
+    """
 
     # ------------ SERVICES ------------
 
-    stt = DeepgramSTTService(api_key=os.getenv("DEEPGRAM_API_KEY"))
+    stt = DeepgramSTTService(api_key=os.getenv("DEEPGRAM_API_KEY", ""))
 
     tts = CartesiaTTSService(
         api_key=os.getenv("CARTESIA_API_KEY", ""),
@@ -382,34 +377,51 @@ async def run_bot(transport: BaseTransport, config: WarmTransferConfig, handle_s
 
     system_instruction = build_system_prompt(config)
 
-    messages = [{"role": "system", "content": system_instruction}]
+    messages: list[LLMContextMessage] = [{"role": "system", "content": system_instruction}]
 
-    # ------------ FUNCTION DEFINITIONS ------------
+    # ------------ DIRECT FUNCTIONS ------------
+    # Functions are defined here to access transport, config, etc. via closure
 
-    terminate_call_function = FunctionSchema(
-        name="terminate_call",
-        description="Call this function to terminate the call when the customer is done.",
-        properties={},
-        required=[],
-    )
+    async def terminate_call(params: FunctionCallParams, **kwargs: Any) -> None:
+        """Terminate the call when the customer is done or says goodbye."""
+        await params.llm.queue_frame(EndTaskFrame(), FrameDirection.UPSTREAM)
 
-    initiate_warm_transfer_function = FunctionSchema(
-        name="initiate_warm_transfer",
-        description="Call this function to initiate a warm transfer to connect the customer with a specialist.",
-        properties={
-            "target_name": {
-                "type": "string",
-                "description": "The name of the team to transfer to (e.g., 'Sales Team', 'Support Team')",
-            },
-            "summary": {
-                "type": "string",
-                "description": "A brief 2-3 sentence summary of what the customer needs help with",
-            },
-        },
-        required=["target_name", "summary"],
-    )
+    async def initiate_warm_transfer(
+        params: FunctionCallParams, target_name: str, summary: str, **kwargs: Any
+    ) -> None:
+        """Initiate a warm transfer to connect the customer with a specialist.
 
-    tools = ToolsSchema(standard_tools=[terminate_call_function, initiate_warm_transfer_function])
+        Args:
+            target_name (str): The name of the team to transfer to (e.g., 'Sales Team', 'Support Team').
+            summary (str): A brief 2-3 sentence summary of what the customer needs help with.
+        """
+        # Find the target
+        target = next(
+            (t for t in config.transfer_targets if t.name.lower() == target_name.lower()),
+            None,
+        )
+
+        if not target:
+            # Target not found - inform bot
+            available = ", ".join(t.name for t in config.transfer_targets)
+            message = {
+                "role": "system",
+                "content": f"Transfer target '{target_name}' not found. Available targets are: {available}. Please try again with a valid target name.",
+            }
+            await params.llm.push_frame(LLMMessagesAppendFrame([message], run_llm=True))
+            return
+
+        logger.info(f"Initiating warm transfer to {target.name}")
+
+        # Speak hold message to customer
+        hold_message = {"role": "system", "content": config.transfer_messages.hold_message}
+        await params.llm.push_frame(LLMMessagesAppendFrame([hold_message], run_llm=True))
+
+        # Push StartTransferFrame to begin the transfer flow
+        # TransferCoordinator will handle the rest after BotStoppedSpeakingFrame
+        await params.llm.push_frame(StartTransferFrame(target=target, summary=summary))
+
+    tools = ToolsSchema(standard_tools=[terminate_call, initiate_warm_transfer])
 
     # Initialize LLM context and aggregator
     context = LLMContext(messages, tools)
@@ -426,7 +438,6 @@ async def run_bot(transport: BaseTransport, config: WarmTransferConfig, handle_s
     # ------------ PROCESSORS ------------
 
     customer_hold_gate = CustomerHoldGate()
-    bot_audio_gate = BotAudioGate()
     transfer_coordinator = TransferCoordinator(transport, config)
 
     # ------------ PIPELINE SETUP ------------
@@ -439,7 +450,6 @@ async def run_bot(transport: BaseTransport, config: WarmTransferConfig, handle_s
             user_aggregator,
             llm,
             tts,
-            bot_audio_gate,
             transfer_coordinator,
             transport.output(),
             assistant_aggregator,
@@ -458,34 +468,46 @@ async def run_bot(transport: BaseTransport, config: WarmTransferConfig, handle_s
 
     # ------------ REGISTER FUNCTIONS ------------
 
-    llm.register_function("terminate_call", terminate_call)
-    llm.register_function(
-        "initiate_warm_transfer",
-        lambda params: initiate_warm_transfer(transport, task, config, transfer_coordinator, params),
-    )
+    llm.register_direct_function(terminate_call)
+    llm.register_direct_function(initiate_warm_transfer)
 
     # ------------ EVENT HANDLERS ------------
 
     @transport.event_handler("on_first_participant_joined")
-    async def on_first_participant_joined(transport, participant):
+    async def on_first_participant_joined(transport, participant) -> None:
+        # First participant after bot is always the customer
         logger.info(f"Customer joined: {participant.get('id')}")
         await task.queue_frames([LLMRunFrame()])
 
+    @transport.event_handler("on_dialout_connected")
+    async def on_dialout_connected(transport, data) -> None:
+        logger.info(f"Dialout connected (ringing): {data}")
+        # Stop hold music so customer hears the ringing
+        await task.queue_frame(MixerEnableFrame(False))
+
     @transport.event_handler("on_dialout_answered")
-    async def on_dialout_answered(transport, data):
+    async def on_dialout_answered(transport, data) -> None:
         logger.info(f"Dialout answered: {data}")
-        await transfer_coordinator.handle_dialout_answered(task)
+        await task.queue_frame(DialoutAnsweredFrame())
+
+    @transport.event_handler("on_dialout_stopped")
+    async def on_dialout_stopped(transport, data) -> None:
+        logger.info(f"Dialout stopped: {data}")
+        await task.queue_frame(DialoutStoppedFrame())
 
     @transport.event_handler("on_dialout_error")
-    async def on_dialout_error(transport, data):
+    async def on_dialout_error(transport, data) -> None:
         logger.error(f"Dialout error: {data}")
-        await transfer_coordinator.handle_dialout_error(task)
+        await task.queue_frame(DialoutErrorFrame())
+
+    @transport.event_handler("on_participant_joined")
+    async def on_participant_joined(transport, participant) -> None:
+        logger.info(f"Participant joined: {participant.get('id')}")
 
     @transport.event_handler("on_participant_left")
-    async def on_participant_left(transport, participant, reason):
-        logger.info(f"Participant left: {participant}, reason: {reason}")
-        # If customer leaves, end the call
-        await task.cancel()
+    async def on_participant_left(transport, participant, reason) -> None:
+        logger.info(f"Participant left: {participant.get('id')}, reason: {reason}")
+        await task.queue_frame(ParticipantLeftFrame())
 
     # ------------ RUN PIPELINE ------------
 
@@ -493,41 +515,77 @@ async def run_bot(transport: BaseTransport, config: WarmTransferConfig, handle_s
     await runner.run(task)
 
 
-async def bot(runner_args: RunnerArguments):
+async def bot(runner_args: RunnerArguments) -> None:
     """Main bot entry point compatible with Pipecat Cloud."""
     try:
-        request = AgentRequest.model_validate(runner_args.body)
+        # runner_args can be DailyRunnerArguments (local) or PipecatSessionArguments (cloud)
+        body = runner_args.body
+        logger.debug(f"Runner args body: {body}")
+        request = AgentRequest.model_validate(body)
+        logger.debug(f"Parsed callId: {request.callId}, callDomain: {request.callDomain}")
 
         # Get hold music file path
         hold_music_path = Path(__file__).parent / "hold_music.wav"
 
-        # Initialize hold music mixer
-        hold_music_mixer = SoundfileMixer(
-            sound_files={"hold": str(hold_music_path)},
-            default_sound="hold",
-            volume=0.5,
-            loop=True,
+        # Initialize hold music mixer (optional - skip if file doesn't exist)
+        hold_music_mixer = None
+        if hold_music_path.exists():
+            hold_music_mixer = SoundfileMixer(
+                sound_files={"hold": str(hold_music_path)},
+                default_sound="hold",
+                volume=0.5,
+                mixing=False,
+                loop=True,
+            )
+        else:
+            logger.warning(
+                f"Hold music file not found: {hold_music_path}. Continuing without hold music."
+            )
+
+        # Build DailyParams based on whether we have PSTN dialin settings
+        # Note: Don't set audio_out_destinations here - we route specific audio
+        # to "agent" track in BotAudioGate when briefing the agent during transfer
+        daily_params = DailyParams(
+            api_key=os.getenv("DAILY_API_KEY", ""),
+            audio_in_enabled=True,
+            audio_out_enabled=True,
+            audio_out_mixer=hold_music_mixer,
         )
 
-        daily_dialin_settings = DailyDialinSettings(
-            call_id=request.callId, call_domain=request.callDomain
-        )
+        # Add dialin settings if available (PSTN mode)
+        if request.callId and request.callDomain:
+            logger.info(
+                f"Setting dialin_settings: call_id={request.callId}, call_domain={request.callDomain}"
+            )
+            daily_params.dialin_settings = DailyDialinSettings(
+                call_id=request.callId, call_domain=request.callDomain
+            )
+        else:
+            logger.warning(
+                f"No dialin settings - callId={request.callId}, callDomain={request.callDomain}"
+            )
+
+        # Get room_url/token from body (works for both local and Pipecat Cloud)
+        room_url = request.room_url
+        token = request.token
+
+        if not room_url:
+            raise ValueError("room_url is required in body")
 
         transport = DailyTransport(
-            request.room_url,
-            request.token,
+            room_url,
+            token,
             "Warm Transfer Bot",
-            params=DailyParams(
-                dialin_settings=daily_dialin_settings,
-                api_key=os.getenv("DAILY_API_KEY"),
-                audio_in_enabled=True,
-                audio_out_enabled=True,
-                audio_out_mixer=hold_music_mixer,
-                audio_out_destinations=["agent"],
-            ),
+            params=daily_params,
         )
 
-        await run_bot(transport, request.warm_transfer_config, runner_args.handle_sigint)
+        warm_transfer_config = request.warm_transfer_config or None
+        if not warm_transfer_config:
+            raise ValueError("warm_transfer_config is required in body")
+
+        # handle_sigint may not exist on PipecatSessionArguments, default to False
+        handle_sigint = getattr(runner_args, "handle_sigint", False)
+        await run_bot(transport, warm_transfer_config, handle_sigint)
 
     except Exception as e:
         logger.error(f"Error running bot: {e}")

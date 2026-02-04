@@ -74,18 +74,29 @@ This example uses:
    # Edit .env with your API keys
    ```
 
-3. Add a hold music file:
+3. Buy a phone number:
 
-   Place a mono WAV file named `hold_music.wav` in this directory. The file should be:
-   - Mono (single channel)
-   - Any sample rate (will be resampled automatically)
-   - Royalty-free for your use case
+   First, list available numbers (e.g., in California):
 
-4. Buy a phone number:
+   ```bash
+   curl --request GET \
+     --url 'https://api.daily.co/v1/list-available-numbers?region=CA' \
+     --header "Authorization: Bearer $DAILY_API_KEY"
+   ```
 
-   See [Daily docs on purchasing phone numbers](https://docs.daily.co/reference/rest-api/phone-numbers/buy-phone-number).
+   Then purchase your chosen number:
 
-5. Set up the dial-in config:
+   ```bash
+   curl --request POST \
+     --url 'https://api.daily.co/v1/buy-phone-number' \
+     --header "Authorization: Bearer $DAILY_API_KEY" \
+     --header 'Content-Type: application/json' \
+     --data '{"number": "+1XXXXXXXXXX"}'
+   ```
+
+   See [Daily docs on purchasing phone numbers](https://docs.daily.co/reference/rest-api/phone-numbers) for more options.
+
+4. Set up the dial-in config:
 
    See [Daily docs on domain dial-in config](https://docs.daily.co/reference/rest-api/domainDialinConfig).
 
@@ -103,7 +114,7 @@ The bot supports two deployment modes controlled by the `ENV` variable:
 ### Production (`ENV=production`)
 
 - Bot is deployed to Pipecat Cloud
-- Requires `PIPECAT_API_KEY` and `PIPECAT_AGENT_NAME`
+- Requires `PIPECAT_CLOUD_API_KEY` and `PIPECAT_AGENT_NAME`
 
 ## Run the Bot Locally
 
@@ -164,25 +175,24 @@ If `warm_transfer_config` is not provided, the bot uses default targets from env
 
 ### Deploy to Pipecat Cloud
 
-1. Install the Pipecat CLI:
-
-   ```bash
-   pip install pipecat-ai-cli
-   ```
-
-2. Deploy your bot:
-
-   ```bash
-   pcc deploy
-   ```
-
-3. Set environment variables for production:
+1. Set environment variables for production:
 
    ```bash
    ENV=production
-   PIPECAT_API_KEY=your_pipecat_cloud_api_key
+   PIPECAT_CLOUD_PRIVATE_API_KEY=sk_your_private_key
+   PIPECAT_CLOUD_API_KEY=pk_your_public_key
    PIPECAT_AGENT_NAME=daily-pstn-warm-transfer
    ```
+
+2. Deploy your agent
+
+   ```bash
+   pipecat cloud secrets set -f .env daily-pstn-secrets
+   pipecat cloud docker build-push
+   pipecat cloud deploy
+   ```
+
+
 
 ### Deploy the Server
 
@@ -217,11 +227,6 @@ A warm transfer differs from a cold transfer:
 If the specialist doesn't answer, the bot returns to the customer with an apology.
 
 ## Troubleshooting
-
-### Customer doesn't hear hold music
-
-- Ensure `hold_music.wav` exists and is a valid mono WAV file
-- Check that the SoundfileMixer is properly initialized
 
 ### Transfer fails immediately
 

@@ -57,6 +57,24 @@ class WarmTransferConfig(BaseModel):
     transfer_messages: TransferMessages = TransferMessages()
 
 
+def default_transfer_config() -> WarmTransferConfig:
+    """Create default transfer config for local testing."""
+    return WarmTransferConfig(
+        transfer_targets=[
+            TransferTarget(
+                name="Sales Team",
+                phone_number="+15551234567",
+                description="Handles sales inquiries, pricing, and new orders",
+            ),
+            TransferTarget(
+                name="Support Team",
+                phone_number="+15559876543",
+                description="Handles technical support and troubleshooting",
+            ),
+        ]
+    )
+
+
 class AgentRequest(BaseModel):
     """Request data sent to bot start endpoint.
 
@@ -70,10 +88,15 @@ class AgentRequest(BaseModel):
         warm_transfer_config: Configuration for warm transfer
     """
 
-    room_url: str
-    token: str
-    callId: str
-    callDomain: str
-    From: str
-    To: str
-    warm_transfer_config: WarmTransferConfig
+    room_url: str | None = None
+    token: str | None = None
+    callId: str | None = None
+    callDomain: str | None = None
+    From: str = "+15550001111"
+    To: str = "+15550002222"
+    warm_transfer_config: WarmTransferConfig | None = None
+
+    def __init__(self, **data):
+        if "warm_transfer_config" not in data or data.get("warm_transfer_config") is None:
+            data["warm_transfer_config"] = default_transfer_config()
+        super().__init__(**data)

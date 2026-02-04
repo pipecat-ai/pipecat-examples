@@ -28,6 +28,7 @@ from fastapi.responses import JSONResponse
 from loguru import logger
 from pipecat.runner.daily import configure
 from pipecat.runner.types import DailyRunnerArguments
+from pipecat.transports.daily.utils import DailyRoomProperties, DailyRoomSipParams
 
 from bot import bot as bot_function
 from models import TransferMessages, TransferTarget, WarmTransferConfig
@@ -83,6 +84,7 @@ async def handle_incoming_daily_webhook(request: Request) -> JSONResponse:
 
     try:
         data = await request.json()
+        logger.debug(f"Received webhook data: {data}")
 
         if not all(key in data for key in ["From", "To", "callId", "callDomain"]):
             raise HTTPException(
@@ -93,9 +95,17 @@ async def handle_incoming_daily_webhook(request: Request) -> JSONResponse:
         call_id = data.get("callId")
         logger.debug(f"Processing call with ID: {call_id} from {caller_phone}")
 
-        # Create a Daily room with dial-in capabilities
+        # Create a Daily room with dial-in and dial-out capabilities
         try:
-            room_details = await configure(request.app.state.session, sip_caller_phone=caller_phone)
+            # Include SIP configuration in room_properties to avoid parameter override
+            room_properties = DailyRoomProperties(
+                enable_dialout=True,
+                sip=DailyRoomSipParams(display_name=caller_phone),
+            )
+            room_details = await configure(
+                request.app.state.session,
+                room_properties=room_properties,
+            )
         except Exception as e:
             logger.error(f"Error creating Daily room: {e}")
             raise HTTPException(status_code=500, detail=f"Failed to create Daily room: {str(e)}")
@@ -122,20 +132,24 @@ async def handle_incoming_daily_webhook(request: Request) -> JSONResponse:
         try:
             environment = os.getenv("ENV", "local")
 
-            body_data = {
+            body_data: dict[str, object] = {
                 **data,
                 "room_url": room_url,
                 "token": token,
                 "warm_transfer_config": config.model_dump(),
             }
+            logger.debug(
+                f"Body data callId={body_data.get('callId')}, callDomain={body_data.get('callDomain')}"
+            )
 
             if environment == "production":
-                pipecat_api_key = os.getenv("PIPECAT_API_KEY")
+                pipecat_api_key = os.getenv("PIPECAT_CLOUD_API_KEY")
                 agent_name = os.getenv("PIPECAT_AGENT_NAME")
 
                 if not pipecat_api_key:
                     raise HTTPException(
-                        status_code=500, detail="PIPECAT_API_KEY required for production mode"
+                        status_code=500,
+                        detail="PIPECAT_CLOUD_API_KEY required for production mode",
                     )
 
                 logger.debug(f"Starting bot via Pipecat Cloud for call {call_id}")
@@ -179,17 +193,21 @@ async def handle_incoming_daily_webhook(request: Request) -> JSONResponse:
 
         except Exception as e:
             logger.error(f"Error starting bot: {e}")
+            if isinstance(e, HTTPException):
+                raise e
             raise HTTPException(status_code=500, detail=f"Failed to start bot: {str(e)}")
 
     except Exception as e:
         logger.error(f"Unexpected error: {str(e)}")
+        if isinstance(e, HTTPException):
+            raise e
         raise HTTPException(status_code=500, detail=f"Server error: {str(e)}")
 
     return JSONResponse({"room_url": room_url, "token": token})
 
 
 @app.post("/start_bot")
-async def start_bot_endpoint(request: Request):
+async def start_bot_endpoint(request: Request) -> dict[str, str]:
     """Start bot endpoint for local development.
 
     This endpoint mimics the Pipecat Cloud API pattern, receiving the same body data
@@ -218,8 +236,8 @@ async def start_bot_endpoint(request: Request):
             )
 
         runner_args = DailyRunnerArguments(
-            room_url=None,
-            token=None,
+            room_url=room_url,
+            token=token,
             body=body,
         )
         runner_args.handle_sigint = False
@@ -234,7 +252,7 @@ async def start_bot_endpoint(request: Request):
 
 
 @app.get("/health")
-async def health_check():
+async def health_check() -> dict[str, str]:
     """Health check endpoint.
 
     Returns:

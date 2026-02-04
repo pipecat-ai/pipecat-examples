@@ -154,6 +154,11 @@
     "skip": false
   },
   {
+    "path": "phone-chatbot/daily-pstn-warm-transfer",
+    "runCommand": "uv run server.py",
+    "skip": false
+  },
+  {
     "path": "phone-chatbot/daily-pstn-dial-in",
     "runCommand": "uv run bot.py -t daily --dialin",
     "skip": false

@@ -6,13 +6,17 @@ requires-python = ">=3.10"
 dependencies = [
     "pipecat-ai[daily,deepgram,cartesia,openai,silero,local-smart-turn-v3,runner,soundfile]>=0.0.101",
     "pipecat-ai-cli",
+    "loguru",
+    "uvicorn",
+    "aiohttp",
+    "fastapi",
+    "python-dotenv>=1.0.1,<2.0.0",
 ]
 
 [dependency-groups]
 dev = [
     "pre-commit~=4.2.0",
-    "ruff~=0.12.1",
-    "python-dotenv>=1.0.1,<2.0.0",
+    "ruff~=0.12.1"
 ]
 
 [tool.ruff]
