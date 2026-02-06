@@ -1,0 +1,9 @@
+[project]
+name = "daily-voice-client"
+version = "0.1.0"
+description = "Daily Voice Client bot"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "pipecat-ai[daily,google,silero,runner,local-smart-turn-v3]>=0.0.101"
+]
