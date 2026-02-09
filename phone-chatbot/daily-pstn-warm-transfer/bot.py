@@ -58,7 +58,7 @@ from pipecat.turns.user_mute.base_user_mute_strategy import BaseUserMuteStrategy
 from pipecat.turns.user_stop import TurnAnalyzerUserTurnStopStrategy
 from pipecat.turns.user_turn_strategies import UserTurnStrategies
 
-from models import AgentRequest, TransferTarget, WarmTransferConfig
+from server_utils import AgentRequest, TransferTarget, WarmTransferConfig
 
 load_dotenv(override=True)
 
@@ -343,8 +343,7 @@ async def run_bot(
 
     messages: list[LLMContextMessage] = [{"role": "system", "content": system_instruction}]
 
-    # ------------ DIRECT FUNCTIONS ------------
-    # Functions are defined here to access transport, config, etc. via closure
+    # ------------ REGISTER FUNCTIONS ------------
 
     async def terminate_call(params: FunctionCallParams, **kwargs: Any) -> None:
         """Terminate the call when the customer is done or says goodbye."""
@@ -403,8 +402,6 @@ async def run_bot(
             vad_analyzer=SileroVADAnalyzer(params=VADParams(stop_secs=0.2)),
         ),
     )
-
-    # ------------ PROCESSORS ------------
 
     transfer_coordinator = TransferCoordinator(transport, config)
 
@@ -471,87 +468,46 @@ async def run_bot(
         logger.info(f"Participant left: {participant.get('id')}, reason: {reason}")
         await task.queue_frame(ParticipantLeftFrame())
 
-    # ------------ RUN PIPELINE ------------
-
     runner = PipelineRunner(handle_sigint=handle_sigint)
     await runner.run(task)
 
 
+def _create_hold_music_mixer() -> SoundfileMixer | None:
+    """Create hold music mixer if the audio file exists."""
+    hold_music_path = Path(__file__).parent / "hold_music.wav"
+    if not hold_music_path.exists():
+        logger.warning(f"Hold music file not found: {hold_music_path}")
+        return None
+    return SoundfileMixer(
+        sound_files={"hold": str(hold_music_path)},
+        default_sound="hold",
+        volume=0.5,
+        mixing=False,
+        loop=True,
+    )
+
+
 async def bot(runner_args: RunnerArguments) -> None:
     """Main bot entry point compatible with Pipecat Cloud."""
-    try:
-        # runner_args can be DailyRunnerArguments (local) or PipecatSessionArguments (cloud)
-        body = runner_args.body
-        logger.debug(f"Runner args body: {body}")
-        request = AgentRequest.model_validate(body)
-        logger.debug(f"Parsed callId: {request.callId}, callDomain: {request.callDomain}")
+    request = AgentRequest.model_validate(runner_args.body)
 
-        # Get hold music file path
-        hold_music_path = Path(__file__).parent / "hold_music.wav"
-
-        # Initialize hold music mixer (optional - skip if file doesn't exist)
-        hold_music_mixer = None
-        if hold_music_path.exists():
-            hold_music_mixer = SoundfileMixer(
-                sound_files={"hold": str(hold_music_path)},
-                default_sound="hold",
-                volume=0.5,
-                mixing=False,
-                loop=True,
-            )
-        else:
-            logger.warning(
-                f"Hold music file not found: {hold_music_path}. Continuing without hold music."
-            )
-
-        # Build DailyParams based on whether we have PSTN dialin settings
-        # Note: Don't set audio_out_destinations here - we route specific audio
-        # to "agent" track in BotAudioGate when briefing the agent during transfer
-        daily_params = DailyParams(
-            api_key=os.getenv("DAILY_API_KEY", ""),
+    transport = DailyTransport(
+        request.room_url,
+        request.token,
+        "Warm Transfer Bot",
+        params=DailyParams(
+            api_key=os.getenv("DAILY_API_KEY"),
+            dialin_settings=DailyDialinSettings(
+                call_id=request.call_id,
+                call_domain=request.call_domain,
+            ),
             audio_in_enabled=True,
             audio_out_enabled=True,
-            audio_out_mixer=hold_music_mixer,
-        )
+            audio_out_mixer=_create_hold_music_mixer(),
+        ),
+    )
 
-        # Add dialin settings if available (PSTN mode)
-        if request.callId and request.callDomain:
-            logger.info(
-                f"Setting dialin_settings: call_id={request.callId}, call_domain={request.callDomain}"
-            )
-            daily_params.dialin_settings = DailyDialinSettings(
-                call_id=request.callId, call_domain=request.callDomain
-            )
-        else:
-            logger.warning(
-                f"No dialin settings - callId={request.callId}, callDomain={request.callDomain}"
-            )
-
-        # Get room_url/token from body (works for both local and Pipecat Cloud)
-        room_url = request.room_url
-        token = request.token
-
-        if not room_url:
-            raise ValueError("room_url is required in body")
-
-        transport = DailyTransport(
-            room_url,
-            token,
-            "Warm Transfer Bot",
-            params=daily_params,
-        )
-
-        warm_transfer_config = request.warm_transfer_config or None
-        if not warm_transfer_config:
-            raise ValueError("warm_transfer_config is required in body")
-
-        # handle_sigint may not exist on PipecatSessionArguments, default to False
-        handle_sigint = getattr(runner_args, "handle_sigint", False)
-        await run_bot(transport, warm_transfer_config, handle_sigint)
-
-    except Exception as e:
-        logger.error(f"Error running bot: {e}")
-        raise e
+    await run_bot(transport, request.warm_transfer_config, runner_args.handle_sigint)
 
 
 if __name__ == "__main__":
