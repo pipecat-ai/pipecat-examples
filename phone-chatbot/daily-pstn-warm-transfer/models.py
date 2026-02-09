@@ -96,7 +96,7 @@ class AgentRequest(BaseModel):
     To: str = "+15550002222"
     warm_transfer_config: WarmTransferConfig | None = None
 
-    def __init__(self, **data):
+    def __init__(self, **data: object) -> None:
         if "warm_transfer_config" not in data or data.get("warm_transfer_config") is None:
             data["warm_transfer_config"] = default_transfer_config()
         super().__init__(**data)
