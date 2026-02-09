@@ -17,6 +17,7 @@ A Pipecat example demonstrating the simplest way to create a voice agent using `
 2. **Build the Docker container:**
 
    ```bash
+   uv sync
    docker build -t small-webrtc-bot .
    ```
 
