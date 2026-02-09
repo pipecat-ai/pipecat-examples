@@ -18,7 +18,6 @@ This bot handles customer calls and performs warm transfers:
 """
 
 import os
-import sys
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
@@ -36,13 +35,9 @@ from pipecat.frames.frames import (
     ControlFrame,
     EndTaskFrame,
     Frame,
-    InputAudioRawFrame,
-    InterruptionFrame,
     LLMMessagesAppendFrame,
     LLMRunFrame,
     MixerEnableFrame,
-    STTMuteFrame,
-    UserStartedSpeakingFrame,
 )
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
@@ -59,23 +54,13 @@ from pipecat.services.deepgram.stt import DeepgramSTTService
 from pipecat.services.llm_service import FunctionCallParams
 from pipecat.services.openai.llm import OpenAILLMService
 from pipecat.transports.daily.transport import DailyDialinSettings, DailyParams, DailyTransport
+from pipecat.turns.user_mute.base_user_mute_strategy import BaseUserMuteStrategy
 from pipecat.turns.user_stop import TurnAnalyzerUserTurnStopStrategy
 from pipecat.turns.user_turn_strategies import UserTurnStrategies
 
 from models import AgentRequest, TransferTarget, WarmTransferConfig
 
 load_dotenv(override=True)
-
-# Remove default handler if it exists (may not exist on Pipecat Cloud)
-try:
-    logger.remove(0)
-except ValueError:
-    # Handler with ID 0 does not exist (e.g., on Pipecat Cloud); safe to ignore.
-    pass
-logger.add(sys.stderr, level="DEBUG")
-
-
-# ------------ TRANSFER STATE ------------
 
 
 class TransferState(Enum):
@@ -86,9 +71,6 @@ class TransferState(Enum):
     TALKING_TO_AGENT = "talking_to_agent"
     CONNECTED = "connected"
     TRANSFER_FAILED = "transfer_failed"
-
-
-# ------------ CUSTOM CONTROL FRAMES ------------
 
 
 @dataclass
@@ -134,45 +116,31 @@ class ParticipantLeftFrame(ControlFrame):
     pass
 
 
-# ------------ FRAME PROCESSORS ------------
+# ------------ MUTE STRATEGIES ------------
 
 
-class CustomerHoldGate(FrameProcessor):
-    """Gates customer audio input when on hold.
+class HoldMuteStrategy(BaseUserMuteStrategy):
+    """Mutes user input when customer is on hold during a warm transfer.
 
-    Listens for CustomerHoldFrame to toggle hold state.
-    When on hold, suppresses customer audio input and mutes STT.
+    Listens for CustomerHoldFrame to toggle hold state. When on hold,
+    the LLMUserAggregator suppresses all user input frames automatically.
     """
 
     def __init__(self) -> None:
         super().__init__()
         self._on_hold = False
 
-    async def process_frame(self, frame: Frame, direction: FrameDirection) -> None:
-        await super().process_frame(frame, direction)
+    async def process_frame(self, frame: Frame) -> bool:
+        await super().process_frame(frame)
 
-        # Listen for hold control frame
         if isinstance(frame, CustomerHoldFrame):
             self._on_hold = frame.on_hold
             logger.info(f"Customer hold state: {'ON HOLD' if frame.on_hold else 'ACTIVE'}")
-            # Mute STT when on hold
-            await self.push_frame(STTMuteFrame(mute=frame.on_hold))
-            await self.push_frame(frame, direction)
-            return
 
-        # When on hold, suppress customer audio input frames
-        if self._on_hold and isinstance(
-            frame,
-            (
-                InputAudioRawFrame,
-                UserStartedSpeakingFrame,
-                InterruptionFrame,
-            ),
-        ):
-            logger.trace(f"{frame.__class__.__name__} suppressed - Customer on hold")
-            return  # Suppress customer input
+        return self._on_hold
 
-        await self.push_frame(frame, direction)
+
+# ------------ FRAME PROCESSORS ------------
 
 
 class TransferCoordinator(FrameProcessor):
@@ -221,7 +189,7 @@ class TransferCoordinator(FrameProcessor):
             # Enable hold music
             await self.push_frame(MixerEnableFrame(True))
 
-            # Push CustomerHoldFrame UPSTREAM to reach CustomerHoldGate
+            # Push CustomerHoldFrame UPSTREAM to reach HoldMuteStrategy
             await self.push_frame(CustomerHoldFrame(on_hold=True), FrameDirection.UPSTREAM)
 
             # Dial the agent
@@ -362,8 +330,6 @@ async def run_bot(
     3. Agent joins third via dialout (triggers on_participant_joined after dialout)
     """
 
-    # ------------ SERVICES ------------
-
     stt = DeepgramSTTService(api_key=os.getenv("DEEPGRAM_API_KEY", ""))
 
     tts = CartesiaTTSService(
@@ -372,8 +338,6 @@ async def run_bot(
     )
 
     llm = OpenAILLMService(api_key=os.getenv("OPENAI_API_KEY"))
-
-    # ------------ LLM AND CONTEXT SETUP ------------
 
     system_instruction = build_system_prompt(config)
 
@@ -421,9 +385,13 @@ async def run_bot(
         # TransferCoordinator will handle the rest after BotStoppedSpeakingFrame
         await params.llm.push_frame(StartTransferFrame(target=target, summary=summary))
 
+    llm.register_direct_function(terminate_call)
+    llm.register_direct_function(initiate_warm_transfer)
+
     tools = ToolsSchema(standard_tools=[terminate_call, initiate_warm_transfer])
 
     # Initialize LLM context and aggregator
+    hold_mute_strategy = HoldMuteStrategy()
     context = LLMContext(messages, tools)
     user_aggregator, assistant_aggregator = LLMContextAggregatorPair(
         context,
@@ -431,13 +399,13 @@ async def run_bot(
             user_turn_strategies=UserTurnStrategies(
                 stop=[TurnAnalyzerUserTurnStopStrategy(turn_analyzer=LocalSmartTurnAnalyzerV3())]
             ),
-            vad_analyzer=SileroVADAnalyzer(),
+            user_mute_strategies=[hold_mute_strategy],
+            vad_analyzer=SileroVADAnalyzer(params=VADParams(stop_secs=0.2)),
         ),
     )
 
     # ------------ PROCESSORS ------------
 
-    customer_hold_gate = CustomerHoldGate()
     transfer_coordinator = TransferCoordinator(transport, config)
 
     # ------------ PIPELINE SETUP ------------
@@ -445,7 +413,6 @@ async def run_bot(
     pipeline = Pipeline(
         [
             transport.input(),
-            customer_hold_gate,
             stt,
             user_aggregator,
             llm,
@@ -465,11 +432,6 @@ async def run_bot(
             audio_out_sample_rate=8000,
         ),
     )
-
-    # ------------ REGISTER FUNCTIONS ------------
-
-    llm.register_direct_function(terminate_call)
-    llm.register_direct_function(initiate_warm_transfer)
 
     # ------------ EVENT HANDLERS ------------
 
