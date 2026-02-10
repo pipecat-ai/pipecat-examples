@@ -40,7 +40,7 @@ if IS_TRACING_ENABLED:
     otlp_exporter = OTLPSpanExporter(
         endpoint=os.getenv(
             "OTEL_EXPORTER_OTLP_ENDPOINT",
-            "https://www.comet.com/opik/api/v1/private/otel/v1/traces"
+            "https://www.comet.com/opik/api/v1/private/otel/v1/traces",
         ),
     )
 
