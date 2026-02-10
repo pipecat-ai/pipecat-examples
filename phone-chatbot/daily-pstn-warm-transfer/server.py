@@ -28,9 +28,7 @@ from loguru import logger
 
 from server_utils import (
     AgentRequest,
-    TransferMessages,
-    TransferTarget,
-    WarmTransferConfig,
+    build_warm_transfer_config,
     call_data_from_request,
     create_daily_room,
     start_bot_local,
@@ -39,31 +37,21 @@ from server_utils import (
 
 load_dotenv()
 
-# Default transfer targets if not provided in request
-DEFAULT_TRANSFER_TARGETS = [
-    TransferTarget(
-        name="Sales Team",
-        phone_number=os.getenv("SALES_NUMBER", ""),
-        description="Handles new purchases, upgrades, and pricing questions",
-    ),
-    TransferTarget(
-        name="Support Team",
-        phone_number=os.getenv("SUPPORT_NUMBER", ""),
-        description="Handles technical issues, bugs, and troubleshooting",
-    ),
-    TransferTarget(
-        name="Billing Team",
-        phone_number=os.getenv("BILLING_NUMBER", ""),
-        description="Handles invoices, refunds, and payment issues",
-    ),
-]
-
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    """Manage application lifecycle and shared resources.
+
+    Creates a shared aiohttp session for making HTTP requests to bot endpoints.
+    The session is reused across requests for better performance through connection pooling.
+    """
+    # Create shared HTTP session for bot API calls
     app.state.http_session = aiohttp.ClientSession()
+    logger.info("Created shared HTTP session")
     yield
+    # Clean up: close the session on shutdown
     await app.state.http_session.close()
+    logger.info("Closed shared HTTP session")
 
 
 app = FastAPI(lifespan=lifespan)
@@ -78,26 +66,23 @@ async def handle_incoming_daily_webhook(request: Request) -> JSONResponse:
     2. Creates a Daily room with dial-in and dial-out capabilities
     3. Starts the bot (locally or via Pipecat Cloud based on ENV)
     4. Returns room details for the caller
+
+    Args:
+        request: FastAPI request containing Daily webhook data
+
+    Returns:
+        JSONResponse: Success status with room_url and token
+
+    Raises:
+        HTTPException: If request data is invalid or bot fails to start
     """
     logger.debug("Received webhook from Daily")
 
-    call_data = await call_data_from_request(request)
+    call_data, request_data = await call_data_from_request(request)
 
     daily_room_config = await create_daily_room(call_data, request.app.state.http_session)
 
-    # Build warm transfer config from request or use defaults
-    request_data = await request.json()
-    warm_transfer_config_data = request_data.get("warm_transfer_config")
-    if warm_transfer_config_data:
-        warm_transfer_config = WarmTransferConfig.model_validate(warm_transfer_config_data)
-    else:
-        valid_targets = [t for t in DEFAULT_TRANSFER_TARGETS if t.phone_number]
-        if not valid_targets:
-            logger.warning("No valid transfer targets configured")
-        warm_transfer_config = WarmTransferConfig(
-            transfer_targets=valid_targets,
-            transfer_messages=TransferMessages(),
-        )
+    warm_transfer_config = await build_warm_transfer_config(request_data)
 
     agent_request = AgentRequest(
         room_url=daily_room_config.room_url,
@@ -127,11 +112,19 @@ async def handle_incoming_daily_webhook(request: Request) -> JSONResponse:
 
 @app.get("/health")
 async def health_check():
-    """Health check endpoint."""
+    """Health check endpoint.
+
+    Returns:
+        dict: Status indicating server health
+    """
     return {"status": "healthy"}
 
 
+# ----------------- Main ----------------- #
+
+
 if __name__ == "__main__":
+    # Run the server
     port = int(os.getenv("PORT", "7860"))
     logger.info(f"Starting server on port {port}")
     uvicorn.run("server:app", host="0.0.0.0", port=port, reload=True)

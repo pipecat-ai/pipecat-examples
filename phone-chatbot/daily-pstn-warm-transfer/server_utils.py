@@ -9,6 +9,7 @@
 This module provides data models and functions for:
 - Parsing Daily PSTN webhook data
 - Creating Daily rooms for incoming calls
+- Building warm transfer configuration
 - Starting bots in production (Pipecat Cloud) or local development mode
 """
 
@@ -100,14 +101,14 @@ class AgentRequest(BaseModel):
     warm_transfer_config: WarmTransferConfig
 
 
-async def call_data_from_request(request: Request) -> DailyCallData:
+async def call_data_from_request(request: Request) -> tuple[DailyCallData, dict]:
     """Parse and validate Daily PSTN webhook data from incoming request.
 
     Args:
         request: FastAPI request object containing webhook data
 
     Returns:
-        DailyCallData: Parsed and validated call data
+        tuple: (DailyCallData, dict) - Parsed call data and raw request data
 
     Raises:
         HTTPException: If required fields are missing from the webhook data
@@ -120,12 +121,14 @@ async def call_data_from_request(request: Request) -> DailyCallData:
             status_code=400, detail="Missing properties 'From', 'To', 'callId', 'callDomain'"
         )
 
-    return DailyCallData(
+    call_data = DailyCallData(
         from_phone=str(data.get("From")),
         to_phone=str(data.get("To")),
         call_id=data.get("callId"),
         call_domain=data.get("callDomain"),
     )
+
+    return call_data, data
 
 
 async def create_daily_room(
@@ -228,3 +231,55 @@ async def start_bot_local(agent_request: AgentRequest, session: aiohttp.ClientSe
                 detail=f"Failed to start bot via local /start endpoint: {error_text}",
             )
         logger.debug("Bot started successfully via local /start endpoint")
+
+
+def get_default_transfer_targets() -> list[TransferTarget]:
+    """Get default transfer targets from environment variables.
+
+    Returns:
+        list[TransferTarget]: List of transfer targets with configured phone numbers
+    """
+    default_targets = [
+        TransferTarget(
+            name="Sales Team",
+            phone_number=os.getenv("SALES_NUMBER", ""),
+            description="Handles new purchases, upgrades, and pricing questions",
+        ),
+        TransferTarget(
+            name="Support Team",
+            phone_number=os.getenv("SUPPORT_NUMBER", ""),
+            description="Handles technical issues, bugs, and troubleshooting",
+        ),
+        TransferTarget(
+            name="Billing Team",
+            phone_number=os.getenv("BILLING_NUMBER", ""),
+            description="Handles invoices, refunds, and payment issues",
+        ),
+    ]
+    # Filter out targets without phone numbers
+    return [t for t in default_targets if t.phone_number]
+
+
+async def build_warm_transfer_config(data: dict) -> WarmTransferConfig:
+    """Build warm transfer configuration from request data or use defaults.
+
+    Args:
+        data: Parsed request data dictionary containing optional warm_transfer_config
+
+    Returns:
+        WarmTransferConfig: Configuration for warm transfer functionality
+    """
+    warm_transfer_config_data = data.get("warm_transfer_config")
+
+    if warm_transfer_config_data:
+        return WarmTransferConfig.model_validate(warm_transfer_config_data)
+
+    # Use defaults if not provided in request
+    transfer_targets = get_default_transfer_targets()
+    if not transfer_targets:
+        logger.warning("No valid transfer targets configured")
+
+    return WarmTransferConfig(
+        transfer_targets=transfer_targets,
+        transfer_messages=TransferMessages(),
+    )
