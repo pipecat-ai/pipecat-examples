@@ -82,7 +82,7 @@ async def handle_incoming_daily_webhook(request: Request) -> JSONResponse:
 
     daily_room_config = await create_daily_room(call_data, request.app.state.http_session)
 
-    warm_transfer_config = await build_warm_transfer_config(request_data)
+    warm_transfer_config = build_warm_transfer_config(request_data)
 
     agent_request = AgentRequest(
         room_url=daily_room_config.room_url,

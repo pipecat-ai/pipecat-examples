@@ -260,7 +260,7 @@ def get_default_transfer_targets() -> list[TransferTarget]:
     return [t for t in default_targets if t.phone_number]
 
 
-async def build_warm_transfer_config(data: dict) -> WarmTransferConfig:
+def build_warm_transfer_config(data: dict) -> WarmTransferConfig:
     """Build warm transfer configuration from request data or use defaults.
 
     Args:
