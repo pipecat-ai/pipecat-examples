@@ -257,7 +257,14 @@ def get_default_transfer_targets() -> list[TransferTarget]:
         ),
     ]
     # Filter out targets without phone numbers
-    return [t for t in default_targets if t.phone_number]
+    filtered_targets = [t for t in default_targets if t.phone_number]
+    
+    # Log which targets were filtered out
+    filtered_out = [t.name for t in default_targets if not t.phone_number]
+    if filtered_out:
+        logger.debug(f"Filtered out transfer targets without phone numbers: {', '.join(filtered_out)}")
+    
+    return filtered_targets
 
 
 def build_warm_transfer_config(data: dict) -> WarmTransferConfig:
