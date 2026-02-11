@@ -123,6 +123,11 @@
     "skip": false
   },
   {
+    "path": "open-telemetry/opik",
+    "runCommand": "uv run bot.py",
+    "skip": false
+  },
+  {
     "path": "p2p-webrtc/daily-interop-bridge",
     "runCommand": "uv run server.py",
     "skip": false
