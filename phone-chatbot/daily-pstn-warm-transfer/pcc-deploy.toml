@@ -1,0 +1,8 @@
+agent_name = "daily-pstn-warm-transfer"
+image = "your_username/daily-pstn-warm-transfer:0.1"
+image_credentials = "my-image-pull-secret"
+secret_set = "daily-pstn-secrets"
+agent_profile = "agent-1x"
+
+[scaling]
+	min_agents = 1
