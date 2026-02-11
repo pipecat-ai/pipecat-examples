@@ -1,6 +1,6 @@
 agent_name = "daily-pstn-warm-transfer"
 image = "your_username/daily-pstn-warm-transfer:0.1"
-image_credentials = "your_dockerhub_image_pull_secret"
+image_credentials = "my-image-pull-secret"
 secret_set = "daily-pstn-secrets"
 agent_profile = "agent-1x"
 

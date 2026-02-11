@@ -164,13 +164,13 @@ async def start_bot_production(agent_request: AgentRequest, session: aiohttp.Cli
     Raises:
         HTTPException: If required environment variables are missing or API call fails
     """
-    pipecat_api_key = os.getenv("PIPECAT_API_KEY")
+    pipecat_api_key = os.getenv("PIPECAT_CLOUD_API_KEY")
     agent_name = os.getenv("PIPECAT_AGENT_NAME")
 
     if not pipecat_api_key or not agent_name:
         raise HTTPException(
             status_code=500,
-            detail="PIPECAT_API_KEY and PIPECAT_AGENT_NAME required for production mode",
+            detail="PIPECAT_CLOUD_API_KEY and PIPECAT_AGENT_NAME required for production mode",
         )
 
     logger.debug(f"Starting bot via Pipecat Cloud for call {agent_request.call_id}")

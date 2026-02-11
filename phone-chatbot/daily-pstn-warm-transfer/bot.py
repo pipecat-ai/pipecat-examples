@@ -239,8 +239,8 @@ class TransferCoordinator(FrameProcessor):
 
         # Participant left
         elif isinstance(frame, ParticipantLeftFrame):
-            if self._state == TransferState.TALKING_TO_CUSTOMER:
-                logger.info("Customer left, ending call")
+            if self._state in (TransferState.TALKING_TO_CUSTOMER, TransferState.CONNECTED):
+                logger.info(f"Participant left during {self._state.value}, ending call")
                 await self.push_frame(EndTaskFrame(), FrameDirection.UPSTREAM)
             return
 
@@ -496,7 +496,7 @@ async def bot(runner_args: RunnerArguments) -> None:
         request.token,
         "Warm Transfer Bot",
         params=DailyParams(
-            api_key=os.getenv("DAILY_API_KEY"),
+            api_key=os.getenv("DAILY_API_KEY", ""),
             dialin_settings=DailyDialinSettings(
                 call_id=request.call_id,
                 call_domain=request.call_domain,
