@@ -147,7 +147,7 @@ class WebsocketClientApp {
     try {
       const startTime = Date.now();
 
-      //const transport = new DailyTransport();
+      const wsUrl = 'https://us-west.api.staging.pipecat.daily.co/ws/generic?serviceHost=websocket-generic.brian-keda';
       const PipecatConfig: PipecatClientOptions = {
         transport: new WebSocketTransport(),
         enableMic: true,
@@ -187,10 +187,7 @@ class WebsocketClientApp {
       await this.pcClient.initDevices();
 
       this.log('Connecting to bot...');
-      await this.pcClient.startBotAndConnect({
-        // The baseURL and endpoint of your bot server that the client will connect to
-        endpoint: 'http://localhost:7860/connect',
-      });
+      await this.pcClient.connect({ ws_url: wsUrl });
 
       const timeTaken = Date.now() - startTime;
       this.log(`Connection complete, timeTaken: ${timeTaken}`);
