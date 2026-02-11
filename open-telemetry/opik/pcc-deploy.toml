@@ -1,0 +1,6 @@
+agent_name = "opik-tracing"
+image = "your_username/opik-tracing:0.1"
+secret_set = "opik-tracing-secrets"
+
+[scaling]
+	min_agents = 1

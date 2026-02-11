@@ -41,7 +41,7 @@ OTEL_EXPORTER_OTLP_ENDPOINT=http://<YOUR-OPIK-INSTANCE>/api/v1/private/otel/v1/t
 ### 3. Install Dependencies
 
 ```bash
-pip install -r requirements.txt
+uv sync
 ```
 
 > **Important**: Use the HTTP exporter (`opentelemetry-exporter-otlp-proto-http`), not the GRPC exporter. Opik only supports HTTP transport.
@@ -49,7 +49,7 @@ pip install -r requirements.txt
 ### 4. Run the Demo
 
 ```bash
-python bot.py
+uv run bot.py
 ```
 
 ### 5. View Traces in Opik
