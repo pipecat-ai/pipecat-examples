@@ -101,8 +101,10 @@ class InstantVoiceClient {
             this.log(`User: ${data.text}`);
           }
         },
-        onBotTranscript: (data) => this.log(`Bot: ${data.text}`),
         onMessageError: (error) => console.error('Message error:', error),
+        onBotOutput: (data) => this.log(`Bot output: ${data.text}`),
+        onBotStartedSpeaking: () => this.log('Bot started speaking'),
+        onBotStoppedSpeaking: () => this.log('Bot stopped speaking'),
         onError: (error) => console.error('Error:', error),
       } as DailyEventCallbacks,
     };
