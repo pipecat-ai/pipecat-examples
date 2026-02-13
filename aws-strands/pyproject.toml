@@ -7,7 +7,7 @@ dependencies = [
     "fastapi",
     "uvicorn",
     "python-dotenv",
-    "pipecat-ai[webrtc,daily,deepgram,cartesia,silero]>=0.0.101",
+    "pipecat-ai[webrtc,daily,deepgram,cartesia,silero]>=0.0.102",
     "strands-agents",
 ]
 
