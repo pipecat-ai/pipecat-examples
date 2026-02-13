@@ -19,13 +19,15 @@ import aiohttp
 from dotenv import load_dotenv
 from loguru import logger
 from pipecat.audio.vad.silero import SileroVADAnalyzer
-from pipecat.audio.vad.vad_analyzer import VADParams
 from pipecat.frames.frames import EndFrame, TransportMessageUrgentFrame
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineParams, PipelineTask
 from pipecat.processors.aggregators.llm_context import LLMContext
-from pipecat.processors.aggregators.llm_response_universal import LLMContextAggregatorPair
+from pipecat.processors.aggregators.llm_response_universal import (
+    LLMContextAggregatorPair,
+    LLMUserAggregatorParams,
+)
 from pipecat.processors.audio.audio_buffer_processor import AudioBufferProcessor
 from pipecat.serializers.twilio import TwilioFrameSerializer
 from pipecat.services.cartesia.tts import CartesiaTTSService
@@ -93,7 +95,7 @@ async def run_client(client_name: str, server_url: str, duration_secs: int):
             audio_out_enabled=True,
             add_wav_header=False,
             serializer=TwilioFrameSerializer(stream_sid=stream_sid, call_sid=call_sid),
-            vad_analyzer=SileroVADAnalyzer(params=VADParams(stop_secs=1.0)),
+            vad_analyzer=SileroVADAnalyzer(),
         ),
     )
 
@@ -115,7 +117,12 @@ async def run_client(client_name: str, server_url: str, duration_secs: int):
     ]
 
     context = LLMContext(messages)
-    context_aggregator = LLMContextAggregatorPair(context)
+    context_aggregator = LLMContextAggregatorPair(
+        context,
+        user_params=LLMUserAggregatorParams(
+            vad_analyzer=SileroVADAnalyzer(),
+        ),
+    )
 
     # NOTE: Watch out! This will save all the conversation in memory. You can
     # pass `buffer_size` to get periodic callbacks.

@@ -10,7 +10,6 @@ from dotenv import load_dotenv
 from loguru import logger
 from pipecat.audio.mixers.soundfile_mixer import SoundfileMixer
 from pipecat.audio.vad.silero import SileroVADAnalyzer
-from pipecat.audio.vad.vad_analyzer import VADParams
 from pipecat.observers.loggers.transcription_log_observer import TranscriptionLogObserver
 from pipecat.pipeline.parallel_pipeline import ParallelPipeline
 from pipecat.pipeline.pipeline import Pipeline
@@ -75,7 +74,7 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     llm_french = OpenAILLMService(api_key=os.getenv("OPENAI_API_KEY"))
     llm_german = OpenAILLMService(api_key=os.getenv("OPENAI_API_KEY"))
 
-    vad_processor = VADProcessor(vad_analyzer=SileroVADAnalyzer(params=VADParams(stop_secs=0.2)))
+    vad_processor = VADProcessor(vad_analyzer=SileroVADAnalyzer())
 
     context_spanish = LLMContext(messages_spanish)
     context_aggregator_spanish = LLMContextAggregatorPair(context_spanish)

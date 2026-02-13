@@ -9,9 +9,7 @@ import os
 
 from dotenv import load_dotenv
 from loguru import logger
-from pipecat.audio.turn.smart_turn.local_smart_turn_v3 import LocalSmartTurnAnalyzerV3
 from pipecat.audio.vad.silero import SileroVADAnalyzer
-from pipecat.audio.vad.vad_analyzer import VADParams
 from pipecat.frames.frames import LLMRunFrame
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
@@ -26,10 +24,6 @@ from pipecat.runner.utils import create_transport
 from pipecat.services.google.gemini_live.llm import GeminiLiveLLMService
 from pipecat.transports.daily.transport import DailyParams, DailyTransport
 from pipecat.turns.mute import MuteUntilFirstBotCompleteUserMuteStrategy
-from pipecat.turns.user_stop.turn_analyzer_user_turn_stop_strategy import (
-    TurnAnalyzerUserTurnStopStrategy,
-)
-from pipecat.turns.user_turn_strategies import UserTurnStrategies
 
 load_dotenv(override=True)
 
@@ -112,13 +106,8 @@ Important guidelines:
     user_aggregator, assistant_aggregator = LLMContextAggregatorPair(
         context,
         user_params=LLMUserAggregatorParams(
-            user_turn_strategies=UserTurnStrategies(
-                stop=[TurnAnalyzerUserTurnStopStrategy(turn_analyzer=LocalSmartTurnAnalyzerV3())]
-            ),
-            user_mute_strategies=[
-                MuteUntilFirstBotCompleteUserMuteStrategy(),
-            ],
-            vad_analyzer=SileroVADAnalyzer(params=VADParams(stop_secs=0.2)),
+            user_mute_strategies=[MuteUntilFirstBotCompleteUserMuteStrategy()],
+            vad_analyzer=SileroVADAnalyzer(),
         ),
     )
 

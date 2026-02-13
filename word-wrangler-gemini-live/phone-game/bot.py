@@ -20,9 +20,7 @@ from typing import Any, Mapping, Optional
 from dotenv import load_dotenv
 from loguru import logger
 from pipecat.audio.resamplers.soxr_resampler import SOXRAudioResampler
-from pipecat.audio.turn.smart_turn.local_smart_turn_v3 import LocalSmartTurnAnalyzerV3
 from pipecat.audio.vad.silero import SileroVADAnalyzer
-from pipecat.audio.vad.vad_analyzer import VADParams
 from pipecat.frames.frames import (
     BotStoppedSpeakingFrame,
     CancelFrame,
@@ -64,10 +62,6 @@ from pipecat.transports.websocket.fastapi import (
 from pipecat.turns.user_mute import (
     MuteUntilFirstBotCompleteUserMuteStrategy,
 )
-from pipecat.turns.user_stop.turn_analyzer_user_turn_stop_strategy import (
-    TurnAnalyzerUserTurnStopStrategy,
-)
-from pipecat.turns.user_turn_strategies import UserTurnStrategies
 from pipecat.utils.sync.base_notifier import BaseNotifier
 from pipecat.utils.sync.event_notifier import EventNotifier
 from pipecat.utils.text.base_text_filter import BaseTextFilter
@@ -653,13 +647,8 @@ Important guidelines:
     user_aggregator, assistant_aggregator = LLMContextAggregatorPair(
         context,
         user_params=LLMUserAggregatorParams(
-            user_turn_strategies=UserTurnStrategies(
-                stop=[TurnAnalyzerUserTurnStopStrategy(turn_analyzer=LocalSmartTurnAnalyzerV3())]
-            ),
-            user_mute_strategies=[
-                MuteUntilFirstBotCompleteUserMuteStrategy(),
-            ],
-            vad_analyzer=SileroVADAnalyzer(params=VADParams(stop_secs=0.2)),
+            user_mute_strategies=[MuteUntilFirstBotCompleteUserMuteStrategy()],
+            vad_analyzer=SileroVADAnalyzer(),
         ),
     )
 
