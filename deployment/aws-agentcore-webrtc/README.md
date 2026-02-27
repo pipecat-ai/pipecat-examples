@@ -1,6 +1,6 @@
 # Amazon Bedrock AgentCore Runtime WebRTC Example
 
-This example demonstrates how to deploy a Pipecat bot to **Amazon Bedrock AgentCore Runtime** using SmallWebRTC for communication.
+This example demonstrates how to deploy a Pipecat voice agent to **Amazon Bedrock AgentCore Runtime** using SmallWebRTC as a lightweight transport mechanism. The example pipeline orchestrates Deepgram (speech-to-text), Amazon Nova (LLM), and Cartesia (text-to-speech).
 
 ## Prerequisites
 
@@ -15,10 +15,43 @@ This example demonstrates how to deploy a Pipecat bot to **Amazon Bedrock AgentC
 
 ### IAM Configuration
 
-Configure your IAM user with the necessary policies for AgentCore usage. Start with these:
+Configure your IAM user with the necessary policies for AgentCore deployment and management:
 
 - `BedrockAgentCoreFullAccess`
-- A new policy (maybe named `BedrockAgentCoreCLI`) configured [like this](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-permissions.html#runtime-permissions-starter-toolkit)
+- A new policy (maybe named `BedrockAgentCoreCLI`) configured [like this](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-permissions.html#runtime-permissions-starter-toolkit), with the following additional statement to support VPC setup and teardown:
+
+  ```json
+  {
+    "Sid": "EC2Access",
+    "Effect": "Allow",
+    "Action": [
+      "ec2:CreateVpc",
+      "ec2:CreateTags",
+      "ec2:ModifyVpcAttribute",
+      "ec2:CreateInternetGateway",
+      "ec2:AttachInternetGateway",
+      "ec2:DescribeAvailabilityZones",
+      "ec2:CreateSubnet",
+      "ec2:AllocateAddress",
+      "ec2:CreateNatGateway",
+      "ec2:DescribeNatGateways",
+      "ec2:CreateRouteTable",
+      "ec2:CreateRoute",
+      "ec2:AssociateRouteTable",
+      "ec2:CreateSecurityGroup",
+      "ec2:AuthorizeSecurityGroupEgress",
+      "ec2:DeleteNatGateway",
+      "ec2:ReleaseAddress",
+      "ec2:DetachInternetGateway",
+      "ec2:DeleteInternetGateway",
+      "ec2:DeleteSubnet",
+      "ec2:DeleteRouteTable",
+      "ec2:DeleteSecurityGroup",
+      "ec2:DeleteVpc"
+    ],
+    "Resource": "*"
+  }
+  ```
 
 You can also choose to specify more granular permissions; see [Amazon Bedrock AgentCore docs](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-permissions.html) for more information.
 
@@ -57,22 +90,27 @@ uv sync
    ```
 
    Add your API keys:
-
    - `AWS_ACCESS_KEY_ID`: Your AWS access key ID for the Amazon Bedrock LLM used by the agent
    - `AWS_SECRET_ACCESS_KEY`: Your AWS secret access key for the Amazon Bedrock LLM used by the agent
    - `AWS_REGION`: The AWS region for the Amazon Bedrock LLM used by the agent
    - `DEEPGRAM_API_KEY`: Your Deepgram API key
    - `CARTESIA_API_KEY`: Your Cartesia API key
-   - `ICE_SERVER_URLS`: Your TCP TURN server urls
+   - `ICE_SERVER_URLS`: Your TURN server URLs
    - `ICE_SERVER_USERNAME`: Your TURN server username
    - `ICE_SERVER_CREDENTIAL`: Your TURN server credential
 
    > Important Notes about TURN Server Configuration:
    >
-   > - You must use TURN servers that support TCP connections
-   > - UDP connections are not supported within AgentCore runtime environment
-   > - If your TURN server only supports UDP, your WebRTC connection will fail
-   > - Consider using a service like Twilio's TURN servers which support TCP
+   > **VPC Mode (recommended):**
+   >
+   > - Both TCP and UDP TURN are supported via NAT Gateway
+   > - UDP (recommended): `turn:server.example.com:80`
+   > - TCP: `turn:server.example.com:80?transport=tcp`
+   >
+   > **PUBLIC Mode:**
+   >
+   > - Only TCP TURN is supported - use `turn:server.example.com:80?transport=tcp`
+   > - UDP connections are blocked
 
 2. For the server:
    ```bash
@@ -89,13 +127,11 @@ Configure your bot as an AgentCore agent:
 ./scripts/configure.sh
 ```
 
-This script:
+This script automatically:
 
-1. Configures deployment type as "Container" (required by Pipecat)
-2. Applies necessary patches to the Dockerfile
-3. Adds dependencies required by SmallWebRTC (`libgl1` and `libglib2.0-0`)
-
-Follow the prompts to complete the configuration.
+1. Creates IAM execution role (if needed)
+2. Configures container deployment with docker runtime
+3. Patches Dockerfile to add SmallWebRTC dependencies (`libgl1` and `libglib2.0-0`)
 
 > Technical Note:
 > Direct Code Deploy isn't used because some dependencies (like `numba`) lack `aarch64_manylinux2014` wheels.
@@ -115,13 +151,36 @@ The following steps act on `agentcore`'s default agent.
 
 ## Deployment to AgentCore Runtime
 
-Deploy your bot:
+**VPC Mode (recommended) - TCP and UDP TURN support:**
+
+```bash
+# First time: Create VPC infrastructure (NAT Gateway costs ~$32/month)
+# Note that this creates various Elastic IP addresses; ensure you have sufficient quota (https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/elastic-ip-addresses-eip.html#using-instance-addressing-limit)
+./scripts/setup-vpc.sh
+
+# Deploy agent
+./scripts/launch.sh
+```
+
+This deploys AgentCore Runtime in private subnets with NAT Gateway for outbound internet access, enabling UDP TURN relay (blocked in PUBLIC mode) for better WebRTC connection reliability, lower latency, and enhanced security with private subnet isolation.
+
+**Infrastructure overview:**
+
+- VPC with public and private subnets across 2 availability zones
+- Internet Gateway for public subnet connectivity
+- NAT Gateway in public subnet for private subnet outbound traffic
+- Route tables directing private subnet traffic through NAT Gateway
+- Security groups allowing outbound HTTPS and UDP connections
+
+**PUBLIC Mode - TCP TURN only:**
+
+For development/testing without UDP TURN:
 
 ```bash
 ./scripts/launch.sh
 ```
 
-This script:
+The launch script:
 
 1. Reads environment variables from `agent/.env`
 2. Deploys to AgentCore
@@ -141,7 +200,27 @@ This script:
    - Open http://localhost:7860 in your browser
    - Or use your configured custom port
 
+3. Test WebRTC connectivity:
+   - Click "Connect" in the UI
+   - Allow microphone permissions when prompted
+   - Speak to the agent - you should hear a voice response
+   - Verify connection type:
+     - Open browser DevTools (F12 → Console tab)
+     - Type `chrome://webrtc-internals` in address bar (Chrome) or `about:webrtc` (Firefox) for detailed stats
+     - Look for "Selected candidate pair" showing protocol (`udp` for VPC, `tcp` for PUBLIC) and type (`relay` for TURN)
+   - For log monitoring, see the next section below
+
 ## Monitoring and Troubleshooting
+
+### View Intermediary Server Logs
+
+The intermediary server (`server.py`) proxies WebRTC signaling between the browser client and AgentCore Runtime. Check the terminal where the server is already running (from step 1 above).
+
+Look for:
+
+- WebRTC SDP offers and answers
+- ICE candidate exchanges showing protocol (`udp`/`tcp`) and type (`relay`/`host`)
+- Connection events and errors
 
 ### View Agent Logs
 
@@ -173,6 +252,12 @@ Remove your agent:
 
 ```bash
 ./scripts/destroy.sh
+```
+
+If using VPC mode, remove VPC resources:
+
+```bash
+./scripts/cleanup-vpc.sh
 ```
 
 ## Local Development
