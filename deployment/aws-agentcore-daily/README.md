@@ -1,11 +1,12 @@
-# Amazon Bedrock AgentCore Runtime WebRTC Example
+# Amazon Bedrock AgentCore Runtime Daily Example
 
-This example demonstrates how to deploy a Pipecat voice agent to **Amazon Bedrock AgentCore Runtime** using SmallWebRTC as a lightweight transport mechanism. The example pipeline orchestrates Deepgram (speech-to-text), Amazon Nova (LLM), and Cartesia (text-to-speech).
+This example demonstrates how to deploy a Pipecat voice agent to **Amazon Bedrock AgentCore Runtime** using Daily as the transport. Users join by visiting a Daily room URL in their browser. The example pipeline orchestrates Deepgram (speech-to-text), Amazon Nova (LLM), and Cartesia (text-to-speech).
 
 ## Prerequisites
 
 - Accounts with:
   - AWS
+  - Daily
   - Deepgram
   - Cartesia
 - Python 3.10 or higher
@@ -18,7 +19,7 @@ This example demonstrates how to deploy a Pipecat voice agent to **Amazon Bedroc
 Configure your IAM user with the necessary policies for AgentCore deployment and management:
 
 - `BedrockAgentCoreFullAccess`
-- A new policy (maybe named `BedrockAgentCoreCLI`) configured [like this](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-permissions.html#runtime-permissions-starter-toolkit), with the following additional statement to support VPC setup and teardown:
+- A new policy (maybe named `BedrockAgentCoreCLI`) configured [like this](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-permissions.html#runtime-permissions-starter-toolkit), with the following additional statement for VPC setup and teardown (required for Daily's UDP transport):
 
   ```json
   {
@@ -95,29 +96,18 @@ uv sync
    - `AWS_REGION`: The AWS region for the Amazon Bedrock LLM used by the agent
    - `DEEPGRAM_API_KEY`: Your Deepgram API key
    - `CARTESIA_API_KEY`: Your Cartesia API key
-   - `ICE_SERVER_URLS`: Your TURN server URLs
-   - `ICE_SERVER_USERNAME`: Your TURN server username
-   - `ICE_SERVER_CREDENTIAL`: Your TURN server credential
-
-   > Important Notes about TURN Server Configuration:
-   >
-   > **VPC Mode (recommended):**
-   >
-   > - Both TCP and UDP TURN are supported via NAT Gateway
-   > - UDP (recommended): `turn:server.example.com:80`
-   > - TCP: `turn:server.example.com:80?transport=tcp`
-   >
-   > **PUBLIC Mode:**
-   >
-   > - Only TCP TURN is supported - use `turn:server.example.com:80?transport=tcp`
-   > - UDP connections are blocked
 
 2. For the server:
+
    ```bash
    cd server
    cp env.example .env
    ```
-   The server configuration is minimal - the `AGENT_RUNTIME_ARN` will be automatically set during agent deployment.
+
+   - `DAILY_ROOM_URL`: Your Daily room URL (e.g. `https://YOURDOMAIN.daily.co/YOURROOM`). The server passes this to the agent at invocation time and returns it to callers of `/start`.
+   - `AGENT_RUNTIME_ARN`: Automatically set during agent deployment
+
+   > You must create a Daily room beforehand via the [Daily dashboard](https://dashboard.daily.co/) or [Daily REST API](https://docs.daily.co/reference/rest-api/rooms/create-room).
 
 ## Agent Configuration
 
@@ -131,12 +121,11 @@ This script automatically:
 
 1. Creates IAM execution role (if needed)
 2. Configures container deployment with docker runtime
-3. Patches Dockerfile to add SmallWebRTC dependencies (`libgl1` and `libglib2.0-0`)
 
 > Technical Note:
 > Direct Code Deploy isn't used because some dependencies (like `numba`) lack `aarch64_manylinux2014` wheels.
 
-## ⚠️ Before Proceeding
+## Before Proceeding
 
 Just in case you've previously deployed other agents to AgentCore, ensure that you have the desired agent selected as "default" in the `agentcore` tool:
 
@@ -151,7 +140,7 @@ The following steps act on `agentcore`'s default agent.
 
 ## Deployment to AgentCore Runtime
 
-**VPC Mode (recommended) - TCP and UDP TURN support:**
+VPC deployment is required for this example. Daily's transport relies on UDP, which is blocked in AgentCore's PUBLIC network mode. VPC mode deploys AgentCore Runtime in private subnets with a NAT Gateway for outbound internet access, enabling UDP connectivity.
 
 ```bash
 # First time: Create VPC infrastructure (NAT Gateway costs ~$32/month)
@@ -163,23 +152,13 @@ The following steps act on `agentcore`'s default agent.
 ./scripts/launch.sh
 ```
 
-This deploys AgentCore Runtime in private subnets with NAT Gateway for outbound internet access, enabling UDP TURN relay (blocked in PUBLIC mode) for better WebRTC connection reliability, lower latency, and enhanced security with private subnet isolation.
-
 **Infrastructure overview:**
 
 - VPC with public and private subnets across 2 availability zones
 - Internet Gateway for public subnet connectivity
 - NAT Gateway in public subnet for private subnet outbound traffic
 - Route tables directing private subnet traffic through NAT Gateway
-- Security groups allowing outbound HTTPS and UDP connections
-
-**PUBLIC Mode - TCP TURN only:**
-
-For development/testing without UDP TURN:
-
-```bash
-./scripts/launch.sh
-```
+- Security groups allowing outbound connections
 
 The launch script:
 
@@ -197,31 +176,24 @@ The launch script:
    uv run server.py
    ```
 
-2. Access the UI:
-   - Open http://localhost:7860 in your browser
-   - Or use your configured custom port
+2. Trigger the agent:
 
-3. Test WebRTC connectivity:
-   - Click "Connect" in the UI
+   ```bash
+   curl -X POST http://localhost:7860/start
+   ```
+
+   This invokes the agent on AgentCore and returns the Daily room URL.
+
+3. Join the call:
+   - Open the Daily room URL in your browser (the `room_url` returned by `/start`)
    - Allow microphone permissions when prompted
-   - Speak to the agent - you should hear a voice response
-   - Verify connection type:
-     - Open browser DevTools (F12 → Console tab)
-     - Type `chrome://webrtc-internals` in address bar (Chrome) or `about:webrtc` (Firefox) for detailed stats
-     - Look for "Selected candidate pair" showing protocol (`udp` for VPC, `tcp` for PUBLIC) and type (`relay` for TURN)
-   - For log monitoring, see the next section below
+   - Speak to the agent -- you should hear a voice response
 
 ## Monitoring and Troubleshooting
 
-### View Intermediary Server Logs
+### View Server Logs
 
-The intermediary server (`server.py`) proxies WebRTC signaling between the browser client and AgentCore Runtime. Check the terminal where the server is already running (from step 1 above).
-
-Look for:
-
-- WebRTC SDP offers and answers
-- ICE candidate exchanges showing protocol (`udp`/`tcp`) and type (`relay`/`host`)
-- Connection events and errors
+The server (`server.py`) invokes the AgentCore agent and returns the room URL. Check the terminal where the server is already running (from step 1 above).
 
 ### View Agent Logs
 
@@ -238,21 +210,6 @@ If you don't have that command handy, no worries. Just run:
 uv run agentcore status
 ```
 
-## Test Agent Manually
-
-Test the agent using the AWS CLI:
-
-```bash
-uv run agentcore invoke \
-  --session-id user-123456-conversation-12345679 \
-  '{
-  "sdp": "YOUR_OFFER",
-  "type": "offer"
-}'
-```
-
-> This will only allow you to see that the Pipecat agent has started, but you won’t be able to hear or send audio. So it is only useful for troubleshooting.
-
 ## Cleanup
 
 Remove your agent:
@@ -261,7 +218,7 @@ Remove your agent:
 ./scripts/destroy.sh
 ```
 
-If using VPC mode, remove VPC resources:
+Remove VPC resources:
 
 ```bash
 ./scripts/cleanup-vpc.sh
@@ -278,4 +235,4 @@ PIPECAT_LOCAL_DEV=1 uv run pipecat-agent.py
 ## Additional Resources
 
 - [Amazon Bedrock AgentCore Developer Guide](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/what-is-bedrock-agentcore.html)
-- [TURN Server Configuration Guide](https://webrtc.org/getting-started/turn-server)
+- [Daily Documentation](https://docs.daily.co/)
