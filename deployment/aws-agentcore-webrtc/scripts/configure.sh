@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Script to configure the bot, patch Dockerfile and sync AGENT_RUNTIME_ARN
+# Script to detect/create IAM execution role, configure AgentCore and patch Dockerfile
 
 DOCKERFILE=".bedrock_agentcore/pipecat_agent/Dockerfile"
 TARGET_LINE="RUN cd . && uv pip install ."

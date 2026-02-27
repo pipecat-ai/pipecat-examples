@@ -15,10 +15,43 @@ This example demonstrates how to deploy a Pipecat voice agent to **Amazon Bedroc
 
 ### IAM Configuration
 
-Configure your IAM user with the necessary policies for AgentCore deployment:
+Configure your IAM user with the necessary policies for AgentCore deployment and management:
 
 - `BedrockAgentCoreFullAccess`
-- A new policy (maybe named `BedrockAgentCoreCLI`) configured [like this](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-permissions.html#runtime-permissions-starter-toolkit)
+- A new policy (maybe named `BedrockAgentCoreCLI`) configured [like this](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-permissions.html#runtime-permissions-starter-toolkit), with the following additional statement to support VPC setup and teardown:
+
+  ```json
+  {
+    "Sid": "EC2Access",
+    "Effect": "Allow",
+    "Action": [
+      "ec2:CreateVpc",
+      "ec2:CreateTags",
+      "ec2:ModifyVpcAttribute",
+      "ec2:CreateInternetGateway",
+      "ec2:AttachInternetGateway",
+      "ec2:DescribeAvailabilityZones",
+      "ec2:CreateSubnet",
+      "ec2:AllocateAddress",
+      "ec2:CreateNatGateway",
+      "ec2:DescribeNatGateways",
+      "ec2:CreateRouteTable",
+      "ec2:CreateRoute",
+      "ec2:AssociateRouteTable",
+      "ec2:CreateSecurityGroup",
+      "ec2:AuthorizeSecurityGroupEgress",
+      "ec2:DeleteNatGateway",
+      "ec2:ReleaseAddress",
+      "ec2:DetachInternetGateway",
+      "ec2:DeleteInternetGateway",
+      "ec2:DeleteSubnet",
+      "ec2:DeleteRouteTable",
+      "ec2:DeleteSecurityGroup",
+      "ec2:DeleteVpc"
+    ],
+    "Resource": "*"
+  }
+  ```
 
 You can also choose to specify more granular permissions; see [Amazon Bedrock AgentCore docs](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-permissions.html) for more information.
 
@@ -57,7 +90,6 @@ uv sync
    ```
 
    Add your API keys:
-
    - `AWS_ACCESS_KEY_ID`: Your AWS access key ID for the Amazon Bedrock LLM used by the agent
    - `AWS_SECRET_ACCESS_KEY`: Your AWS secret access key for the Amazon Bedrock LLM used by the agent
    - `AWS_REGION`: The AWS region for the Amazon Bedrock LLM used by the agent
@@ -70,11 +102,13 @@ uv sync
    > Important Notes about TURN Server Configuration:
    >
    > **VPC Mode (recommended):**
+   >
    > - Both TCP and UDP TURN are supported via NAT Gateway
    > - UDP (recommended): `turn:server.example.com:80`
    > - TCP: `turn:server.example.com:80?transport=tcp`
    >
    > **PUBLIC Mode:**
+   >
    > - Only TCP TURN is supported - use `turn:server.example.com:80?transport=tcp`
    > - UDP connections are blocked
 
@@ -94,6 +128,7 @@ Configure your bot as an AgentCore agent:
 ```
 
 This script automatically:
+
 1. Creates IAM execution role (if needed)
 2. Configures container deployment with docker runtime
 3. Patches Dockerfile to add SmallWebRTC dependencies (`libgl1` and `libglib2.0-0`)
@@ -120,6 +155,7 @@ The following steps act on `agentcore`'s default agent.
 
 ```bash
 # First time: Create VPC infrastructure (NAT Gateway costs ~$32/month)
+# Note that this creates various Elastic IP addresses; ensure you have sufficient quota (https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/elastic-ip-addresses-eip.html#using-instance-addressing-limit)
 ./scripts/setup-vpc.sh
 
 # Deploy agent
@@ -129,6 +165,7 @@ The following steps act on `agentcore`'s default agent.
 This deploys AgentCore Runtime in private subnets with NAT Gateway for outbound internet access, enabling UDP TURN relay (blocked in PUBLIC mode) for better WebRTC connection reliability, lower latency, and enhanced security with private subnet isolation.
 
 **Infrastructure overview:**
+
 - VPC with public and private subnets across 2 availability zones
 - Internet Gateway for public subnet connectivity
 - NAT Gateway in public subnet for private subnet outbound traffic
@@ -144,6 +181,7 @@ For development/testing without UDP TURN:
 ```
 
 The launch script:
+
 1. Reads environment variables from `agent/.env`
 2. Deploys to AgentCore
 3. Updates the server's configuration with the agent ARN
@@ -179,6 +217,7 @@ The launch script:
 The intermediary server (`server.py`) proxies WebRTC signaling between the browser client and AgentCore Runtime. Check the terminal where the server is already running (from step 1 above).
 
 Look for:
+
 - WebRTC SDP offers and answers
 - ICE candidate exchanges showing protocol (`udp`/`tcp`) and type (`relay`/`host`)
 - Connection events and errors
