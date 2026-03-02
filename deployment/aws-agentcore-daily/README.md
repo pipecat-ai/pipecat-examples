@@ -229,7 +229,7 @@ Remove VPC resources:
 Run your bot locally for testing:
 
 ```bash
-PIPECAT_LOCAL_DEV=1 uv run pipecat-agent.py
+PIPECAT_LOCAL_DEV=1 uv run pipecat-agent.py -t daily -d
 ```
 
 ## Additional Resources
