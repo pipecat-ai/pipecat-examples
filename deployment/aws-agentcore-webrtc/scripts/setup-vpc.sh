@@ -232,8 +232,7 @@ SG_ID=$(aws ec2 create-security-group \
     --query 'GroupId' \
     --output text)
 
-# Allow all outbound traffic (default for security groups)
-# Allow HTTPS outbound to AWS services
+# Allow all outbound traffic
 aws ec2 authorize-security-group-egress \
     --group-id $SG_ID \
     --ip-permissions IpProtocol=-1,FromPort=-1,ToPort=-1,IpRanges='[{CidrIp=0.0.0.0/0}]' \
