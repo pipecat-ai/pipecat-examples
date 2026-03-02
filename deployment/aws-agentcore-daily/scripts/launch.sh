@@ -22,34 +22,34 @@ source "$AGENT_ENV_FILE"
 set +a
 
 ###############################################
-# STEP 3 — Check VPC configuration
+# STEP 3 — Apply VPC configuration (if available)
 ###############################################
-NETWORK_MODE=$(grep -A 2 "network_mode:" .bedrock_agentcore.yaml | grep "network_mode:" | awk '{print $2}')
-
-if [ "$NETWORK_MODE" = "VPC" ]; then
+if [ -f "vpc-config.env" ]; then
     echo ""
-    echo "VPC mode detected in configuration..."
+    echo "Applying VPC configuration from vpc-config.env..."
+    source vpc-config.env
 
-    # Check if VPC is already configured
-    if [ ! -f "vpc-config.env" ]; then
-        echo ""
-        echo "⚠️  VPC configuration not found. VPC must be configured first."
-        echo ""
-        read -p "Do you want to create VPC infrastructure now? (y/n): " -n 1 -r
-        echo ""
-        if [[ $REPLY =~ ^[Yy]$ ]]; then
-            echo "Running VPC setup..."
-            ./scripts/setup-vpc.sh
-        else
-            echo "❌ VPC setup cancelled. Please run './scripts/setup-vpc.sh' before deploying."
-            exit 1
-        fi
-    else
-        echo "✅ VPC configuration found (vpc-config.env)"
-        source vpc-config.env
-        echo "   VPC ID: $VPC_ID"
-        echo "   Private Subnets: $PRIVATE_SUBNET_1, $PRIVATE_SUBNET_2"
-    fi
+    # Update .bedrock_agentcore.yaml with VPC network settings
+    cp .bedrock_agentcore.yaml .bedrock_agentcore.yaml.backup
+    sed -i.tmp "s/network_mode: PUBLIC/network_mode: VPC/" .bedrock_agentcore.yaml
+    sed -i.tmp "s/network_mode_config: null/network_mode_config:\\
+          subnets:\\
+            - $PRIVATE_SUBNET_1\\
+            - $PRIVATE_SUBNET_2\\
+          security_groups:\\
+            - $SG_ID/" .bedrock_agentcore.yaml
+    rm -f .bedrock_agentcore.yaml.tmp
+
+    NETWORK_MODE="VPC"
+    echo "✅ VPC configuration applied"
+    echo "   VPC ID: $VPC_ID"
+    echo "   Private Subnets: $PRIVATE_SUBNET_1, $PRIVATE_SUBNET_2"
+    echo "   Security Group: $SG_ID"
+else
+    echo ""
+    echo "⚠️  No vpc-config.env found. Please run './scripts/setup-vpc.sh' first."
+    echo "   VPC is required for Daily transport (UDP must not be blocked)."
+    exit 1
 fi
 
 ###############################################

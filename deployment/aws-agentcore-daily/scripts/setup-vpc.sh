@@ -242,30 +242,7 @@ aws ec2 authorize-security-group-egress \
 echo "✅ Security group created: $SG_ID"
 
 ###############################################
-# STEP 9 — Update .bedrock_agentcore.yaml
-###############################################
-echo ""
-echo "Updating .bedrock_agentcore.yaml with VPC configuration..."
-
-# Backup the original file
-cp .bedrock_agentcore.yaml .bedrock_agentcore.yaml.backup
-
-# Update network configuration using sed (preserves formatting better than Python YAML)
-sed -i.tmp "s/network_mode: PUBLIC/network_mode: VPC/" .bedrock_agentcore.yaml
-sed -i.tmp "s/network_mode_config: null/network_mode_config:\\
-          subnets:\\
-            - $PRIVATE_SUBNET_1\\
-            - $PRIVATE_SUBNET_2\\
-          security_groups:\\
-            - $SG_ID/" .bedrock_agentcore.yaml
-
-# Clean up temp file
-rm -f .bedrock_agentcore.yaml.tmp
-
-echo "✅ Configuration updated (backup saved as .bedrock_agentcore.yaml.backup)"
-
-###############################################
-# STEP 10 — Save VPC configuration
+# STEP 9 — Save VPC configuration (used by launch.sh)
 ###############################################
 echo ""
 echo "Saving VPC configuration to vpc-config.env..."
@@ -295,7 +272,7 @@ EOF
 echo "✅ VPC configuration saved"
 
 ###############################################
-# STEP 11 — Summary
+# STEP 10 — Summary
 ###############################################
 echo ""
 echo "=========================================="
@@ -309,8 +286,7 @@ echo "NAT Gateway: $NAT_GW_ID"
 echo "Security Group: $SG_ID"
 echo ""
 echo "Configuration saved to:"
-echo "  - .bedrock_agentcore.yaml (updated)"
-echo "  - vpc-config.env (for reference)"
+echo "  - vpc-config.env"
 echo ""
 echo "Next step: Run ./scripts/launch.sh to deploy to VPC"
 echo ""
