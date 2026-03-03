@@ -14,6 +14,8 @@ import urllib.request
 from urllib.parse import urlparse
 
 from bedrock_agentcore import BedrockAgentCoreApp
+from daily import Daily
+from daily import LogLevel as DailyLogLevel
 from dotenv import load_dotenv
 from loguru import logger
 from pipecat.audio.vad.silero import SileroVADAnalyzer
@@ -31,7 +33,6 @@ from pipecat.services.aws.llm import AWSBedrockLLMService
 from pipecat.services.cartesia.tts import CartesiaTTSService
 from pipecat.services.deepgram.stt import DeepgramSTTService
 from pipecat.transports.daily.transport import DailyParams, DailyTransport
-from daily import Daily, LogLevel as DailyLogLevel
 
 app = BedrockAgentCoreApp()
 
@@ -259,8 +260,7 @@ def setup_ice_relay_workaround(room_url):
         return None
 
     logger.info(
-        f"IPv6-only environment detected (address: {ipv6_addr}),"
-        " setting up ICE relay workaround"
+        f"IPv6-only environment detected (address: {ipv6_addr}), setting up ICE relay workaround"
     )
 
     ice_servers = _fetch_daily_ice_servers(room_url)
@@ -289,9 +289,7 @@ def setup_ice_relay_workaround(room_url):
             # Resolve the TURN hostname to an IPv4 address using Python's DNS,
             # which can reach IPv4 DNS servers via the NAT Gateway.
             try:
-                results = socket.getaddrinfo(
-                    host, port, socket.AF_INET, socket.SOCK_DGRAM
-                )
+                results = socket.getaddrinfo(host, port, socket.AF_INET, socket.SOCK_DGRAM)
                 ipv4_addr = results[0][4][0]
             except Exception as e:
                 logger.warning(f"Could not resolve {host} to IPv4, skipping: {e}")
@@ -311,11 +309,13 @@ def setup_ice_relay_workaround(room_url):
             modified_urls.append(new_url)
 
         if modified_urls:
-            modified_servers.append({
-                "urls": modified_urls,
-                "username": server.get("username", ""),
-                "credential": server.get("credential", ""),
-            })
+            modified_servers.append(
+                {
+                    "urls": modified_urls,
+                    "username": server.get("username", ""),
+                    "credential": server.get("credential", ""),
+                }
+            )
 
     if not modified_servers:
         logger.warning("No UDP TURN/STUN servers could be relayed")
