@@ -15,7 +15,6 @@ from urllib.parse import urlparse
 
 from bedrock_agentcore import BedrockAgentCoreApp
 from daily import Daily
-from daily import LogLevel as DailyLogLevel
 from dotenv import load_dotenv
 from loguru import logger
 from pipecat.audio.vad.silero import SileroVADAnalyzer
@@ -456,8 +455,6 @@ async def agentcore_bot(payload, context):
     if ice_config:
         transport._client._client.set_ice_config(ice_config)
 
-    Daily.set_log_level(DailyLogLevel.Debug)
-
     try:
         async for result in run_bot(transport):
             yield result
@@ -488,8 +485,6 @@ async def bot(runner_args: RunnerArguments):
             audio_out_enabled=True,
         ),
     )
-
-    Daily.set_log_level(DailyLogLevel.Debug)
 
     async for result in run_bot(transport):
         pass  # Consume the stream
