@@ -455,18 +455,8 @@ async def agentcore_bot(payload, context):
     if ice_config:
         transport._client._client.set_ice_config(ice_config)
 
-    try:
-        async for result in run_bot(transport):
-            yield result
-    finally:
-        # Clean up Daily/libwebrtc state between runs. AgentCore reuses
-        # containers, so without this, stale state from a previous invocation
-        # can cause issues on subsequent runs.
-        logger.info("Deinitializing Daily to clean up libwebrtc state")
-        try:
-            Daily.deinit()
-        except Exception as e:
-            logger.warning(f"Daily.deinit() failed: {e}")
+    async for result in run_bot(transport):
+        yield result
 
 
 # Used for local development
