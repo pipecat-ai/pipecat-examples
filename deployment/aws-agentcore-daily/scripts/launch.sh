@@ -47,9 +47,9 @@ if [ -f "vpc-config.env" ]; then
     echo "   Security Group: $SG_ID"
 else
     echo ""
-    echo "No vpc-config.env found. Deploying in PUBLIC mode (TCP TURN only)."
-    echo "For VPC mode with UDP TURN support, run './scripts/setup-vpc.sh' first."
-    NETWORK_MODE="PUBLIC"
+    echo "⚠️  No vpc-config.env found. Please run './scripts/setup-vpc.sh' first."
+    echo "   VPC is required for Daily transport (UDP must not be blocked)."
+    exit 1
 fi
 
 ###############################################
@@ -158,9 +158,5 @@ if [ "$NETWORK_MODE" = "VPC" ]; then
 fi
 echo "Next steps:"
 echo "1. Start the server: cd server && uv run server.py"
-echo "2. Open browser: http://localhost:7860"
-if [ "$NETWORK_MODE" = "VPC" ]; then
-    echo "3. Test WebRTC connection through VPC with TURN relay"
-else
-    echo "3. Test WebRTC connection with TURN relay"
-fi
+echo "2. Start the agent: curl -X POST http://localhost:7860/start"
+echo "3. Open your Daily room URL in your browser to talk to the agent"

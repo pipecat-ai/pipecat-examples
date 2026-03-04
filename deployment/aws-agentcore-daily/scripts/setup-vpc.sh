@@ -25,7 +25,7 @@ echo ""
 echo "Creating VPC..."
 VPC_ID=$(aws ec2 create-vpc \
     --cidr-block 10.0.0.0/16 \
-    --tag-specifications 'ResourceType=vpc,Tags=[{Key=Name,Value=agentcore-webrtc-vpc}]' \
+    --tag-specifications 'ResourceType=vpc,Tags=[{Key=Name,Value=agentcore-daily-vpc}]' \
     --region $AWS_REGION \
     --query 'Vpc.VpcId' \
     --output text)
@@ -44,7 +44,7 @@ aws ec2 modify-vpc-attribute \
 echo ""
 echo "Creating Internet Gateway..."
 IGW_ID=$(aws ec2 create-internet-gateway \
-    --tag-specifications 'ResourceType=internet-gateway,Tags=[{Key=Name,Value=agentcore-webrtc-igw}]' \
+    --tag-specifications 'ResourceType=internet-gateway,Tags=[{Key=Name,Value=agentcore-daily-igw}]' \
     --region $AWS_REGION \
     --query 'InternetGateway.InternetGatewayId' \
     --output text)
@@ -224,15 +224,16 @@ echo "Creating security groups..."
 
 # Create security group for AgentCore Runtime
 SG_ID=$(aws ec2 create-security-group \
-    --group-name agentcore-webrtc-sg \
-    --description "Security group for AgentCore WebRTC runtime" \
+    --group-name agentcore-daily-sg \
+    --description "Security group for AgentCore Daily runtime" \
     --vpc-id $VPC_ID \
-    --tag-specifications 'ResourceType=security-group,Tags=[{Key=Name,Value=agentcore-webrtc-sg}]' \
+    --tag-specifications 'ResourceType=security-group,Tags=[{Key=Name,Value=agentcore-daily-sg}]' \
     --region $AWS_REGION \
     --query 'GroupId' \
     --output text)
 
-# Allow all outbound traffic
+# Allow all outbound traffic (default for security groups)
+# Allow HTTPS outbound to AWS services
 aws ec2 authorize-security-group-egress \
     --group-id $SG_ID \
     --ip-permissions IpProtocol=-1,FromPort=-1,ToPort=-1,IpRanges='[{CidrIp=0.0.0.0/0}]' \

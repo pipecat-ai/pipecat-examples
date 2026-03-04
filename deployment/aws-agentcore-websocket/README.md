@@ -161,10 +161,10 @@ uv run agentcore status
 
 ## Agent Deletion
 
-Delete your agent from AgentCore:
+Delete your agent from AgentCore and clean up generated files:
 
 ```bash
-uv run agentcore destroy
+./scripts/destroy.sh
 ```
 
 ## Additional Resources
