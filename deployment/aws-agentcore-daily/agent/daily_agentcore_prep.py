@@ -1,5 +1,5 @@
 # =============================================================================
-# Workarounds for Daily running in AgentCore's IPv6-only environment
+# Preparing Daily's transport for AgentCore's IPv6-only environment
 # =============================================================================
 #
 # AgentCore runs containers in an IPv6-only network. Normal Python code that
@@ -37,8 +37,8 @@ from loguru import logger
 from pipecat.transports.daily.transport import DailyTransport
 
 
-def apply_daily_transport_agentcore_workarounds(transport: DailyTransport):
-    """Apply the workarounds to a DailyTransport if needed.
+def prepare_daily_transport_for_agentcore(transport: DailyTransport):
+    """Prepare a DailyTransport for AgentCore's IPv6-only environment.
 
     No-op on normal (non-IPv6-only) networks.
     """

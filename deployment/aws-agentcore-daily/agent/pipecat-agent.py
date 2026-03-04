@@ -8,7 +8,7 @@ import os
 
 from bedrock_agentcore import BedrockAgentCoreApp
 from daily import Daily
-from daily_agentcore_workarounds import apply_daily_transport_agentcore_workarounds
+from daily_agentcore_prep import prepare_daily_transport_for_agentcore
 from dotenv import load_dotenv
 from loguru import logger
 from pipecat.audio.vad.silero import SileroVADAnalyzer
@@ -145,7 +145,7 @@ async def agentcore_bot(payload, context):
         ),
     )
 
-    apply_daily_transport_agentcore_workarounds(transport)
+    prepare_daily_transport_for_agentcore(transport)
 
     async for result in run_bot(transport):
         yield result
