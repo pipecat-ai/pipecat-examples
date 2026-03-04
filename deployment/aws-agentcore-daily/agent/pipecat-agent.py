@@ -6,9 +6,9 @@
 
 import os
 
-from daily_agentcore_workarounds import apply_daily_transport_agentcore_workarounds
 from bedrock_agentcore import BedrockAgentCoreApp
 from daily import Daily
+from daily_agentcore_workarounds import apply_daily_transport_agentcore_workarounds
 from dotenv import load_dotenv
 from loguru import logger
 from pipecat.audio.vad.silero import SileroVADAnalyzer
