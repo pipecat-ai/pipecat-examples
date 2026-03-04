@@ -42,51 +42,35 @@ load_dotenv(override=True)
 # ICE relay workaround for IPv6-only container environments
 # =============================================================================
 #
-# WHY THIS IS NEEDED:
+# AgentCore runs containers in an IPv6-only network. Normal Python code that
+# needs to talk to IPv4 services (like TURN servers) works transparently —
+# DNS64 synthesizes IPv6 addresses and NAT64 translates the packets — so
+# Python never even knows it's talking to an IPv4 server.
 #
-# Amazon Bedrock AgentCore Runtime runs containers in an IPv6-only network.
-# The containers DO have IPv4 connectivity — outbound IPv4 traffic is routed
-# through the VPC's NAT Gateway — but only at the transport level. At the DNS
-# level, the container's resolver only returns AAAA (IPv6) records.
+# Daily's libwebrtc, however, doesn't seem to play nicely with the
+# environment's DNS64 + NAT64, so it can't reach the TURN servers it needs
+# for audio/video. This workaround essentially implements our own DNS64 + NAT64
+# translation for Daily's TURN servers specifically:
 #
-# This is fine for most Python code: Python's socket module transparently uses
-# the system DNS resolver, which returns IPv4 A records that work via the NAT
-# Gateway. But Daily's transport uses an embedded copy of libwebrtc, which has
-# its OWN DNS resolver that performs only AAAA lookups. Since most TURN servers
-# only publish A (IPv4) DNS records, libwebrtc's DNS lookups fail and it cannot
-# establish TURN relay connections. Without TURN, the bot cannot send or receive
-# audio/video.
+#   1. We resolve TURN hostnames using Python's DNS (which goes through DNS64
+#      and works fine).
 #
-# HOW IT WORKS:
+#   2. For each TURN server, we start a local UDP relay on the container's
+#      IPv6 address that forwards packets to the real IPv4 TURN server.
 #
-#   1. We fetch Daily's ICE configuration for the room (TURN server URLs and
-#      credentials) using Python's HTTP stack, which has no trouble reaching
-#      IPv4 services.
+#   3. We tell libwebrtc (via set_ice_config) to connect to our local relays
+#      instead of the original TURN hostnames. From its perspective, the TURN
+#      server is at a reachable IPv6 address — no DNS lookup needed.
 #
-#   2. For each TURN server, we resolve its hostname to an IPv4 address using
-#      Python's DNS (which works), then start a local UDP relay that listens
-#      on the container's IPv6 address and forwards traffic to the IPv4 TURN
-#      server via the NAT Gateway.
-#
-#   3. We call Daily's set_ice_config() API to tell libwebrtc to connect to
-#      our local IPv6 relays instead of the original TURN servers. From
-#      libwebrtc's perspective, the TURN server is at a reachable IPv6 address.
-#      The original TURN credentials are passed through unchanged.
-#
-# WHEN IT ACTIVATES:
-#
-# The workaround only activates when the container has a global IPv6 address
-# (indicating an IPv6-only environment). On a normal dual-stack network (e.g.
-# local development), libwebrtc can resolve TURN hostnames directly and the
-# workaround is skipped.
+# On a normal network (e.g. local development), the workaround is skipped.
 # =============================================================================
 
 
 def _get_ipv6_address():
     """Get the container's global-scope IPv6 address, or None.
 
-    Reads /proc/net/if_inet6 to find a global-scope (scope 00) address.
-    Falls back to a dummy-connect trick if /proc is unavailable.
+    A global IPv6 address indicates an IPv6-only environment where the
+    workaround is needed. Returns None on normal dual-stack networks.
     """
     # Primary: read from /proc/net/if_inet6 (works even without a default IPv6 route)
     try:
@@ -113,12 +97,11 @@ def _get_ipv6_address():
 
 
 def _start_udp_relay(ipv6_bind_addr, ipv4_target_addr, ipv4_target_port):
-    """Start a UDP relay that forwards IPv6 traffic to an IPv4 target.
+    """Start a UDP relay: listens on an IPv6 address, forwards to an IPv4 target.
 
-    Binds to a random port on the given IPv6 address and forwards all received
-    UDP datagrams to the specified IPv4 address:port. Responses from the IPv4
-    target are forwarded back to the original IPv6 sender. Each unique IPv6
-    sender gets its own IPv4 socket so that responses are routed correctly.
+    This is the packet-translation half of the workaround. libwebrtc sends
+    IPv6 UDP packets to our relay, and we re-send them as IPv4 packets to the
+    real TURN server (and vice versa for responses).
 
     Returns the port number the relay is listening on.
     """
@@ -161,14 +144,10 @@ def _start_udp_relay(ipv6_bind_addr, ipv4_target_addr, ipv4_target_port):
 
 
 def _fetch_daily_ice_servers(room_url):
-    """Fetch ICE server configuration from Daily for the given room.
+    """Fetch TURN/STUN server list and credentials from Daily for the given room.
 
-    Args:
-        room_url: A Daily room URL, e.g. "https://mydomain.daily.co/myroom".
-
-    Returns:
-        A list of ICE server dicts (each with "urls", "username", "credential"),
-        or None if the fetch fails.
+    We use Python's HTTP stack (which works fine via DNS64 + NAT64) to get the
+    server list that libwebrtc would normally discover on its own.
     """
     parsed = urlparse(room_url)
     host_parts = parsed.hostname.split(".")
@@ -199,12 +178,7 @@ def _fetch_daily_ice_servers(room_url):
 def _parse_ice_url(url):
     """Parse a TURN/STUN URL into (scheme, host, port, query_string).
 
-    ICE URLs follow the format defined in RFC 7064/7065:
-      turn:hostname:port?transport=udp
-      turns:hostname:port?transport=tcp
-      stun:hostname:port
-
-    Returns a (scheme, host, port, query) tuple, or None if parsing fails.
+    E.g. "turn:hostname:3478?transport=udp" -> ("turn", "hostname", 3478, "transport=udp")
     """
     query = ""
     if "?" in url:
@@ -221,11 +195,7 @@ def _parse_ice_url(url):
 
 
 def _is_udp_transport(scheme, query):
-    """Check whether an ICE URL uses UDP transport (which we can relay).
-
-    We can only relay UDP traffic. TURNS (TLS-over-TCP) and explicit
-    ?transport=tcp URLs require TCP relaying which this code doesn't handle.
-    """
+    """Check whether an ICE URL uses UDP transport (the only kind we relay)."""
     if scheme in ("turns", "stuns"):
         return False
     if "transport=tcp" in query:
@@ -234,24 +204,10 @@ def _is_udp_transport(scheme, query):
 
 
 def setup_ice_relay_workaround(room_url):
-    """Set up IPv6-to-IPv4 UDP relays for TURN servers that libwebrtc can't reach.
+    """Set up local IPv6-to-IPv4 relays for TURN servers that libwebrtc can't reach.
 
-    See the module-level comment block for a full explanation of why this is
-    needed and how it works.
-
-    This function:
-      1. Detects whether we're in an IPv6-only environment (skips otherwise)
-      2. Fetches the room's ICE configuration from Daily
-      3. For each UDP TURN server, resolves the hostname to IPv4 and starts
-         a local UDP relay on the container's IPv6 address
-      4. Returns a modified ICE configuration pointing to the local relays
-
-    Args:
-        room_url: The Daily room URL to fetch ICE configuration for.
-
-    Returns:
-        An ice_config dict suitable for passing to CallClient.set_ice_config(),
-        or None if the workaround is not needed or setup failed.
+    Returns an ice_config dict for CallClient.set_ice_config() that points
+    libwebrtc at our local relays, or None if the workaround isn't needed.
     """
     ipv6_addr = _get_ipv6_address()
     if not ipv6_addr:
@@ -266,8 +222,7 @@ def setup_ice_relay_workaround(room_url):
     if not ice_servers:
         return None
 
-    # Track relays by (ipv4_addr, port) to reuse relays when multiple ICE
-    # server entries point to the same underlying server.
+    # Reuse relays when multiple ICE entries point to the same server.
     relay_cache = {}  # (ipv4_addr, port) -> relay_port
 
     modified_servers = []
@@ -285,8 +240,7 @@ def setup_ice_relay_workaround(room_url):
                 logger.debug(f"Skipping non-UDP ICE URL: {url}")
                 continue
 
-            # Resolve the TURN hostname to an IPv4 address using Python's DNS,
-            # which can reach IPv4 DNS servers via the NAT Gateway.
+            # Resolve the hostname ourselves using Python's DNS (works via DNS64).
             try:
                 results = socket.getaddrinfo(host, port, socket.AF_INET, socket.SOCK_DGRAM)
                 ipv4_addr = results[0][4][0]
@@ -294,7 +248,7 @@ def setup_ice_relay_workaround(room_url):
                 logger.warning(f"Could not resolve {host} to IPv4, skipping: {e}")
                 continue
 
-            # Start a relay (or reuse an existing one for the same target).
+            # Start a relay (or reuse one for the same target).
             cache_key = (ipv4_addr, port)
             if cache_key not in relay_cache:
                 relay_port = _start_udp_relay(ipv6_addr, ipv4_addr, port)
@@ -325,8 +279,7 @@ def setup_ice_relay_workaround(room_url):
         f" for {len(modified_servers)} ICE server entry/entries"
     )
 
-    # Use "replace" placement so libwebrtc ONLY uses our relayed servers and
-    # doesn't attempt DNS lookups for the original (unreachable) hostnames.
+    # "replace" so libwebrtc only uses our relays (no DNS lookups for originals).
     return {
         "placement": "replace",
         "iceServers": modified_servers,
@@ -436,8 +389,8 @@ async def agentcore_bot(payload, context):
         yield {"status": "error", "message": "room_url not provided in payload"}
         return
 
-    # Fetch Daily's ICE config and set up local relays BEFORE creating the
-    # transport, so the relays are ready when libwebrtc starts connecting.
+    # Set up local relays before creating the transport, so they're ready
+    # when libwebrtc starts connecting.
     ice_config = setup_ice_relay_workaround(room_url)
 
     transport = DailyTransport(
@@ -450,8 +403,7 @@ async def agentcore_bot(payload, context):
         ),
     )
 
-    # Apply the relayed ICE configuration so libwebrtc connects to our local
-    # IPv6 relays instead of trying (and failing) to resolve TURN hostnames.
+    # Point libwebrtc at our local relays instead of the real TURN hostnames.
     if ice_config:
         transport._client._client.set_ice_config(ice_config)
 
