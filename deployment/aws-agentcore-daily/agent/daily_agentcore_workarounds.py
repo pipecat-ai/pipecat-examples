@@ -221,6 +221,8 @@ def _build_translated_ice_config(room_url):
 
             scheme, host, port, query = parsed
 
+            # Since we fully expect UDP to work in this environment, we're only
+            # bothering to apply the workaround to UDP URLs
             if not _is_udp_transport(scheme, query):
                 logger.debug(f"Skipping non-UDP ICE URL: {url}")
                 continue
