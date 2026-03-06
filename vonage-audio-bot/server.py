@@ -7,11 +7,14 @@ and a WebSocket endpoint to receive/send media frames via Pipecat.
 Run:
   uvicorn vonage_server:app --host 0.0.0.0 --port 8005
 
-Env required:
+Env required (Video API /connect):
   VONAGE_API_KEY
   VONAGE_API_SECRET
   VONAGE_SESSION_ID
   VONAGE_AUDIO_WS_URI          (public wss://.../ws OR omit and let server build)
+Env required (Voice API /answer):
+  WS_URI                       (public wss://.../ws for websocket)
+  VONAGE_VOICE_FROM_NUMBER     (linked Vonage number, e.g. 19045878905)
 Optional:
   OPENTOK_API_URL              (default https://api.opentok.com)
   VONAGE_AUDIO_RATE            (default 16000)
@@ -19,6 +22,7 @@ Optional:
 """
 
 import asyncio
+import json
 import os
 from contextlib import asynccontextmanager
 from typing import Any, Dict, Optional
@@ -27,7 +31,7 @@ import uvicorn
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Request, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, PlainTextResponse
 from loguru import logger
 from opentok import Client as OpenTokClient  # Opentok Video SDK
 from vonage import Auth, HttpClientOptions, Vonage
@@ -132,6 +136,78 @@ app.add_middleware(
 @app.get("/health")
 async def health():
     return {"ok": True}
+
+
+@app.api_route("/answer", methods=["GET", "POST"])
+async def answer(request: Request):
+    """
+    Vonage Voice API calls this webhook to get the NCCO.
+    Accepts GET or POST to make local testing easier.
+    Returns NCCO that connects the call to our WebSocket for Pipecat.
+    """
+    logger.debug("Incoming /answer request")
+    try:
+        body = await request.body()
+        if body:
+            logger.info("ANSWER body: {}", body.decode("utf-8", errors="replace"))
+    except Exception:
+        pass
+
+    logger.info("ANSWER query: {}", dict(request.query_params))
+
+    ws_uri = os.getenv("WS_URI")
+    from_number = os.getenv("VONAGE_VOICE_FROM_NUMBER")
+    if not ws_uri:
+        raise HTTPException(status_code=500, detail="Missing env var: WS_URI")
+    if not from_number:
+        raise HTTPException(
+            status_code=500,
+            detail="Missing env var: VONAGE_VOICE_FROM_NUMBER (linked Vonage number, e.g. 19045878905)",
+        )
+
+    ncco = [
+        {
+            "action": "talk",
+            "text": "Please wait while we connect you to the A I agent",
+        },
+        {
+            "action": "connect",
+            "from": from_number,
+            "endpoint": [
+                {
+                    "type": "websocket",
+                    "uri": ws_uri,
+                    "content-type": "audio/l16;rate=16000",
+                }
+            ],
+        },
+    ]
+    response = JSONResponse(content=ncco)
+    logger.debug("Sending NCCO: {}", response.body)
+    return response
+
+
+@app.api_route("/events", methods=["GET", "POST"])
+async def events(request: Request):
+    """
+    Vonage Voice API status events webhooks land here.
+    Accepts GET or POST (Vonage dashboard lets you choose either).
+    We log and return 200 OK.
+    """
+    if request.method == "GET":
+        # Vonage sends event data as query params for GET
+        event_data = dict(request.query_params)
+        logger.info("EVENTS (GET) query: {}", json.dumps(event_data, indent=2))
+    else:
+        raw = await request.body()
+        text = raw.decode("utf-8", errors="replace")
+        try:
+            parsed = json.loads(text) if text else None
+            logger.info("EVENTS (POST) json: {}", json.dumps(parsed, indent=2))
+        except Exception:
+            logger.info("EVENTS (POST) raw: {}", text)
+
+    return PlainTextResponse("ok")
 
 
 @app.post("/connect")
