@@ -28,6 +28,7 @@ from loguru import logger
 from pipecat.adapters.schemas.tools_schema import ToolsSchema
 from pipecat.audio.mixers.soundfile_mixer import SoundfileMixer
 from pipecat.audio.vad.silero import SileroVADAnalyzer
+from pipecat.extensions.voicemail.voicemail_detector import VoicemailDetector
 from pipecat.frames.frames import (
     BotStoppedSpeakingFrame,
     ControlFrame,
@@ -36,6 +37,7 @@ from pipecat.frames.frames import (
     LLMMessagesAppendFrame,
     LLMRunFrame,
     MixerEnableFrame,
+    TTSSpeakFrame,
 )
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
@@ -335,6 +337,9 @@ async def run_bot(
 
     llm = OpenAILLMService(api_key=os.getenv("OPENAI_API_KEY"))
 
+    classifier_llm = OpenAILLMService(api_key=os.getenv("OPENAI_API_KEY"))
+    voicemail = VoicemailDetector(llm=classifier_llm)
+
     system_instruction = build_system_prompt(config)
 
     messages: list[LLMContextMessage] = [{"role": "system", "content": system_instruction}]
@@ -404,9 +409,11 @@ async def run_bot(
         [
             transport.input(),
             stt,
+            voicemail.detector(),
             user_aggregator,
             llm,
             tts,
+            voicemail.gate(),
             transfer_coordinator,
             transport.output(),
             assistant_aggregator,
@@ -451,6 +458,20 @@ async def run_bot(
     async def on_dialout_error(transport, data) -> None:
         logger.error(f"Dialout error: {data}")
         await task.queue_frame(DialoutErrorFrame())
+
+    @voicemail.event_handler("on_conversation_detected")
+    async def on_conversation_detected(processor):
+        logger.info("Conversation detected - proceeding with transfer")
+
+    @voicemail.event_handler("on_voicemail_detected")
+    async def on_voicemail_detected(processor):
+        logger.info("Voicemail detected on transfer target!")
+        await processor.push_frame(
+            TTSSpeakFrame(
+                "Hello, this is an automated message from customer support. "
+                "A customer is trying to reach your team. Please call back as soon as possible."
+            )
+        )
 
     @transport.event_handler("on_participant_joined")
     async def on_participant_joined(transport, participant) -> None:
