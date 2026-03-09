@@ -5,6 +5,8 @@
 #
 
 import os
+import time
+from collections import defaultdict
 from contextlib import asynccontextmanager
 from typing import Any, Dict
 from urllib.parse import quote
@@ -29,14 +31,36 @@ async def lifespan(app: FastAPI):
 # Initialize FastAPI app with lifespan manager
 app = FastAPI(lifespan=lifespan)
 
-# Configure CORS to allow requests from any origin
+# Configure CORS — set ALLOWED_ORIGINS env var to a comma-separated list of origins in production
+ALLOWED_ORIGINS = [o.strip() for o in os.getenv("ALLOWED_ORIGINS", "*").split(",") if o.strip()]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+class _RateLimiter:
+    """Simple in-memory rate limiter for demonstration purposes."""
+
+    def __init__(self, max_requests: int = 10, window_seconds: int = 60):
+        self.max_requests = max_requests
+        self.window_seconds = window_seconds
+        self._requests: dict[str, list[float]] = defaultdict(list)
+
+    def check(self, key: str) -> bool:
+        now = time.time()
+        cutoff = now - self.window_seconds
+        self._requests[key] = [t for t in self._requests[key] if t > cutoff]
+        if len(self._requests[key]) >= self.max_requests:
+            return False
+        self._requests[key].append(now)
+        return True
+
+
+_rate_limiter = _RateLimiter()
 
 
 @app.post("/start")
@@ -47,6 +71,10 @@ async def start_bot(request: Request) -> Dict[Any, Any]:
     Returns:
         Dict[Any, Any]: Contains the signed WebSocket URL for the client to connect
     """
+    client_ip = request.client.host if request.client else "unknown"
+    if not _rate_limiter.check(client_ip):
+        raise HTTPException(status_code=429, detail="Too many requests")
+
     # Check if LOCAL_AGENT mode is enabled
     if os.getenv("LOCAL_AGENT") == "1":
         return {"ws_url": "ws://localhost:8080/ws"}
@@ -74,7 +102,8 @@ async def start_bot(request: Request) -> Dict[Any, Any]:
         aws_request = AWSRequest(method="GET", url=ws_url)
 
         # Sign the request using SigV4QueryAuth (adds signature to query string)
-        SigV4QueryAuth(credentials, "bedrock-agentcore", region).add_auth(aws_request)
+        url_expiry_seconds = int(os.getenv("SIGNED_URL_EXPIRY_SECONDS", "300"))
+        SigV4QueryAuth(credentials, "bedrock-agentcore", region, expires=url_expiry_seconds).add_auth(aws_request)
 
         # Get the signed URL
         signed_url = aws_request.url
@@ -88,6 +117,8 @@ async def start_bot(request: Request) -> Dict[Any, Any]:
 
 
 if __name__ == "__main__":
-    config = uvicorn.Config(app, host="0.0.0.0", port=7860)
+    host = os.getenv("HOST", "localhost")
+    port = int(os.getenv("PORT", "7860"))
+    config = uvicorn.Config(app, host=host, port=port)
     server = uvicorn.Server(config)
     server.run()

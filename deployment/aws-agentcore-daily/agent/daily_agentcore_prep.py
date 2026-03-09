@@ -30,8 +30,9 @@ import json
 import select
 import socket
 import threading
-import urllib.request
 from urllib.parse import urlparse
+
+import urllib3
 
 from loguru import logger
 from pipecat.transports.daily.transport import DailyTransport
@@ -145,9 +146,9 @@ def _fetch_daily_ice_servers(room_url):
 
     ice_url = f"https://gs.daily.co/rooms/ice/{domain}/{room}"
     try:
-        req = urllib.request.Request(ice_url)
-        with urllib.request.urlopen(req, timeout=10) as resp:
-            data = json.loads(resp.read())
+        http = urllib3.PoolManager()
+        resp = http.request("GET", ice_url, timeout=10)
+        data = json.loads(resp.data)
         ice_servers = data.get("iceConfig", {}).get("iceServers", [])
         logger.info(f"Fetched {len(ice_servers)} ICE server entries from Daily")
         return ice_servers
