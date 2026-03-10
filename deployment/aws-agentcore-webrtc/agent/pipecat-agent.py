@@ -64,7 +64,8 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
         voice_id="71a7ad14-091c-4e8e-a314-022ece01c121",  # British Reading Lady
     )
 
-    # Automatically uses AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, and AWS_REGION env vars.
+    # Automatically uses credentials from assumed IAM role when running in
+    # AgentCore Runtime, or from environment variables when running locally.
     llm = AWSBedrockLLMService(
         model="us.amazon.nova-2-lite-v1:0",
         params=AWSBedrockLLMService.InputParams(temperature=0.8),
