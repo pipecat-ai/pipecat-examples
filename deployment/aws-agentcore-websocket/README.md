@@ -43,7 +43,7 @@ sequenceDiagram
 
 ### IAM Configuration
 
-Configure your IAM user with the necessary policies for AgentCore usage. Start with these:
+Configure your IAM user with the necessary policies for AgentCore deployment and management:
 
 - `BedrockAgentCoreFullAccess`
 - A new policy (maybe named `BedrockAgentCoreCLI`) configured [like this](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-permissions.html#runtime-permissions-starter-toolkit)
@@ -76,7 +76,6 @@ You can also choose to specify more granular permissions; see [Amazon Bedrock Ag
    ```
 
    Add your API keys:
-
    - `DEEPGRAM_API_KEY`: Your Deepgram API key
    - `CARTESIA_API_KEY`: Your Cartesia API key
 
@@ -88,10 +87,10 @@ You can also choose to specify more granular permissions; see [Amazon Bedrock Ag
    ```
 
    Add your AWS credentials and configuration, for generating a signed WebSocket URL in the `/start` endpoint:
-
    - `AWS_ACCESS_KEY_ID`
    - `AWS_SECRET_ACCESS_KEY`
    - `AWS_REGION`
+   - `AWS_SESSION_TOKEN` (optional — only needed for temporary credentials, e.g. AWS SSO or STS AssumeRole)
 
 ### Virtual Environment Setup
 

@@ -67,6 +67,7 @@ To authenticate with AWS, you have two options:
    export AWS_ACCESS_KEY_ID=your_access_key
    export AWS_REGION=your_region
    export AWS_DEFAULT_REGION=your_default_region
+   export AWS_SESSION_TOKEN=your_session_token  # Optional: only for temporary credentials (e.g. AWS SSO, STS AssumeRole)
    ```
 
 2. Or use AWS CLI configuration:
@@ -96,14 +97,21 @@ uv sync
    - `DEEPGRAM_API_KEY`: Your Deepgram API key
    - `CARTESIA_API_KEY`: Your Cartesia API key
 
-   > **Note:** Temporary credentials (e.g., AWS SSO, STS AssumeRole) are not yet supported — `AWS_SESSION_TOKEN` is on the roadmap ([#194](https://github.com/pipecat-ai/pipecat-examples/issues/194)). For now, use long-lived IAM access keys.
-
 2. For the server:
 
    ```bash
    cd server
    cp env.example .env
    ```
+
+   Add your AWS credentials and configuration:
+
+   - `AWS_ACCESS_KEY_ID`
+   - `AWS_SECRET_ACCESS_KEY`
+   - `AWS_REGION`
+   - `AWS_SESSION_TOKEN` (optional — only needed for temporary credentials, e.g. AWS SSO or STS AssumeRole)
+
+   Also configure:
 
    - `DAILY_ROOM_URL`: Your Daily room URL (e.g. `https://YOURDOMAIN.daily.co/YOURROOM`). The server passes this to the agent at invocation time and returns it to callers of `/start`.
    - `AGENT_RUNTIME_ARN`: Automatically set during agent deployment
