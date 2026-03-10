@@ -3,10 +3,17 @@
 # Script to dynamically read all variables from .env file and launch agentcore
 AGENT_ENV_FILE="./agent/.env"
 SERVER_ENV_FILE="./server/.env"
+AGENTCORE_CONFIG=".bedrock_agentcore.yaml"
 
 ###############################################
-# STEP 1 — Check environment file exists
+# STEP 1 — Pre-flight checks
 ###############################################
+if [ ! -f "$AGENTCORE_CONFIG" ]; then
+    echo "❌ Error: $AGENTCORE_CONFIG not found"
+    echo "Please run './scripts/configure.sh' first to configure your agent"
+    exit 1
+fi
+
 if [ ! -f "$AGENT_ENV_FILE" ]; then
     echo "❌ Error: $AGENT_ENV_FILE file not found"
     echo "Please create an agent .env file with your environment variables"
@@ -76,6 +83,11 @@ while IFS= read -r line || [ -n "$line" ]; do
         VAR_NAME="$(echo "$VAR_NAME" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
         VAR_VALUE="$(echo "$VAR_VALUE" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
 
+        # Strip a single pair of surrounding quotes (handles both "value" and 'value')
+        if [[ "${VAR_VALUE}" =~ ^\"(.*)\"$ ]] || [[ "${VAR_VALUE}" =~ ^\'(.*)\'$ ]]; then
+            VAR_VALUE="${BASH_REMATCH[1]}"
+        fi
+
         # Skip PIPECAT_LOCAL_DEV
         if [[ "$VAR_NAME" == "PIPECAT_LOCAL_DEV" ]]; then
             echo "  Skipping: $VAR_NAME (ignored for deployment)"
@@ -106,17 +118,28 @@ eval "$LAUNCH_CMD"
 
 
 ###############################################
-# STEP 2 — Read AGENT ARN from agentcore status
+# STEP 5 — Read AGENT ARN from agentcore status
 ###############################################
 echo "Reading Agent ARN from agentcore status..."
 
 # Extract Agent ARN from status output (removing box formatting characters and spaces)
 AGENT_ARN=$(uv run agentcore status | grep "Agent ARN:" | sed 's/.*Agent ARN: //' | sed 's/│//g' | xargs)
 
+if [ -z "$AGENT_ARN" ]; then
+    echo "Error: Could not extract Agent ARN from 'agentcore status' output"
+    echo "This can happen if:"
+    echo "  - The agent deployment has not completed yet (wait a few minutes and retry)"
+    echo "  - The 'agentcore status' output format has changed"
+    echo "  - No default agent is configured (run 'uv run agentcore configure list' to check)"
+    echo ""
+    echo "You can set AGENT_RUNTIME_ARN manually in server/.env once the ARN is available."
+    exit 1
+fi
+
 echo "Agent ARN: $AGENT_ARN"
 
 ###############################################
-# STEP 3 — Update server .env
+# STEP 6 — Update server .env
 ###############################################
 if [ ! -f "$SERVER_ENV_FILE" ]; then
     echo "ERROR: $SERVER_ENV_FILE not found!"
@@ -136,7 +159,7 @@ echo "AGENT_RUNTIME_ARN is now set to:"
 echo "$AGENT_ARN"
 
 ###############################################
-# STEP 6 — Display log-tailing command
+# STEP 7 — Display log-tailing command
 ###############################################
 echo ""
 echo "📊 To monitor agent logs, run:"

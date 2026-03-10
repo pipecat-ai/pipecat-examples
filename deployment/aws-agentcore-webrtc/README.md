@@ -2,6 +2,8 @@
 
 This example demonstrates how to deploy a Pipecat voice agent to **Amazon Bedrock AgentCore Runtime** using SmallWebRTC as a lightweight transport mechanism. The example pipeline orchestrates Deepgram (speech-to-text), Amazon Nova (LLM), and Cartesia (text-to-speech).
 
+> **Note:** This example focuses on illustrating how to get a Pipecat bot running as an agent in AgentCore Runtime. In the interest of staying focused on that goal, it does not address various production-readiness concerns, including but not limited to: authentication with the server that launches the agent, sanitized logging, rate limiting, CORS tightening, and input validation. Be sure to address these before deploying to production.
+
 ## Prerequisites
 
 - Accounts with:
@@ -98,6 +100,8 @@ uv sync
    - `ICE_SERVER_URLS`: Your TURN server URLs
    - `ICE_SERVER_USERNAME`: Your TURN server username
    - `ICE_SERVER_CREDENTIAL`: Your TURN server credential
+
+   > **Note:** Temporary credentials (e.g., AWS SSO, STS AssumeRole) are not yet supported — `AWS_SESSION_TOKEN` is on the roadmap ([#194](https://github.com/pipecat-ai/pipecat-examples/issues/194)). For now, use long-lived IAM access keys.
 
    > Important Notes about TURN Server Configuration:
    >

@@ -32,7 +32,7 @@ app = FastAPI(lifespan=lifespan)
 # Configure CORS to allow requests from any origin
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*"],  # Add your frontend URL
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -74,7 +74,10 @@ async def start_bot(request: Request) -> Dict[Any, Any]:
         aws_request = AWSRequest(method="GET", url=ws_url)
 
         # Sign the request using SigV4QueryAuth (adds signature to query string)
-        SigV4QueryAuth(credentials, "bedrock-agentcore", region).add_auth(aws_request)
+        url_expiry_seconds = int(os.getenv("SIGNED_URL_EXPIRY_SECONDS", "300"))
+        SigV4QueryAuth(
+            credentials, "bedrock-agentcore", region, expires=url_expiry_seconds
+        ).add_auth(aws_request)
 
         # Get the signed URL
         signed_url = aws_request.url
