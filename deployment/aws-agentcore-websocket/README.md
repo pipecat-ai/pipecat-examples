@@ -77,13 +77,8 @@ You can also choose to specify more granular permissions; see [Amazon Bedrock Ag
 
    Add your API keys:
 
-   - `AWS_ACCESS_KEY_ID`: Your AWS access key ID for the Amazon Bedrock LLM used by the agent
-   - `AWS_SECRET_ACCESS_KEY`: Your AWS secret access key for the Amazon Bedrock LLM used by the agent
-   - `AWS_REGION`: The AWS region for the Amazon Bedrock LLM used by the agent
    - `DEEPGRAM_API_KEY`: Your Deepgram API key
    - `CARTESIA_API_KEY`: Your Cartesia API key
-
-   > **Note:** Temporary credentials (e.g., AWS SSO, STS AssumeRole) are not yet supported — `AWS_SESSION_TOKEN` is on the roadmap ([#194](https://github.com/pipecat-ai/pipecat-examples/issues/194)). For now, use long-lived IAM access keys.
 
 3. For the server:
 
@@ -111,10 +106,13 @@ uv sync
 Configure your Pipecat agent as an AgentCore agent:
 
 ```bash
-uv run agentcore configure -e agent/agent.py
+./scripts/configure.sh
 ```
 
-Follow the prompts to complete the configuration. It's fine to just accept all defaults.
+This script automatically:
+
+1. Creates IAM execution role (if needed)
+2. Configures container deployment with docker runtime
 
 ## ⚠️ Before Proceeding
 
@@ -157,7 +155,9 @@ See [the client README](./client/README.md) for setup and run instructions.
 
 To test agent logic locally before deploying to AgentCore Runtime, do the following.
 
-First, run the agent locally:
+First, ensure that your agent's `.env` file has AWS credentials configured (placeholders should already be there, from env.example).
+
+Then, run the agent locally:
 
 ```bash
 cd agent
