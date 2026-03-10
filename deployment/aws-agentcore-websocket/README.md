@@ -4,6 +4,32 @@ This example demonstrates how to deploy a Pipecat bot to **Amazon Bedrock AgentC
 
 > **Note:** This example focuses on illustrating how to get a Pipecat bot running as an agent in AgentCore Runtime. In the interest of staying focused on that goal, it does not address various production-readiness concerns, including but not limited to: authentication with the server that launches the agent, sanitized logging, rate limiting, CORS tightening, and input validation. Be sure to address these before deploying to production.
 
+## Architecture
+
+```mermaid
+sequenceDiagram
+    participant Client as Browser Client
+    participant Server as FastAPI Server
+    participant AgentCore as AgentCore Runtime
+    participant Agent as Pipecat Agent
+    participant APIs as AI Services<br/>(Deepgram, Cartesia,<br/>Bedrock LLM)
+
+    Note over Client,APIs: Connection Setup
+    Client->>Server: POST /start
+    Server->>Server: SigV4-sign WebSocket URL
+    Server-->>Client: { ws_url: "wss://..." }
+
+    Note over Client,APIs: Audio Streaming (server is not in the data path)
+    Client->>AgentCore: Open signed WebSocket
+    AgentCore->>Agent: Route to Pipecat pipeline
+    loop Conversation
+        Client->>Agent: Audio frames (Protobuf/RTVI)
+        Agent->>APIs: STT, LLM, TTS calls
+        APIs-->>Agent: Responses
+        Agent-->>Client: Audio frames (Protobuf/RTVI)
+    end
+```
+
 ## Prerequisites
 
 - Accounts with:
@@ -56,6 +82,8 @@ You can also choose to specify more granular permissions; see [Amazon Bedrock Ag
    - `AWS_REGION`: The AWS region for the Amazon Bedrock LLM used by the agent
    - `DEEPGRAM_API_KEY`: Your Deepgram API key
    - `CARTESIA_API_KEY`: Your Cartesia API key
+
+   > **Note:** Temporary credentials (e.g., AWS SSO, STS AssumeRole) are not yet supported — `AWS_SESSION_TOKEN` is on the roadmap ([#194](https://github.com/pipecat-ai/pipecat-examples/issues/194)). For now, use long-lived IAM access keys.
 
 3. For the server:
 

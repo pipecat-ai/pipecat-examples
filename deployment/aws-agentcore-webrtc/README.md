@@ -101,6 +101,8 @@ uv sync
    - `ICE_SERVER_USERNAME`: Your TURN server username
    - `ICE_SERVER_CREDENTIAL`: Your TURN server credential
 
+   > **Note:** Temporary credentials (e.g., AWS SSO, STS AssumeRole) are not yet supported — `AWS_SESSION_TOKEN` is on the roadmap ([#194](https://github.com/pipecat-ai/pipecat-examples/issues/194)). For now, use long-lived IAM access keys.
+
    > Important Notes about TURN Server Configuration:
    >
    > **VPC Mode (recommended):**

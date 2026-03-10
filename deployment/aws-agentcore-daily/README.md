@@ -99,6 +99,8 @@ uv sync
    - `DEEPGRAM_API_KEY`: Your Deepgram API key
    - `CARTESIA_API_KEY`: Your Cartesia API key
 
+   > **Note:** Temporary credentials (e.g., AWS SSO, STS AssumeRole) are not yet supported — `AWS_SESSION_TOKEN` is on the roadmap ([#194](https://github.com/pipecat-ai/pipecat-examples/issues/194)). For now, use long-lived IAM access keys.
+
 2. For the server:
 
    ```bash
