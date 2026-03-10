@@ -2,6 +2,8 @@
 
 This example demonstrates how to deploy a Pipecat voice agent to **Amazon Bedrock AgentCore Runtime** using Daily as the transport. Users join by visiting a Daily room URL in their browser. The example pipeline orchestrates Deepgram (speech-to-text), Amazon Nova (LLM), and Cartesia (text-to-speech).
 
+> **Note:** This example focuses on illustrating how to get a Pipecat bot running as an agent in AgentCore Runtime. In the interest of staying focused on that goal, it does not address various production-readiness concerns, including but not limited to: authentication with the server that launches the agent, sanitized logging, rate limiting, CORS tightening, and input validation. Be sure to address these before deploying to production.
+
 ## Prerequisites
 
 - Accounts with:

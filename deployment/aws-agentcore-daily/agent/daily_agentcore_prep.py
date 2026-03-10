@@ -33,7 +33,6 @@ import threading
 from urllib.parse import urlparse
 
 import urllib3
-
 from loguru import logger
 from pipecat.transports.daily.transport import DailyTransport
 

@@ -8,9 +8,7 @@ import argparse
 import json
 import os
 import sys
-import time
 import uuid
-from collections import defaultdict
 
 import boto3
 import uvicorn
@@ -24,36 +22,14 @@ load_dotenv(override=True)
 
 app = FastAPI()
 
-# Configure CORS — set ALLOWED_ORIGINS env var to a comma-separated list of origins in production
-ALLOWED_ORIGINS = [o.strip() for o in os.getenv("ALLOWED_ORIGINS", "*").split(",") if o.strip()]
+# Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=ALLOWED_ORIGINS,
+    allow_origins=["*"],  # Add your frontend URL
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-
-class _RateLimiter:
-    """Simple in-memory rate limiter for demonstration purposes."""
-
-    def __init__(self, max_requests: int = 10, window_seconds: int = 60):
-        self.max_requests = max_requests
-        self.window_seconds = window_seconds
-        self._requests: dict[str, list[float]] = defaultdict(list)
-
-    def check(self, key: str) -> bool:
-        now = time.time()
-        cutoff = now - self.window_seconds
-        self._requests[key] = [t for t in self._requests[key] if t > cutoff]
-        if len(self._requests[key]) >= self.max_requests:
-            return False
-        self._requests[key].append(now)
-        return True
-
-
-_rate_limiter = _RateLimiter()
 
 # Initialize Bedrock client
 bedrock = boto3.client("bedrock-agentcore")
@@ -66,25 +42,18 @@ DAILY_ROOM_URL = os.getenv("DAILY_ROOM_URL")
 @app.post("/start")
 async def start_agent(request: Request):
     """Invoke AgentCore Runtime and return the Daily room URL."""
-    client_ip = request.client.host if request.client else "unknown"
-    if not _rate_limiter.check(client_ip):
-        raise HTTPException(429, "Too many requests")
-
     if not AGENT_RUNTIME_ARN:
         raise HTTPException(500, "AGENT_RUNTIME_ARN not configured")
 
     if not DAILY_ROOM_URL:
         raise HTTPException(500, "DAILY_ROOM_URL not configured")
 
-    # Invoke the agent with the room URL so it knows where to join.
-    # Only allow known safe keys from the client payload — room_url is always server-controlled.
+    # Invoke the agent with the room URL so it knows where to join
     payload = {"room_url": DAILY_ROOM_URL}
     try:
         body = await request.json()
-        if isinstance(body, dict):
-            ALLOWED_KEYS = {"config"}
-            for key in ALLOWED_KEYS & body.keys():
-                payload[key] = body[key]
+        if body:
+            payload.update(body)
     except Exception:
         pass
 

@@ -8,9 +8,7 @@ import argparse
 import json
 import os
 import sys
-import time
 import uuid
-from collections import defaultdict
 from contextlib import asynccontextmanager
 from http import HTTPMethod
 from typing import Any, Dict, List, Optional, TypedDict, Union
@@ -29,36 +27,14 @@ load_dotenv(override=True)
 
 app = FastAPI()
 
-# Configure CORS — set ALLOWED_ORIGINS env var to a comma-separated list of origins in production
-ALLOWED_ORIGINS = [o.strip() for o in os.getenv("ALLOWED_ORIGINS", "*").split(",") if o.strip()]
+# Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=ALLOWED_ORIGINS,
+    allow_origins=["*"],  # Add your frontend URL
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-
-class _RateLimiter:
-    """Simple in-memory rate limiter for demonstration purposes."""
-
-    def __init__(self, max_requests: int = 10, window_seconds: int = 60):
-        self.max_requests = max_requests
-        self.window_seconds = window_seconds
-        self._requests: dict[str, list[float]] = defaultdict(list)
-
-    def check(self, key: str) -> bool:
-        now = time.time()
-        cutoff = now - self.window_seconds
-        self._requests[key] = [t for t in self._requests[key] if t > cutoff]
-        if len(self._requests[key]) >= self.max_requests:
-            return False
-        self._requests[key].append(now)
-        return True
-
-
-_rate_limiter = _RateLimiter()
 
 
 # In-memory store of active sessions: session_id -> session info
@@ -91,7 +67,7 @@ ice_servers = [
     )
 ]
 
-logger.info(f"Ice servers configured: {len(ice_servers)} server(s) with URLs: {urls}")
+logger.info(f"Ice servers: {ice_servers}")
 
 
 @app.get("/", include_in_schema=False)
@@ -189,9 +165,6 @@ async def patch_offer(request: Request, session_id: str):
 @app.post("/start")
 async def rtvi_start(request: Request):
     """Mimic Pipecat Cloud's /start endpoint."""
-    client_ip = request.client.host if request.client else "unknown"
-    if not _rate_limiter.check(client_ip):
-        raise HTTPException(status_code=429, detail="Too many requests")
 
     class IceConfig(TypedDict):
         iceServers: List[IceServer]
@@ -227,10 +200,6 @@ async def proxy_request(
     session_id: str, path: str, request: Request, background_tasks: BackgroundTasks
 ):
     """Mimic Pipecat Cloud's proxy."""
-    client_ip = request.client.host if request.client else "unknown"
-    if not _rate_limiter.check(client_ip):
-        raise HTTPException(status_code=429, detail="Too many requests")
-
     active_session = active_sessions.get(session_id)
     if active_session is None:
         return Response(content="Invalid or not-yet-ready session_id", status_code=404)
