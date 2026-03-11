@@ -51,7 +51,12 @@ def _env_int(name: str, default: int) -> int:
 
 
 async def run_bot(transport: BaseTransport, handle_sigint: bool, sample_rate: int):
-    llm = OpenAILLMService(api_key=os.getenv("OPENAI_API_KEY"))
+    llm = OpenAILLMService(
+        api_key=os.getenv("OPENAI_API_KEY"),
+        settings=OpenAILLMService.Settings(
+            system_instruction="You are a friendly assistant. Your responses will be read aloud, so keep them concise and conversational. Avoid special characters or formatting. Begin by saying: 'Hello! This is an automated call from our Vonage chatbot demo.' ",
+        ),
+    )
 
     stt = OpenAISTTService(
         api_key=os.getenv("OPENAI_API_KEY"),
@@ -65,19 +70,7 @@ async def run_bot(transport: BaseTransport, handle_sigint: bool, sample_rate: in
         instructions="There may be literal '\\n' characters; ignore them when speaking.",
     )
 
-    messages = [
-        {
-            "role": "system",
-            "content": (
-                "You are a friendly assistant. "
-                "Your responses will be read aloud, so keep them concise and conversational. "
-                "Avoid special characters or formatting. "
-                "Begin by saying: 'Hello! This is an automated call from our Vonage chatbot demo.' "
-            ),
-        },
-    ]
-
-    context = LLMContext(messages)
+    context = LLMContext()
     user_aggregator, assistant_aggregator = LLMContextAggregatorPair(
         context,
         user_params=LLMUserAggregatorParams(

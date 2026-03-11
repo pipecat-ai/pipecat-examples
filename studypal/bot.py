@@ -162,25 +162,26 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
 
         tts = CartesiaTTSService(
             api_key=os.getenv("CARTESIA_API_KEY"),
-            voice_id=os.getenv("CARTESIA_VOICE_ID", "4d2fd738-3b3d-4368-957a-bb4805275bd9"),
-            # British Narration Lady: 4d2fd738-3b3d-4368-957a-bb4805275bd9
+            settings=CartesiaTTSService.Settings(
+                voice="4d2fd738-3b3d-4368-957a-bb4805275bd9",
+            ),
         )
 
-        llm = OpenAILLMService(api_key=os.getenv("OPENAI_API_KEY"), model="gpt-4o-mini")
-
-        messages = [
-            {
-                "role": "system",
-                "content": f"""You are an AI study partner. You have been given the following article content:
+        system_instruction = f"""You are an AI study partner. You have been given the following article content:
 
     {article_content}
 
     Your task is to help the user understand and learn from this article in 2 sentences. THESE RESPONSES SHOULD BE ONLY MAX 2 SENTENCES. THIS INSTRUCTION IS VERY IMPORTANT. RESPONSES SHOULDN'T BE LONG.
-    """,
-            },
-        ]
+    """
 
-        context = LLMContext(messages)
+        llm = OpenAILLMService(
+            api_key=os.getenv("OPENAI_API_KEY"),
+            settings=OpenAILLMService.Settings(
+                system_instruction=system_instruction,
+            ),
+        )
+
+        context = LLMContext()
         user_aggregator, assistant_aggregator = LLMContextAggregatorPair(
             context,
             user_params=LLMUserAggregatorParams(
@@ -214,9 +215,9 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
         async def on_client_connected(transport, client):
             logger.info(f"Client connected")
             # Kick off the conversation.
-            messages.append(
+            context.add_message(
                 {
-                    "role": "system",
+                    "role": "user",
                     "content": "Hello! I'm ready to discuss the article with you. What would you like to learn about?",
                 }
             )

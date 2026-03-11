@@ -108,25 +108,24 @@ async def run_bot(
     logger.info(f"Starting dial-out bot, dialing out to: {dialout_settings.sip_uri}")
 
     stt = DeepgramSTTService(api_key=os.getenv("DEEPGRAM_API_KEY"))
-    llm = OpenAILLMService(api_key=os.getenv("OPENAI_API_KEY"))
-    tts = CartesiaTTSService(
-        api_key=os.getenv("CARTESIA_API_KEY"),
-        voice_id="71a7ad14-091c-4e8e-a314-022ece01c121",  # British Reading Lady
-    )
-
-    # Create system message and initialize messages list
-    messages = [
-        {
-            "role": "system",
-            "content": (
+    llm = OpenAILLMService(
+        api_key=os.getenv("OPENAI_API_KEY"),
+        settings=OpenAILLMService.Settings(
+            system_instruction=(
                 "You are a friendly phone assistant. Your responses will be read aloud, "
                 "so keep them concise and conversational. Avoid special characters or "
                 "formatting. Begin by greeting the caller and asking how you can help them today."
             ),
-        },
-    ]
+        ),
+    )
+    tts = CartesiaTTSService(
+        api_key=os.getenv("CARTESIA_API_KEY"),
+        settings=CartesiaTTSService.Settings(
+            voice="71a7ad14-091c-4e8e-a314-022ece01c121",  # British Reading Lady
+        ),
+    )
 
-    context = LLMContext(messages)
+    context = LLMContext()
     user_aggregator, assistant_aggregator = LLMContextAggregatorPair(
         context,
         user_params=LLMUserAggregatorParams(

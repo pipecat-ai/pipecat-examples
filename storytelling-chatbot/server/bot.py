@@ -69,7 +69,10 @@ async def main(room_url, token=None):
         llm_service = GoogleLLMService(api_key=os.getenv("GOOGLE_API_KEY"))
 
         tts_service = ElevenLabsTTSService(
-            api_key=os.getenv("ELEVENLABS_API_KEY"), voice_id=os.getenv("ELEVENLABS_VOICE_ID")
+            api_key=os.getenv("ELEVENLABS_API_KEY"),
+            settings=ElevenLabsTTSService.Settings(
+                voice=os.getenv("ELEVENLABS_VOICE_ID"),
+            ),
         )
 
         image_gen = GoogleImageGenService(api_key=os.getenv("GOOGLE_API_KEY"))

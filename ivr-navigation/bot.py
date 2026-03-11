@@ -49,7 +49,9 @@ async def run_bot(transport: BaseTransport, handle_sigint: bool) -> None:
     stt = DeepgramSTTService(api_key=os.getenv("DEEPGRAM_API_KEY"))
     tts = CartesiaTTSService(
         api_key=os.getenv("CARTESIA_API_KEY", ""),
-        voice_id="b7d50908-b17c-442d-ad8d-810c63997ed9",  # Use Helpful Woman voice by default
+        settings=CartesiaTTSService.Settings(
+            voice="b7d50908-b17c-442d-ad8d-810c63997ed9",  # Use Helpful Woman voice by default
+        ),
     )
 
     llm = OpenAILLMService(api_key=os.getenv("OPENAI_API_KEY"))

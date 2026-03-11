@@ -37,52 +37,54 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
 
     tts_spanish = CartesiaTTSService(
         api_key=os.getenv("CARTESIA_API_KEY"),
-        voice_id="cefcb124-080b-4655-b31f-932f3ee743de",
+        settings=CartesiaTTSService.Settings(
+            voice="cefcb124-080b-4655-b31f-932f3ee743de",
+        ),
         transport_destination="spanish",
     )
     tts_french = CartesiaTTSService(
         api_key=os.getenv("CARTESIA_API_KEY"),
-        voice_id="8832a0b5-47b2-4751-bb22-6a8e2149303d",
+        settings=CartesiaTTSService.Settings(
+            voice="8832a0b5-47b2-4751-bb22-6a8e2149303d",
+        ),
         transport_destination="french",
     )
     tts_german = CartesiaTTSService(
         api_key=os.getenv("CARTESIA_API_KEY"),
-        voice_id="38aabb6a-f52b-4fb0-a3d1-988518f4dc06",
+        settings=CartesiaTTSService.Settings(
+            voice="38aabb6a-f52b-4fb0-a3d1-988518f4dc06",
+        ),
         transport_destination="german",
     )
 
-    messages_spanish = [
-        {
-            "role": "system",
-            "content": "You will be provided with a sentence in English, and your task is to only translate it into Spanish.",
-        },
-    ]
-    messages_french = [
-        {
-            "role": "system",
-            "content": "You will be provided with a sentence in English, and your task is to only translate it into French.",
-        },
-    ]
-    messages_german = [
-        {
-            "role": "system",
-            "content": "You will be provided with a sentence in English, and your task is to only translate it into German.",
-        },
-    ]
-
-    llm_spanish = OpenAILLMService(api_key=os.getenv("OPENAI_API_KEY"))
-    llm_french = OpenAILLMService(api_key=os.getenv("OPENAI_API_KEY"))
-    llm_german = OpenAILLMService(api_key=os.getenv("OPENAI_API_KEY"))
+    llm_spanish = OpenAILLMService(
+        api_key=os.getenv("OPENAI_API_KEY"),
+        settings=OpenAILLMService.Settings(
+            system_instruction="You will be provided with a sentence in English, and your task is to only translate it into Spanish."
+        ),
+    )
+    llm_french = OpenAILLMService(
+        api_key=os.getenv("OPENAI_API_KEY"),
+        settings=OpenAILLMService.Settings(
+            system_instruction="You will be provided with a sentence in English, and your task is to only translate it into French."
+        ),
+    )
+    llm_german = OpenAILLMService(
+        api_key=os.getenv("OPENAI_API_KEY"),
+        settings=OpenAILLMService.Settings(
+            system_instruction="You will be provided with a sentence in English, and your task is to only translate it into German."
+        ),
+    )
 
     vad_processor = VADProcessor(vad_analyzer=SileroVADAnalyzer())
 
-    context_spanish = LLMContext(messages_spanish)
+    context_spanish = LLMContext()
     context_aggregator_spanish = LLMContextAggregatorPair(context_spanish)
 
-    context_french = LLMContext(messages_french)
+    context_french = LLMContext()
     context_aggregator_french = LLMContextAggregatorPair(context_french)
 
-    context_german = LLMContext(messages_german)
+    context_german = LLMContext()
     context_aggregator_german = LLMContextAggregatorPair(context_german)
 
     pipeline = Pipeline(

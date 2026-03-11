@@ -149,43 +149,29 @@ async def run_bot(room_url: str, token: str):
     # Initialize text-to-speech service
     tts = ElevenLabsTTSService(
         api_key=os.getenv("ELEVENLABS_API_KEY"),
-        #
-        # English
-        #
-        voice_id="D38z5RcWu1voky8WS1ja",
-        #
-        # Spanish
-        #
-        # model="eleven_multilingual_v2",
-        # voice_id="gD1IexrzCvsXPHUuT0s3",
+        settings=ElevenLabsTTSService.Settings(
+            voice="D38z5RcWu1voky8WS1ja",
+            # Spanish
+            # voice="gD1IexrzCvsXPHUuT0s3",
+        ),
     )
 
     # Initialize LLM service
     llm = OpenAILLMService(
         # To use OpenAI
         api_key=api_key,
-        # Or, to use a local vLLM (or similar) api server
-        model="neuralmagic/Meta-Llama-3.1-8B-Instruct-quantized.w4a16",
         base_url=f"{modal_url}/v1",
-    )
-
-    messages = [
-        {
-            "role": "system",
-            #
-            # English
-            #
-            "content": "You are a salesman for Modal, the cloud-native serverless Python computing platform.",
-            #
+        settings=OpenAILLMService.Settings(
+            model="neuralmagic/Meta-Llama-3.1-8B-Instruct-quantized.w4a16",
+            system_instruction="You are a salesman for Modal, the cloud-native serverless Python computing platform.",
             # Spanish
-            #
-            # "content": "Eres Chatbot, un amigable y útil robot. Tu objetivo es demostrar tus capacidades de una manera breve. Tus respuestas se convertiran a audio así que nunca no debes incluir caracteres especiales. Contesta a lo que el usuario pregunte de una manera creativa, útil y breve. Empieza por presentarte a ti mismo.",
-        },
-    ]
+            # system_instruction="Eres Chatbot, un amigable y útil robot. Tu objetivo es demostrar tus capacidades de una manera breve. Tus respuestas se convertiran a audio así que nunca no debes incluir caracteres especiales. Contesta a lo que el usuario pregunte de una manera creativa, útil y breve. Empieza por presentarte a ti mismo.",
+        ),
+    )
 
     # Set up conversation context and management
     # The context_aggregator will automatically collect conversation context
-    context = LLMContext(messages)
+    context = LLMContext()
     user_aggregator, assistant_aggregator = LLMContextAggregatorPair(
         context,
         user_params=LLMUserAggregatorParams(

@@ -89,12 +89,10 @@ async def run_bot(transport: BaseTransport, handle_sigint: bool) -> None:
 
     tts = CartesiaTTSService(
         api_key=os.getenv("CARTESIA_API_KEY", ""),
-        voice_id="b7d50908-b17c-442d-ad8d-810c63997ed9",  # Use Helpful Woman voice by default
+        settings=CartesiaTTSService.Settings(
+            voice="b7d50908-b17c-442d-ad8d-810c63997ed9",  # Use Helpful Woman voice by default
+        ),
     )
-
-    llm = OpenAILLMService(api_key=os.getenv("OPENAI_API_KEY"))
-
-    # ------------ LLM AND CONTEXT SETUP ------------
 
     system_instruction = """You are Hailey, a friendly customer support representative. Your responses will be converted to speech, so use natural, conversational language without special characters or formatting.
 
@@ -113,12 +111,12 @@ Available functions:
 - `dial_operator`: Call this when the user requests to speak with a supervisor or manager (this will transfer the call)
 - `terminate_call`: Call this when the user wants to end the conversation"""
 
-    messages = [
-        {
-            "role": "system",
-            "content": system_instruction,
-        }
-    ]
+    llm = OpenAILLMService(
+        api_key=os.getenv("OPENAI_API_KEY"),
+        settings=OpenAILLMService.Settings(
+            system_instruction=system_instruction,
+        ),
+    )
 
     # ------------ FUNCTION DEFINITIONS ------------
 
@@ -145,7 +143,7 @@ Available functions:
     llm.register_function("dial_operator", lambda params: dial_operator(transport, params))
 
     # Initialize LLM context and aggregator
-    context = LLMContext(messages, tools)
+    context = LLMContext(tools=tools)
     user_aggregator, assistant_aggregator = LLMContextAggregatorPair(
         context,
         user_params=LLMUserAggregatorParams(
@@ -198,7 +196,7 @@ Available functions:
         logger.error(f"Operator dialout error: {data}")
         # Inform the customer that transfer failed
         content = "I'm sorry, but I'm unable to connect you with a supervisor at this time. Is there anything else I can help you with?"
-        message = {"role": "system", "content": content}
+        message = {"role": "user", "content": content}
         await task.queue_frames([LLMMessagesAppendFrame([message], run_llm=True)])
 
     @transport.event_handler("on_participant_left")

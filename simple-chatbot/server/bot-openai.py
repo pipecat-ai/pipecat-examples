@@ -122,22 +122,23 @@ async def run_bot(transport: BaseTransport):
 
     # Text-to-Speech service
     tts = ElevenLabsTTSService(
-        api_key=os.getenv("ELEVENLABS_API_KEY"), voice_id="pNInz6obpgDQGcFmaJgB"
+        api_key=os.getenv("ELEVENLABS_API_KEY"),
+        settings=ElevenLabsTTSService.Settings(
+            voice="pNInz6obpgDQGcFmaJgB",
+        ),
     )
 
     # LLM service
-    llm = OpenAILLMService(api_key=os.getenv("OPENAI_API_KEY"))
-
-    messages = [
-        {
-            "role": "system",
-            "content": "You are Chatbot, a friendly, helpful robot. Your goal is to demonstrate your capabilities in a succinct way. Your output will be converted to audio so don't include special characters in your answers. Respond to what the user said in a creative and helpful way, but keep your responses brief. Start by introducing yourself.",
-        },
-    ]
+    llm = OpenAILLMService(
+        api_key=os.getenv("OPENAI_API_KEY"),
+        settings=OpenAILLMService.Settings(
+            system_instruction="You are Chatbot, a friendly, helpful robot. Your goal is to demonstrate your capabilities in a succinct way. Your output will be converted to audio so don't include special characters in your answers. Respond to what the user said in a creative and helpful way, but keep your responses brief. Start by introducing yourself.",
+        ),
+    )
 
     # Set up conversation context and management
     # The context_aggregator will automatically collect conversation context
-    context = LLMContext(messages)
+    context = LLMContext()
     user_aggregator, assistant_aggregator = LLMContextAggregatorPair(
         context,
         user_params=LLMUserAggregatorParams(
@@ -176,6 +177,7 @@ async def run_bot(transport: BaseTransport):
     async def on_client_ready(rtvi):
         logger.info("Client ready event received")
         # Kick off the conversation
+        context.add_message({"role": "user", "content": "Start by introducing yourself."})
         await task.queue_frames([LLMRunFrame()])
 
     @transport.event_handler("on_client_connected")

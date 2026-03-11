@@ -128,11 +128,13 @@ Remember: Present the pre-written statements exactly as shown, keep your comment
 
     llm = GeminiLiveLLMService(
         api_key=os.getenv("GOOGLE_API_KEY"),
-        model="gemini-2.5-flash-native-audio-preview-09-2025",
-        voice_id="Charon",  # Puck, Charon, Kore, Fenrir, Aoede, Leda, Orus, and Zephyr
-        system_instruction=instructions,
+        settings=GeminiLiveLLMService.Settings(
+            model="gemini-2.5-flash-native-audio-preview-09-2025",
+            voice="Charon",  # Puck, Charon, Kore, Fenrir, Aoede, Leda, Orus, and Zephyr
+            system_instruction=instructions,
+            thinking=ThinkingConfig(thinking_budget=0),
+        ),
         tools=tools,
-        params=InputParams(thinking=ThinkingConfig(thinking_budget=0)),
     )
 
     # Register the function with the LLM

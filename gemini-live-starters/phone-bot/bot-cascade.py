@@ -41,7 +41,7 @@ from pipecat.processors.aggregators.llm_response_universal import (
 from pipecat.processors.frame_processor import FrameDirection
 from pipecat.runner.types import RunnerArguments
 from pipecat.runner.utils import create_transport
-from pipecat.services.google.llm import GoogleLLMService
+from pipecat.services.google.llm import GoogleLLMService, GoogleThinkingConfig
 from pipecat.services.google.stt import GoogleSTTService
 from pipecat.services.google.tts import GoogleTTSService
 from pipecat.services.llm_service import FunctionCallParams
@@ -72,13 +72,17 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     logger.info(f"Starting bot")
 
     stt = GoogleSTTService(
-        params=GoogleSTTService.InputParams(languages=Language.EN_US),
+        settings=GoogleSTTService.Settings(
+            languages=Language.EN_US,
+        ),
         credentials_path=os.getenv("GOOGLE_CREDENTIALS_PATH"),
     )
 
     tts = GoogleTTSService(
-        voice_id="en-US-Chirp3-HD-Charon",
-        params=GoogleTTSService.InputParams(language=Language.EN_US),
+        settings=GoogleTTSService.Settings(
+            voice="en-US-Chirp3-HD-Charon",
+            language=Language.EN_US,
+        ),
         credentials_path=os.getenv("GOOGLE_CREDENTIALS_PATH"),
     )
 
@@ -96,20 +100,7 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
 
     tools = ToolsSchema(standard_tools=[end_game_function])
 
-    llm = GoogleLLMService(
-        api_key=os.getenv("GOOGLE_API_KEY"),
-        model="gemini-2.5-flash",
-        # Turn on thinking if you want it
-        # params=GoogleLLMService.InputParams(extra={"thinking_config": {"thinking_budget": 4096}}),)
-    )
-
-    # Register the function with the LLM
-    llm.register_function("end_game", end_game_handler)
-
-    messages = [
-        {
-            "role": "system",
-            "content": f"""You are an enthusiastic game show host playing "Two Truths and a Lie."
+    system_instruction = f"""You are an enthusiastic game show host playing "Two Truths and a Lie."
 
 GAME RULES:
 1. Present three numbered statements - two TRUE, one LIE
@@ -151,15 +142,22 @@ Which one's the lie?"
 [After their guess]
 "That's right! Number 2 was the lie. You're 1 for 1!"
 
-Remember: Present the pre-written statements exactly as shown, keep your commentary brief, and call end_game after round {NUM_ROUNDS}!""",
-        },
-        {
-            "role": "user",
-            "content": "Introduce the game in one sentence, then say 'Ready? Here's the first one:' then present the first three statements.",
-        },
-    ]
+Remember: Present the pre-written statements exactly as shown, keep your commentary brief, and call end_game after round {NUM_ROUNDS}!"""
 
-    context = LLMContext(messages, tools)
+    llm = GoogleLLMService(
+        api_key=os.getenv("GOOGLE_API_KEY"),
+        settings=GoogleLLMService.Settings(
+            model="gemini-2.5-flash",
+            system_instruction=system_instruction,
+            # Turn on thinking if you want it
+            # thinking=GoogleThinkingConfig(thinking_budget=4096),
+        ),
+    )
+
+    # Register the function with the LLM
+    llm.register_function("end_game", end_game_handler)
+
+    context = LLMContext(tools=tools)
     user_aggregator, assistant_aggregator = LLMContextAggregatorPair(
         context,
         user_params=LLMUserAggregatorParams(
@@ -192,6 +190,12 @@ Remember: Present the pre-written statements exactly as shown, keep your comment
     async def on_client_connected(transport, client):
         logger.info(f"Client connected")
         # Kick off the conversation.
+        context.add_message(
+            {
+                "role": "user",
+                "content": "Introduce the game in one sentence, then say 'Ready? Here's the first one:' then present the first three statements from ROUND 1.",
+            }
+        )
         await task.queue_frames([LLMRunFrame()])
 
     @transport.event_handler("on_client_disconnected")
