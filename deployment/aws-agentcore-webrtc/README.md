@@ -66,6 +66,7 @@ To authenticate with AWS, you have two options:
    export AWS_ACCESS_KEY_ID=your_access_key
    export AWS_REGION=your_region
    export AWS_DEFAULT_REGION=your_default_region
+   export AWS_SESSION_TOKEN=your_session_token  # Optional: only for temporary credentials (e.g. AWS SSO, STS AssumeRole)
    ```
 
 2. Or use AWS CLI configuration:
@@ -92,16 +93,11 @@ uv sync
    ```
 
    Add your API keys:
-   - `AWS_ACCESS_KEY_ID`: Your AWS access key ID for the Amazon Bedrock LLM used by the agent
-   - `AWS_SECRET_ACCESS_KEY`: Your AWS secret access key for the Amazon Bedrock LLM used by the agent
-   - `AWS_REGION`: The AWS region for the Amazon Bedrock LLM used by the agent
    - `DEEPGRAM_API_KEY`: Your Deepgram API key
    - `CARTESIA_API_KEY`: Your Cartesia API key
    - `ICE_SERVER_URLS`: Your TURN server URLs
    - `ICE_SERVER_USERNAME`: Your TURN server username
    - `ICE_SERVER_CREDENTIAL`: Your TURN server credential
-
-   > **Note:** Temporary credentials (e.g., AWS SSO, STS AssumeRole) are not yet supported — `AWS_SESSION_TOKEN` is on the roadmap ([#194](https://github.com/pipecat-ai/pipecat-examples/issues/194)). For now, use long-lived IAM access keys.
 
    > Important Notes about TURN Server Configuration:
    >
@@ -117,11 +113,22 @@ uv sync
    > - UDP connections are blocked
 
 2. For the server:
+
    ```bash
    cd server
    cp env.example .env
    ```
-   The server configuration is minimal - the `AGENT_RUNTIME_ARN` will be automatically set during agent deployment.
+
+   Add your AWS credentials and configuration:
+
+   - `AWS_ACCESS_KEY_ID`
+   - `AWS_SECRET_ACCESS_KEY`
+   - `AWS_REGION`
+   - `AWS_SESSION_TOKEN` (optional — only needed for temporary credentials, e.g. AWS SSO or STS AssumeRole)
+
+   Also configure:
+
+   - `AGENT_RUNTIME_ARN`: Automatically set during agent deployment
 
 ## Agent Configuration
 
@@ -273,7 +280,11 @@ If using VPC mode, remove VPC resources:
 
 ## Local Development
 
-Run your bot locally for testing:
+For testing, it may be helpful to run your bot locally without having to deploy to AgentCore.
+
+First, ensure that your agent's `.env` file specifies the necessary variables for local development (placeholders should already be there, from env.example).
+
+Then, run your bot in local dev mode:
 
 ```bash
 PIPECAT_LOCAL_DEV=1 uv run pipecat-agent.py

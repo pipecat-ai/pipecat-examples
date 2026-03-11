@@ -40,7 +40,10 @@ app.add_middleware(
 # In-memory store of active sessions: session_id -> session info
 active_sessions: Dict[str, Dict[str, Any]] = {}
 
-# Initialize Bedrock client
+# Initialize Bedrock client.
+# boto3 picks up credentials (including AWS_SESSION_TOKEN) from the standard
+# credential chain. For production, consider using a credential provider that
+# automatically refreshes temporary credentials instead of env vars.
 bedrock = boto3.client("bedrock-agentcore")
 
 # You can find this inside .bedrock_agentcore.yaml

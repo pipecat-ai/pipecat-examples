@@ -51,9 +51,12 @@ async def start_bot(request: Request) -> Dict[Any, Any]:
     if os.getenv("LOCAL_AGENT") == "1":
         return {"ws_url": "ws://localhost:8080/ws"}
 
-    # Get required environment variables
+    # Get required environment variables.
+    # NOTE: For production, consider using a credential provider that automatically
+    # refreshes temporary credentials instead of env vars.
     access_key_id = os.getenv("AWS_ACCESS_KEY_ID")
     secret_access_key = os.getenv("AWS_SECRET_ACCESS_KEY")
+    session_token = os.getenv("AWS_SESSION_TOKEN")  # Optional, for temporary credentials
     agent_runtime_arn = os.getenv("AGENT_RUNTIME_ARN")
     region = os.getenv("AWS_REGION")
 
@@ -68,7 +71,7 @@ async def start_bot(request: Request) -> Dict[Any, Any]:
         ws_url = f"wss://bedrock-agentcore.{region}.amazonaws.com/runtimes/{quote(agent_runtime_arn, safe='')}/ws"
 
         # Create AWS credentials
-        credentials = Credentials(access_key_id, secret_access_key)
+        credentials = Credentials(access_key_id, secret_access_key, token=session_token)
 
         # Create an AWS request for signing
         aws_request = AWSRequest(method="GET", url=ws_url)
