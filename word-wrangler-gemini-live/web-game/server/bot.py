@@ -90,7 +90,9 @@ Important guidelines:
 
     llm = GeminiLiveLLMService(
         api_key=os.getenv("GOOGLE_API_KEY"),
-        system_instruction=system_instruction,
+        settings=GeminiLiveLLMService.Settings(
+            system_instruction=system_instruction,
+        ),
     )
 
     # Set up the initial context for the conversation

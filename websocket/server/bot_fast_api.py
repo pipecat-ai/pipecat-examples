@@ -55,7 +55,10 @@ async def run_bot(websocket_client):
 
     llm = GeminiLiveLLMService(
         api_key=os.getenv("GOOGLE_API_KEY"),
-        voice_id="Puck",  # Aoede, Charon, Fenrir, Kore, Puck
+        settings=GeminiLiveLLMService.Settings(
+            voice="Puck",  # Aoede, Charon, Fenrir, Kore, Puck
+            system_instruction=SYSTEM_INSTRUCTION,
+        ),
         system_instruction=SYSTEM_INSTRUCTION,
     )
 

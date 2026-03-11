@@ -100,24 +100,24 @@ async def save_audio(audio: bytes, sample_rate: int, num_channels: int):
 
 
 async def run_bot(transport: BaseTransport, handle_sigint: bool, testing: bool):
-    llm = GoogleLLMService(api_key=os.getenv("GOOGLE_API_KEY"))
+    llm = GoogleLLMService(
+        api_key=os.getenv("GOOGLE_API_KEY"),
+        settings=GoogleLLMService.Settings(
+            system_instruction="You are an elementary teacher in an audio call. Your output will be converted to audio so don't include special characters in your answers. Respond to what the student said in a short short sentence.",
+        ),
+    )
 
     stt = DeepgramSTTService(api_key=os.getenv("DEEPGRAM_API_KEY"))
 
     tts = CartesiaTTSService(
         api_key=os.getenv("CARTESIA_API_KEY"),
-        voice_id="71a7ad14-091c-4e8e-a314-022ece01c121",  # British Reading Lady
+        settings=CartesiaTTSService.Settings(
+            voice="71a7ad14-091c-4e8e-a314-022ece01c121",  # British Reading Lady
+        ),
         push_silence_after_stop=testing,
     )
 
-    messages = [
-        {
-            "role": "system",
-            "content": "You are an elementary teacher in an audio call. Your output will be converted to audio so don't include special characters in your answers. Respond to what the student said in a short short sentence.",
-        },
-    ]
-
-    context = LLMContext(messages)
+    context = LLMContext()
     user_aggregator, assistant_aggregator = LLMContextAggregatorPair(
         context,
         user_params=LLMUserAggregatorParams(
@@ -157,7 +157,7 @@ async def run_bot(transport: BaseTransport, handle_sigint: bool, testing: bool):
         # Start recording.
         await audiobuffer.start_recording()
         # Kick off the conversation.
-        messages.append({"role": "system", "content": "Please introduce yourself to the user."})
+        context.add_message({"role": "user", "content": "Please introduce yourself to the user."})
         await task.queue_frames([LLMRunFrame()])
 
     @transport.event_handler("on_client_disconnected")

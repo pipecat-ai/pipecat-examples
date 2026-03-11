@@ -35,7 +35,13 @@ async def main(input_device: int, output_device: int):
         )
     )
 
-    stt = WhisperSTTService(device="cuda", model=Model.LARGE, no_speech_prob=0.3)
+    stt = WhisperSTTService(
+        device="cuda",
+        no_speech_prob=0.3,
+        settings=WhisperSTTService.Settings(
+            model=Model.LARGE,
+        ),
+    )
 
     pipeline = Pipeline([transport.input(), stt])
 

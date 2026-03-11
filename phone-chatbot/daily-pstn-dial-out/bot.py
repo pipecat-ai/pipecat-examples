@@ -126,24 +126,24 @@ async def run_bot(
 
     tts = CartesiaTTSService(
         api_key=os.getenv("CARTESIA_API_KEY", ""),
-        voice_id="b7d50908-b17c-442d-ad8d-810c63997ed9",  # Use Helpful Woman voice by default
+        settings=CartesiaTTSService.Settings(
+            voice="b7d50908-b17c-442d-ad8d-810c63997ed9",  # Use Helpful Woman voice by default
+        ),
     )
 
-    llm = OpenAILLMService(api_key=os.getenv("OPENAI_API_KEY"))
-
-    # Initialize LLM context with system prompt
-    messages = [
-        {
-            "role": "system",
-            "content": (
+    llm = OpenAILLMService(
+        api_key=os.getenv("OPENAI_API_KEY"),
+        settings=OpenAILLMService.Settings(
+            system_instruction=(
                 "You are a friendly phone assistant. Your responses will be read aloud, "
                 "so keep them concise and conversational. Avoid special characters or "
                 "formatting. Begin by greeting the caller and asking how you can help them today."
             ),
-        },
-    ]
+        ),
+    )
 
-    context = LLMContext(messages)
+    # Initialize LLM context with system prompt
+    context = LLMContext()
     user_aggregator, assistant_aggregator = LLMContextAggregatorPair(
         context,
         user_params=LLMUserAggregatorParams(

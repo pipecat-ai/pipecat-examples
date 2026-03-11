@@ -41,26 +41,24 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     # Configure your STT, LLM, and TTS services here
     # Swap out different processors or properties to customize your bot
     stt = DeepgramSTTService(api_key=os.getenv("DEEPGRAM_API_KEY"))
-    llm = OpenAILLMService(api_key=os.getenv("OPENAI_API_KEY"), model="gpt-4o")
+    llm = OpenAILLMService(
+        api_key=os.getenv("OPENAI_API_KEY"),
+        settings=OpenAILLMService.Settings(
+            system_instruction="You are Chatbot, a friendly, helpful robot. Your goal is to demonstrate your capabilities in a succinct way. Your output will be converted to audio so don't include special characters in your answers. Respond to what the user said in a creative and helpful way, but keep your responses brief. Start by introducing yourself.",
+        ),
+    )
     tts = CartesiaTTSService(
         api_key=os.getenv("CARTESIA_API_KEY"),
-        voice_id="71a7ad14-091c-4e8e-a314-022ece01c121",  # British Reading Lady
+        settings=CartesiaTTSService.Settings(
+            voice="71a7ad14-091c-4e8e-a314-022ece01c121",  # British Reading Lady
+        ),
     )
-
-    # Set up the initial context for the conversation
-    # You can specified initial system and assistant messages here
-    messages = [
-        {
-            "role": "system",
-            "content": "You are Chatbot, a friendly, helpful robot. Your goal is to demonstrate your capabilities in a succinct way. Your output will be converted to audio so don't include special characters in your answers. Respond to what the user said in a creative and helpful way, but keep your responses brief. Start by introducing yourself.",
-        },
-    ]
 
     # Define and register tools as required
     tools = NOT_GIVEN
 
     # This sets up the LLM context by providing messages and tools
-    context = LLMContext(messages, tools)
+    context = LLMContext(tools)
     user_aggregator, assistant_aggregator = LLMContextAggregatorPair(
         context,
         user_params=LLMUserAggregatorParams(

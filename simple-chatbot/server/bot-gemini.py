@@ -121,13 +121,16 @@ async def run_bot(transport: BaseTransport):
     # Initialize the Gemini Live model
     llm = GeminiLiveLLMService(
         api_key=os.getenv("GOOGLE_API_KEY"),
-        voice_id="Charon",  # Aoede, Charon, Fenrir, Kore, Puck
+        settings=GeminiLiveLLMService.Settings(
+            system_instruction="You are Chatbot, a friendly, helpful robot. Your goal is to demonstrate your capabilities in a succinct way. Your output will be converted to audio so don't include special characters in your answers. Respond to what the user said in a creative and helpful way, but keep your responses brief.",
+            voice="Charon",  # Aoede, Charon, Fenrir, Kore, Puck
+        ),
     )
 
     messages = [
         {
             "role": "user",
-            "content": "You are Chatbot, a friendly, helpful robot. Your goal is to demonstrate your capabilities in a succinct way. Your output will be converted to audio so don't include special characters in your answers. Respond to what the user said in a creative and helpful way, but keep your responses brief. Start by introducing yourself.",
+            "content": "Start by introducing yourself.",
         },
     ]
 

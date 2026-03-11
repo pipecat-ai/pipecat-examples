@@ -330,14 +330,17 @@ async def run_bot(
 
     tts = CartesiaTTSService(
         api_key=os.getenv("CARTESIA_API_KEY", ""),
-        voice_id="b7d50908-b17c-442d-ad8d-810c63997ed9",  # Helpful Woman voice
+        settings=CartesiaTTSService.Settings(
+            voice="b7d50908-b17c-442d-ad8d-810c63997ed9",  # Helpful Woman voice
+        ),
     )
 
-    llm = OpenAILLMService(api_key=os.getenv("OPENAI_API_KEY"))
-
-    system_instruction = build_system_prompt(config)
-
-    messages: list[LLMContextMessage] = [{"role": "system", "content": system_instruction}]
+    llm = OpenAILLMService(
+        api_key=os.getenv("OPENAI_API_KEY"),
+        settings=OpenAILLMService.Settings(
+            system_instruction=build_system_prompt(config),
+        ),
+    )
 
     # ------------ REGISTER FUNCTIONS ------------
 
@@ -364,7 +367,7 @@ async def run_bot(
             # Target not found - inform bot
             available = ", ".join(t.name for t in config.transfer_targets)
             message = {
-                "role": "system",
+                "role": "user",
                 "content": f"Transfer target '{target_name}' not found. Available targets are: {available}. Please try again with a valid target name.",
             }
             await params.llm.push_frame(LLMMessagesAppendFrame([message], run_llm=True))
@@ -373,7 +376,7 @@ async def run_bot(
         logger.info(f"Initiating warm transfer to {target.name}")
 
         # Speak hold message to customer
-        hold_message = {"role": "system", "content": config.transfer_messages.hold_message}
+        hold_message = {"role": "user", "content": config.transfer_messages.hold_message}
         await params.llm.push_frame(LLMMessagesAppendFrame([hold_message], run_llm=True))
 
         # Push StartTransferFrame to begin the transfer flow
@@ -387,7 +390,7 @@ async def run_bot(
 
     # Initialize LLM context and aggregator
     hold_mute_strategy = HoldMuteStrategy()
-    context = LLMContext(messages, tools)
+    context = LLMContext(tools=tools)
     user_aggregator, assistant_aggregator = LLMContextAggregatorPair(
         context,
         user_params=LLMUserAggregatorParams(

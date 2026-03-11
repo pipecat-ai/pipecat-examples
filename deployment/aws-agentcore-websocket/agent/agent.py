@@ -50,14 +50,19 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
 
     tts = CartesiaTTSService(
         api_key=os.getenv("CARTESIA_API_KEY"),
-        voice_id="71a7ad14-091c-4e8e-a314-022ece01c121",  # British Reading Lady
+        settings=CartesiaTTSService.Settings(
+            voice="71a7ad14-091c-4e8e-a314-022ece01c121",  # British Reading Lady
+        ),
     )
 
     # Automatically uses credentials from assumed IAM role when running in AgentCore
     # Runtime, or from environment variables when running locally.
     llm = AWSBedrockLLMService(
-        model="us.amazon.nova-2-lite-v1:0",
-        params=AWSBedrockLLMService.InputParams(temperature=0.8),
+        settings=AWSBedrockLLMService.Settings(
+            model="us.amazon.nova-2-lite-v1:0",
+            temperature=0.8,
+            system_instruction="You are a helpful LLM in a WebRTC call. Your goal is to demonstrate your capabilities in a succinct way. Your output will be spoken aloud, so avoid special characters that can't easily be spoken, such as emojis or bullet points. Respond to what the user said in a creative and helpful way.",
+        ),
     )
 
     # You can also register a function_name of None to get all functions
@@ -98,15 +103,7 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     )
     tools = ToolsSchema(standard_tools=[weather_function, restaurant_function])
 
-    messages = [
-        {
-            "role": "system",
-            "content": "You are a helpful LLM in a voice call. Your goal is to demonstrate your capabilities in a succinct way. Your output will be spoken aloud, so avoid special characters that can't easily be spoken, such as emojis or bullet points. Respond to what the user said in a creative and helpful way.",
-        },
-        {"role": "user", "content": "Say hello and briefly introduce yourself."},
-    ]
-
-    context = LLMContext(messages, tools)
+    context = LLMContext(tools=tools)
     user_aggregator, assistant_aggregator = LLMContextAggregatorPair(
         context,
         user_params=LLMUserAggregatorParams(
@@ -139,6 +136,9 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     async def on_client_ready(rtvi):
         logger.info(f"Client ready")
         # Kick off the conversation
+        context.add_message(
+            {"role": "user", "content": "Say hello and briefly introduce yourself."}
+        )
         await task.queue_frames([LLMRunFrame()])
 
     @transport.event_handler("on_client_connected")

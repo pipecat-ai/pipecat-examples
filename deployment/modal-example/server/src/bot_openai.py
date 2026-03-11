@@ -144,37 +144,26 @@ async def run_bot(room_url: str, token: str):
     # Initialize text-to-speech service
     tts = ElevenLabsTTSService(
         api_key=os.getenv("ELEVENLABS_API_KEY"),
-        #
-        # English
-        #
-        voice_id="SAz9YHcvj6GT2YYXdXww",
-        #
-        # Spanish
-        #
-        # model="eleven_multilingual_v2",
-        # voice_id="gD1IexrzCvsXPHUuT0s3",
+        settings=ElevenLabsTTSService.Settings(
+            voice="SAz9YHcvj6GT2YYXdXww",
+            # Spanish
+            # voice="gD1IexrzCvsXPHUuT0s3",
+        ),
     )
 
     # Initialize LLM service
-    llm = OpenAILLMService(api_key=os.getenv("OPENAI_API_KEY"))
-
-    messages = [
-        {
-            "role": "system",
-            #
-            # English
-            #
-            "content": "You are an incessant one-upper. Start by asking the user how their day is going.",
-            #
+    llm = OpenAILLMService(
+        api_key=os.getenv("OPENAI_API_KEY"),
+        settings=OpenAILLMService.Settings(
+            system_instruction="You are an incessant one-upper. Start by asking the user how their day is going.",
             # Spanish
-            #
-            # "content": "Eres Chatbot, un amigable y útil robot. Tu objetivo es demostrar tus capacidades de una manera breve. Tus respuestas se convertiran a audio así que nunca no debes incluir caracteres especiales. Contesta a lo que el usuario pregunte de una manera creativa, útil y breve. Empieza por presentarte a ti mismo.",
-        },
-    ]
+            # system_instruction="Eres Chatbot, un amigable y útil robot. Tu objetivo es demostrar tus capacidades de una manera breve. Tus respuestas se convertiran a audio así que nunca no debes incluir caracteres especiales. Contesta a lo que el usuario pregunte de una manera creativa, útil y breve. Empieza por presentarte a ti mismo.",
+        ),
+    )
 
     # Set up conversation context and management
     # The context_aggregator will automatically collect conversation context
-    context = LLMContext(messages)
+    context = LLMContext()
     user_aggregator, assistant_aggregator = LLMContextAggregatorPair(
         context,
         user_params=LLMUserAggregatorParams(

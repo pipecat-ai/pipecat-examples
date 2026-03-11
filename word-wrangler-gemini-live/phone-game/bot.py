@@ -593,12 +593,16 @@ Important guidelines:
 
     host_llm = GeminiLiveLLMService(
         api_key=os.getenv("GOOGLE_API_KEY"),
-        system_instruction=host_instruction,
-        params=InputParams(modalities=GeminiModalities.TEXT),
+        settings=GeminiLiveLLMService.Settings(
+            modalities=GeminiModalities.TEXT,
+            system_instruction=host_instruction,
+        ),
     )
 
     host_tts = GoogleTTSService(
-        voice_id=HOST_VOICE_ID,
+        settings=GoogleTTSService.Settings(
+            voice=HOST_VOICE_ID,
+        ),
         credentials_path=os.getenv("GOOGLE_TEST_CREDENTIALS_FILE"),
         text_filters=[HostResponseTextFilter()],
     )
@@ -626,10 +630,12 @@ Important guidelines:
     # Create a resettable player LLM that coordinates between notifiers
     player_llm = ResettablePlayerLLM(
         api_key=os.getenv("GOOGLE_API_KEY"),
-        system_instruction=player_instruction,
+        settings=GeminiLiveLLMService.Settings(
+            system_instruction=player_instruction,
+            voice=PLAYER_VOICE_ID,
+        ),
         new_word_notifier=new_word_notifier,
         host_stopped_speaking_notifier=bot_speaking_notifier,
-        voice_id=PLAYER_VOICE_ID,
     )
 
     # Set up the initial context for the conversation

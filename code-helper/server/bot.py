@@ -108,7 +108,9 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     #   using skip_aggregator_types to avoid having code blocks spoken out loud
     tts = CartesiaTTSService(
         api_key=os.getenv("CARTESIA_API_KEY"),
-        voice_id="71a7ad14-091c-4e8e-a314-022ece01c121",  # British Reading Lady
+        settings=CartesiaTTSService.Settings(
+            voice="71a7ad14-091c-4e8e-a314-022ece01c121",  # British Reading Lady
+        ),
         skip_aggregator_types=["code"],  # Skip code blocks in TTS speech
     )
 
@@ -135,20 +137,15 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     tts.add_text_transformer(spell_out_text, "credit_card")
 
     # LLM service with a function call to retrieve credit card info
-    llm = OpenAILLMService(api_key=os.getenv("OPENAI_API_KEY"))
+    llm = OpenAILLMService(
+        api_key=os.getenv("OPENAI_API_KEY"),
+        settings=OpenAILLMService.Settings(system_instruction=system_prompt),
+    )
     llm.register_function("get_credit_card_info", fetch_credit_card_info)
 
     # RTVI text transformer to obfuscate credit card numbers in the bot's output.
     async def obfuscate_credit_card(text: str, type: str) -> str:
         return "XXXX-XXXX-XXXX-" + text[-4:]
-
-    # LLM aggregator context
-    messages = [
-        {
-            "role": "system",
-            "content": system_prompt,
-        },
-    ]
 
     credit_card_function = FunctionSchema(
         name="get_credit_card_info",
@@ -157,7 +154,7 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
         required=[],
     )
     tools = ToolsSchema(standard_tools=[credit_card_function])
-    context = LLMContext(messages, tools)
+    context = LLMContext(tools=tools)
     user_aggregator, assistant_aggregator = LLMContextAggregatorPair(
         context,
         user_params=LLMUserAggregatorParams(
@@ -196,7 +193,9 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     async def on_client_connected(transport, client):
         logger.info("Client connected")
         # Kick off the conversation.
-        messages.append({"role": "system", "content": "Say hello and briefly introduce yourself."})
+        context.add_message(
+            {"role": "user", "content": "Say hello and briefly introduce yourself."}
+        )
         await task.queue_frames([LLMRunFrame()])
 
     @transport.event_handler("on_client_disconnected")
