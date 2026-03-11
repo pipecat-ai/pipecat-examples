@@ -99,7 +99,16 @@ async def run_bot(transport: BaseTransport, request: AgentRequest, handle_sigint
         logger.info(f"Forwarding call {request.call_sid} to {request.sip_uri}")
 
         try:
-            twilio_client = Client(os.getenv("TWILIO_ACCOUNT_SID"), os.getenv("TWILIO_AUTH_TOKEN"))
+            # Use to_phone to select Twilio credentials if you have multiple
+            # accounts (e.g., US vs EU). For now, we use a single set of credentials.
+            to_phone = request.to_phone
+            logger.info(f"Dialing in to {to_phone}")
+
+            account_sid = os.getenv("TWILIO_ACCOUNT_SID")
+            auth_token = os.getenv("TWILIO_AUTH_TOKEN")
+            logger.info(f"Using Twilio credentials for {to_phone}")
+
+            twilio_client = Client(account_sid, auth_token)
 
             # Update the Twilio call with TwiML to forward to the Daily SIP endpoint
             twilio_client.calls(request.call_sid).update(

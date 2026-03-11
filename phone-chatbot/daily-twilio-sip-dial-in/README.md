@@ -175,6 +175,7 @@ class AgentRequest(BaseModel):
     token: str
     call_sid: str
     sip_uri: str
+    to_phone: str
     # Add your custom fields here
     customer_name: str | None = None
     account_id: str | None = None
@@ -191,6 +192,7 @@ agent_request = AgentRequest(
     token=sip_config.token,
     call_sid=call_data.call_sid,
     sip_uri=sip_config.sip_endpoint,
+    to_phone=call_data.to_phone,
     customer_name=customer_info.name,
     account_id=customer_info.id,
 )

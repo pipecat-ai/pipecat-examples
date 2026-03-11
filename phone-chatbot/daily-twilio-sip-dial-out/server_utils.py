@@ -13,11 +13,13 @@ This module provides data models and functions for:
 """
 
 import os
+import time
 
 import aiohttp
 from fastapi import HTTPException, Request
 from loguru import logger
 from pipecat.runner.daily import DailyRoomConfig, configure
+from pipecat.transports.daily.utils import DailyRoomProperties
 from pydantic import BaseModel
 
 
@@ -26,9 +28,11 @@ class DialoutSettings(BaseModel):
 
     Attributes:
         sip_uri: The SIP URI to dial
+        provider: Optional SIP provider name (e.g., "daily")
     """
 
     sip_uri: str
+    provider: str | None = None
     # Include any custom data here needed for the call
 
 
@@ -109,7 +113,22 @@ async def create_daily_room(
         raise HTTPException(status_code=400, detail="Invalid SIP URI")
 
     try:
-        return await configure(session, sip_caller_phone=sip_caller_phone)
+        # sip_params = DailyRoomSipParams(
+        #     display_name=sip_caller_phone,
+        #     video=False,
+        #     sip_mode="dial-in",
+        #     num_endpoints=1,
+        #     provider="daily"
+        # )
+        room_props = DailyRoomProperties(
+            exp=time.time() + 600, # 10 minutes
+            eject_at_room_exp=True,
+            # sip=sip_params,
+            enable_dialout=True,
+            start_video_off=True,
+            geo="us-east-1", # select a region close to the from_number/pipecat agent
+        )
+        return await configure(session, room_properties=room_props)
     except Exception as e:
         logger.error(f"Error creating Daily room: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to create Daily room: {str(e)}")
