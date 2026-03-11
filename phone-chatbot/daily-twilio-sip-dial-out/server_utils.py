@@ -121,12 +121,12 @@ async def create_daily_room(
         #     provider="daily"
         # )
         room_props = DailyRoomProperties(
-            exp=time.time() + 600, # 10 minutes
+            exp=time.time() + 600,  # 10 minutes
             eject_at_room_exp=True,
             # sip=sip_params,
             enable_dialout=True,
             start_video_off=True,
-            geo="us-east-1", # select a region close to the from_number/pipecat agent
+            geo="us-east-1",  # select a region close to the from_number/pipecat agent
         )
         return await configure(session, room_properties=room_props)
     except Exception as e:
