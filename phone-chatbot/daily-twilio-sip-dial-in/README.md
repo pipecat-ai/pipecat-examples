@@ -1,17 +1,23 @@
-# Daily + Twilio SIP dial-in Voice Bot
+# Twilio Phone Number → Daily SIP → Pipecat Bot (Dial-in)
 
-This project demonstrates how to create a voice bot that can receive phone calls via Twilio and use Daily's SIP capabilities to enable voice conversations.
+This example shows how to receive inbound phone calls on a **Twilio phone number** and route them through **Daily's SIP infrastructure** to a **Pipecat voice bot**. The `provider="daily"` setting tells Daily to use its own SIP servers for the media path, so no external SIP trunk is required.
+
+> **Using a Daily phone number instead of Twilio?** See the [`daily-pstn-dial-in`](../daily-pstn-dial-in) example.
 
 ## How It Works
 
-1. Twilio receives an incoming call to your phone number
-2. Twilio calls your webhook server (`/call` endpoint in `server.py`)
-3. The server creates a Daily room with SIP capabilities
-4. The server starts the bot process with the room details (locally or via Pipecat Cloud)
-5. The caller is put on hold with music (a US ringtone in this example)
-6. The bot joins the Daily room and signals readiness
-7. Twilio forwards the call to Daily's SIP endpoint
-8. The caller and the bot are connected, and the bot handles the conversation
+```
+Caller → Twilio Phone Number → Webhook (server.py) → Daily SIP Room → Pipecat Bot
+```
+
+1. A caller dials your **Twilio phone number**
+2. Twilio sends a webhook to your server (`/call` endpoint in `server.py`)
+3. The caller hears hold music while the server handles the webhook
+4. The server creates a **Daily room** with SIP enabled (`provider="daily"`)
+5. The server starts the Pipecat bot (locally or via Pipecat Cloud)
+6. The bot joins the Daily room and signals readiness (`dialin-ready` fires)
+7. TwiML is invoked that asks Twilio to forward the call to Daily's SIP endpoint
+8. The caller and the bot are connected for a voice conversation
 
 ## Project Structure
 
