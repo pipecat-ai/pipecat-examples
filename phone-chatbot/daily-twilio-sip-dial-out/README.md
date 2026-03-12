@@ -1,15 +1,21 @@
-# Daily + Twilio SIP dial-out Voice Bot
+# Pipecat Bot → Daily SIP → Twilio Phone Number (Dial-out)
 
-This project demonstrates how to create a voice bot that uses Daily's SIP capabilities with Twilio to make outbound calls to phone numbers.
+This example shows how a **Pipecat voice bot** can make outbound phone calls through **Daily's SIP infrastructure** to a **Twilio phone number**. The `provider="daily"` setting in the dial-out request tells Daily to use its own SIP servers for the media path.
+
+> **Using a Daily phone number instead of Twilio?** See the [`daily-pstn-dial-out`](../daily-pstn-dial-out) example — no Twilio SIP domain/TwiML configuration needed. However, Twilio has phone numbers in multiple regions.
 
 ## How It Works
 
-1. The server receives a dial-out request with the SIP URI to call
-2. The server creates a Daily room with SIP capabilities
-3. The server starts the bot process (locally or via Pipecat Cloud based on ENV)
-4. The bot joins the room and initiates the dial-out to the specified SIP URI
-5. Twilio receives the SIP request and processes it via configured TwiML
-6. Twilio rings the number found within the SIP URI
+```
+API Request (curl) → server.py → Spins up Pipecat Bot → Daily SIP dial-out → Twilio SIP Domain → Phone
+```
+
+1. Your server receives a dial-out request with the SIP URI and `provider`
+2. The server creates a **Daily room** with dial-out enabled
+3. The server starts the Pipecat bot (locally or via Pipecat Cloud)
+4. The bot joins the room and initiates the dial-out (`provider="daily"`)
+5. **Daily's SIP** sends the call to your **Twilio SIP domain**
+6. Twilio processes the call via your TwiML bin or webhook handler and rings the destination number
 7. The bot automatically retries on failure (up to 5 attempts)
 8. When the call is answered, the bot conducts the conversation
 
@@ -95,6 +101,8 @@ This example is organized to be production-ready and easy to customize:
    - callerId must be a valid number that you own on [Twilio](https://console.twilio.com/us1/develop/phone-numbers/manage/incoming)
    - answerOnBridge="true|false" based on your use-case
    - Save the file. We will use this when creating the SIP domain
+ 
+note: `callerid` is hardcoded in the TwiML bin, to set it dynamically, the username field of the SIP URI can be overloaded to contain both the callerId and the destination number. `+1DESTINATION_+1CALLERID`.
 
 4. Create and configure a SIP domain
 
@@ -171,7 +179,8 @@ You'll need two terminal windows open:
      -H "Content-Type: application/json" \
      -d '{
        "dialout_settings": {
-         "sip_uri": "sip:+1234567890@daily.sip.twilio.com"
+         "sip_uri": "sip:+1234567890@daily.sip.twilio.com",
+         "provider": "daily"
        }
      }'
    ```
@@ -269,3 +278,5 @@ agent_request = AgentRequest(
 - Make sure both IP ACLs (0.0.0.0/1 and 128.0.0.0/1) are created and selected
 - Verify that the TwiML bin has a valid caller ID from your Twilio account
 - Check that the SIP domain name matches what you're using in the SIP URI
+
+Note: Setting Daily Provider come with the advantage of using Static IPs, which means you can set a smaller set of IP in the ACLs and have reliable SIP connectivity.
