@@ -92,18 +92,15 @@ The Host uses Gemini Live API, configured with specific response patterns to han
 By default, all input audio flows to both branches, so both LLMs hear the user. To implement the complex routing:
 
 1. **Producer/Consumer Pattern:** Captures the Player's output audio and feeds it to the Host
-
    - `ProducerProcessor` filters TTSAudioRawFrames from the Player
    - Transforms them from 24kHz to 16kHz (required by Gemini Live)
    - Passes them to the `ConsumerProcessor` at the top of the Host branch
 
 2. **Text Filtering:** The `HostResponseTextFilter` intercepts the "NO" and "IGNORE" responses
-
    - Prevents TTS vocalization of these responses
    - Ensures that only meaningful Host responses are spoken
 
 3. **Host-Player Synchronization:**
-
    - `BotStoppedSpeakingNotifier` detects when the Host finishes speaking
    - `GameStateTracker` parses the streamed text to detect new words and track score
    - `NewWordNotifier` triggers the `ResettablePlayerLLM` to disconnect and reconnect when a new word is presented
@@ -183,7 +180,6 @@ This architecture enables complex interaction patterns that would be difficult t
    ```
 
 4. In .env.local:
-
    - `NEXT_PUBLIC_API_BASE_URL=http://localhost:7860` is used for local development. For deployments, either remove this env var or replace with `/api`.
    - `AGENT_NAME` should be set to the name of your deployed Pipecat agent (e.g., "word-wrangler").
    - `PIPECAT_CLOUD_API_KEY` is used only for deployments to Pipecat Cloud.
@@ -243,13 +239,11 @@ You can deploy your server code using Pipecat Cloud. For a full walkthrough, sta
 
 Here are the steps you'll need to complete:
 
-- Build, tag, and push your Docker image to a registry (e.g. `uv run pcc docker build-push`)
 - Create Pipecat Cloud secrets using the CLI or dashboard. For this agent, you only need a `GOOGLE_API_KEY`. Your `DAILY_API_KEY` is automatically applied.
 - Deploy your agent image. You can use a pcc-deploy.toml file to make deploying easier. For example:
 
 ```toml
 agent_name = "word-wrangler"
-image = "your-dockerhub-name/word-wrangler:0.1"
 secret_set = "word-wrangler-secrets"
 enable_krisp = true
 
@@ -259,8 +253,6 @@ enable_krisp = true
 ```
 
 Then, you can deploy with the CLI using `uv run pcc deploy`.
-
-- Finally, confirm that your agent is deployed. You'll get feedback in the terminal.
 
 #### Deploy your Client
 

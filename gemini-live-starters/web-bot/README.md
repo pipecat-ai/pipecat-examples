@@ -58,17 +58,16 @@ Open `http://localhost:3000` and click Connect. You can share your screen (deskt
 Follow the official quickstart to build and deploy a Docker image, configure secrets, and run your agent in production:
 
 1. **Sign up** for [Pipecat Cloud](https://pipecat.daily.co) and set up Docker
-2. **Configure** `server/pcc-deploy.toml` (agent name, image, scaling)
+2. **Configure** `server/pcc-deploy.toml` (agent name, secrets, scaling)
 3. **Upload secrets** from your `.env`:
 
 ```bash
 uv run pcc secrets set <your-secret-set> --file .env
 ```
 
-4. **Build and deploy**:
+4. **Deploy**:
 
 ```bash
-uv run pcc docker build-push
 uv run pcc deploy
 ```
 

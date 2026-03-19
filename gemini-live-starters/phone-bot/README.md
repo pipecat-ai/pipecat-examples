@@ -82,7 +82,6 @@ Transform your local bot into a production-ready service. Pipecat Cloud handles 
 1. [Sign up for Pipecat Cloud](https://pipecat.daily.co/sign-up).
 
 2. Set up Docker for building your bot image:
-
    - **Install [Docker](https://www.docker.com/)** on your system
    - **Create a [Docker Hub](https://hub.docker.com/) account**
    - **Login to Docker Hub:**
@@ -124,14 +123,12 @@ Transform your local bot into a production-ready service. Pipecat Cloud handles 
    ```
 
    Replace the placeholder values:
-
    - `AGENT_NAME` with your deployed bot’s name (e.g., my-first-agent)
    - `ORGANIZATION_NAME` with your organization name from step 2
 
    For example, if your agent is named “pcc-gemini-twilio” and your organization is “industrious-purple-cat-123”, your value would be: pcc-gemini-twilio.industrious-purple-cat-123
 
 4. Assign the TwiML Bin to your Twilio phone number:
-
    - Navigate to the "Phone Numbers" section in your Twilio dashboard (Phone Numbers > Manage > Active numbers)
    - Select your phone number from the list
    - In the "Configure" tab, under “Voice Configuration” section, find “A call comes in”
@@ -141,11 +138,10 @@ Transform your local bot into a production-ready service. Pipecat Cloud handles 
 
 ### Configure your deployment
 
-The `pcc-deploy.toml` file tells Pipecat Cloud how to run your bot. **Update the `image` field** with your Docker Hub username by editing `pcc-deploy.toml`.
+The `pcc-deploy.toml` file tells Pipecat Cloud how to deploy and run your bot.
 
 ```ini
 agent_name = "pcc-gemini-twilio"
-image = "YOUR_DOCKERHUB_USERNAME/pcc-gemini-twilio:0.1" # 👈 Update this line
 secret_set = "pcc-gemini-twilio-secrets"
 
 [scaling]
@@ -155,11 +151,8 @@ secret_set = "pcc-gemini-twilio-secrets"
 **Understanding the TOML file settings:**
 
 - `agent_name`: Your bot's name in Pipecat Cloud
-- `image`: The Docker image to deploy (format: `username/image:version`)
 - `secret_set`: Where your API keys are stored securely
 - `min_agents`: Number of bot instances to keep ready (1 = instant start)
-
-> 💡 Tip: [Set up `image_credentials`](https://docs.pipecat.ai/deployment/pipecat-cloud/fundamentals/secrets#image-pull-secrets) in your TOML file for authenticated image pulls
 
 ### Configure secrets
 
@@ -171,15 +164,9 @@ uv run pcc secrets set pcc-gemini-twilio-secrets --file .env
 
 This creates a secret set called `pcc-gemini-twilio-secrets` (matching your TOML file) and uploads all your API keys from `.env`.
 
-### Build and deploy
+### Deploy
 
-Build your Docker image and push to Docker Hub:
-
-```bash
-uv run pcc docker build-push
-```
-
-Deploy to Pipecat Cloud:
+Pipecat Cloud will build your image in the cloud and deploy it when you run:
 
 ```bash
 uv run pcc deploy
