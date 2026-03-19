@@ -188,11 +188,8 @@ If `warm_transfer_config` is not provided, the bot uses default targets from env
 
    ```bash
    pipecat cloud secrets set -f .env daily-pstn-secrets
-   pipecat cloud docker build-push
    pipecat cloud deploy
    ```
-
-
 
 ### Deploy the Server
 
@@ -205,12 +202,12 @@ The `server.py` handles inbound call webhooks and should be deployed separately:
 
 A warm transfer differs from a cold transfer:
 
-| Aspect | Cold Transfer | Warm Transfer |
-|--------|---------------|---------------|
-| Bot leaves call | Immediately when specialist answers | After connecting customer |
-| Customer experience | Silence until specialist answers | Hold music while waiting |
-| Specialist briefing | None | Bot explains customer's issue |
-| Failure handling | Customer disconnected | Bot returns to help customer |
+| Aspect              | Cold Transfer                       | Warm Transfer                 |
+| ------------------- | ----------------------------------- | ----------------------------- |
+| Bot leaves call     | Immediately when specialist answers | After connecting customer     |
+| Customer experience | Silence until specialist answers    | Hold music while waiting      |
+| Specialist briefing | None                                | Bot explains customer's issue |
+| Failure handling    | Customer disconnected               | Bot returns to help customer  |
 
 ### Warm Transfer Flow
 
