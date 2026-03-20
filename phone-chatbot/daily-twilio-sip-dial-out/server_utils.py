@@ -13,13 +13,11 @@ This module provides data models and functions for:
 """
 
 import os
-import time
 
 import aiohttp
 from fastapi import HTTPException, Request
 from loguru import logger
 from pipecat.runner.daily import DailyRoomConfig, configure
-from pipecat.transports.daily.utils import DailyRoomProperties
 from pydantic import BaseModel
 
 
@@ -106,29 +104,15 @@ async def create_daily_room(
     """
     sip_uri = dialout_request.dialout_settings.sip_uri
 
-    if sip_uri.startswith("sip:") and "@" in sip_uri:
-        phone_part = sip_uri[4:]  # Remove 'sip:' prefix
-        sip_caller_phone = phone_part.split("@")[0]  # Get everything before '@'
-    else:
+    if not (sip_uri.startswith("sip:") and "@" in sip_uri):
         raise HTTPException(status_code=400, detail="Invalid SIP URI")
 
     try:
-        # sip_params = DailyRoomSipParams(
-        #     display_name=sip_caller_phone,
-        #     video=False,
-        #     sip_mode="dial-in",
-        #     num_endpoints=1,
-        #     provider="daily"
-        # )
-        room_props = DailyRoomProperties(
-            exp=time.time() + 600,  # 10 minutes
-            eject_at_room_exp=True,
-            # sip=sip_params,
+        return await configure(
+            session,
             enable_dialout=True,
-            start_video_off=True,
-            geo="us-east-1",  # select a region close to the from_number/pipecat agent
+            room_geo="us-east-1",  # can set this to the same region as your Twilio number
         )
-        return await configure(session, room_properties=room_props)
     except Exception as e:
         logger.error(f"Error creating Daily room: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to create Daily room: {str(e)}")

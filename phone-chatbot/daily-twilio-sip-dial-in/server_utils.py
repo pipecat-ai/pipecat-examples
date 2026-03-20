@@ -5,13 +5,11 @@
 #
 
 import os
-import time
 
 import aiohttp
 from fastapi import HTTPException, Request
 from loguru import logger
 from pipecat.runner.daily import DailyRoomConfig, configure
-from pipecat.transports.daily.utils import DailyRoomProperties, DailyRoomSipParams
 from pydantic import BaseModel
 
 
@@ -88,23 +86,13 @@ async def create_daily_room(
         HTTPException: If room creation fails
     """
     try:
-        sip_params = DailyRoomSipParams(
-            display_name=call_data.from_phone,
-            video=False,
-            sip_mode="dial-in",
-            num_endpoints=1,
-            codecs=None,
-            provider=sip_provider,
-        )
-        room_props = DailyRoomProperties(
-            exp=time.time() + 600,  # 10 minutes
-            eject_at_room_exp=True,
-            sip=sip_params,
+        return await configure(
+            session,
+            sip_caller_phone=call_data.from_phone,
+            sip_provider=sip_provider,
             enable_dialout=True,
-            start_video_off=True,
-            geo="us-east-1",
+            room_geo="us-east-1",  # can set this to the same region as your Twilio number
         )
-        return await configure(session, room_properties=room_props)
     except Exception as e:
         logger.error(f"Error creating Daily room: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to create Daily room: {e!s}")
