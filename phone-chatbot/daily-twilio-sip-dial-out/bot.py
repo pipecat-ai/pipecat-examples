@@ -80,8 +80,13 @@ class DialoutManager:
         logger.info(
             f"Attempting dialout (attempt {self._attempt_count}/{self._max_retries}) to: {self._sip_uri}"
         )
+        sip_uri = self._sip_uri
+        display_name = sip_uri  # fallback
+        if sip_uri.startswith("sip:") and "@" in sip_uri:
+            phone_part = sip_uri[4:]  # Remove 'sip:' prefix
+            display_name = phone_part.split("@")[0]  # Get everything before '@'
 
-        params = {"sipUri": self._sip_uri}
+        params = {"sipUri": sip_uri, "displayName": display_name}
         if self._provider:
             params["provider"] = self._provider
         await self._transport.start_dialout(params)

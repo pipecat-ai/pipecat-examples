@@ -110,6 +110,7 @@ async def create_daily_room(
     try:
         return await configure(
             session,
+            sip_caller_phone="dialout",
             enable_dialout=True,
             room_geo="us-east-1",  # can set this to the same region as your Twilio number
         )
