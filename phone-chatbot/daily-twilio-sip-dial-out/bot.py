@@ -192,6 +192,12 @@ async def run_bot(
     async def on_dialout_warning(transport, data):
         logger.debug(f"Dial-out warning: {data}")
 
+    @transport.event_handler("on_dtmf_event")
+    async def on_dtmf_event(transport, data):
+        logger.info(f"DTMF event: {data}")
+        # Echo back the DTMF tone to the caller
+        # await transport.send_dtmf({"tones": data["tone"], "duration": 100})
+
     @transport.event_handler("on_dialout_error")
     async def on_dialout_error(transport, data: Any):
         logger.error(f"Dial-out error, retrying: {data}")
