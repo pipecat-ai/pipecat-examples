@@ -87,7 +87,7 @@ class DialoutManager:
         )
 
         # Build dialout settings with phone number and optional caller ID
-        dialout_params = {"phoneNumber": self._phone_number}
+        dialout_params = {"phoneNumber": self._phone_number, "displayName": self._phone_number}
         if self._caller_id:
             dialout_params["callerId"] = self._caller_id
             logger.info(f"Using caller ID: {self._caller_id}")

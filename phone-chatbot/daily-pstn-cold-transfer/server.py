@@ -79,7 +79,9 @@ async def handle_incoming_daily_webhook(request: Request) -> JSONResponse:
 
         # Create a Daily room with dial-in capabilities
         try:
-            room_details = await configure(request.app.state.session, sip_caller_phone=caller_phone)
+            room_details = await configure(
+                request.app.state.session, sip_caller_phone=caller_phone, enable_dialout=True
+            )
         except Exception as e:
             logger.error(f"Error creating Daily room: {e}")
             raise HTTPException(status_code=500, detail=f"Failed to create Daily room: {str(e)}")

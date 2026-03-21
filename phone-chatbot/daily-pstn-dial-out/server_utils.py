@@ -107,7 +107,9 @@ async def create_daily_room(
     """
     try:
         return await configure(
-            session, sip_caller_phone=dialout_request.dialout_settings.phone_number
+            session,
+            sip_caller_phone="Test",
+            enable_dialout=True,
         )
     except Exception as e:
         logger.error(f"Error creating Daily room: {e}")
