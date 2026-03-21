@@ -78,7 +78,9 @@ async def handle_call(request: Request):
 
     call_data = await twilio_call_data_from_request(request)
 
-    sip_config = await create_daily_room(call_data, request.app.state.http_session)
+    sip_config = await create_daily_room(
+        call_data, request.app.state.http_session, sip_provider="daily"
+    )
 
     # Make sure we have a SIP endpoint.
     if not sip_config.sip_endpoint:
@@ -89,6 +91,7 @@ async def handle_call(request: Request):
         token=sip_config.token,
         call_sid=call_data.call_sid,
         sip_uri=sip_config.sip_endpoint,
+        to_phone=call_data.to_phone,
     )
 
     # Start bot locally or in production.

@@ -190,7 +190,10 @@ class TransferCoordinator(FrameProcessor):
 
             # Dial the agent
             if self._transfer_target:
-                dialout_params = {"phoneNumber": self._transfer_target.phone_number}
+                dialout_params = {
+                    "phoneNumber": self._transfer_target.phone_number,
+                    "displayName": self._transfer_target.phone_number,
+                }
                 logger.info(f"Dialing agent: {self._transfer_target.phone_number}")
                 try:
                     await self._transport.start_dialout(dialout_params)

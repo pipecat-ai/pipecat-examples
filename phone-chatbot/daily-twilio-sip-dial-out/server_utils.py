@@ -26,9 +26,11 @@ class DialoutSettings(BaseModel):
 
     Attributes:
         sip_uri: The SIP URI to dial
+        provider: Optional SIP provider name (e.g., "daily")
     """
 
     sip_uri: str
+    provider: str | None = None
     # Include any custom data here needed for the call
 
 
@@ -102,14 +104,16 @@ async def create_daily_room(
     """
     sip_uri = dialout_request.dialout_settings.sip_uri
 
-    if sip_uri.startswith("sip:") and "@" in sip_uri:
-        phone_part = sip_uri[4:]  # Remove 'sip:' prefix
-        sip_caller_phone = phone_part.split("@")[0]  # Get everything before '@'
-    else:
+    if not (sip_uri.startswith("sip:") and "@" in sip_uri):
         raise HTTPException(status_code=400, detail="Invalid SIP URI")
 
     try:
-        return await configure(session, sip_caller_phone=sip_caller_phone)
+        return await configure(
+            session,
+            sip_caller_phone="dialout",
+            enable_dialout=True,
+            room_geo="us-east-1",  # can set this to the same region as your Twilio number
+        )
     except Exception as e:
         logger.error(f"Error creating Daily room: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to create Daily room: {str(e)}")

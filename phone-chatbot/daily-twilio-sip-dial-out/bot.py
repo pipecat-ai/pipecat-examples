@@ -51,6 +51,7 @@ class DialoutManager:
     ):
         self._transport = transport
         self._sip_uri = dialout_settings.sip_uri
+        self._provider = dialout_settings.provider
         self._max_retries = max_retries
         self._attempt_count = 0
         self._is_successful = False
@@ -79,8 +80,16 @@ class DialoutManager:
         logger.info(
             f"Attempting dialout (attempt {self._attempt_count}/{self._max_retries}) to: {self._sip_uri}"
         )
+        sip_uri = self._sip_uri
+        display_name = sip_uri  # fallback
+        if sip_uri.startswith("sip:") and "@" in sip_uri:
+            phone_part = sip_uri[4:]  # Remove 'sip:' prefix
+            display_name = phone_part.split("@")[0]  # Get everything before '@'
 
-        await self._transport.start_dialout({"sipUri": self._sip_uri})
+        params = {"sipUri": sip_uri, "displayName": display_name}
+        if self._provider:
+            params["provider"] = self._provider
+        await self._transport.start_dialout(params)
         return True
 
     def mark_successful(self):
@@ -168,6 +177,25 @@ async def run_bot(
     async def on_dialout_answered(transport, data):
         logger.debug(f"Dial-out answered: {data}")
         dialout_manager.mark_successful()
+
+    @transport.event_handler("on_dialout_connected")
+    async def on_dialout_connected(transport, data):
+        logger.debug(f"Dial-out connected: {data}")
+
+    @transport.event_handler("on_dialout_stopped")
+    async def on_dialout_stopped(transport, data):
+        logger.debug(f"Dial-out stopped: {data}")
+        await task.cancel()
+
+    @transport.event_handler("on_dialout_warning")
+    async def on_dialout_warning(transport, data):
+        logger.debug(f"Dial-out warning: {data}")
+
+    @transport.event_handler("on_dtmf_event")
+    async def on_dtmf_event(transport, data):
+        logger.info(f"DTMF event: {data}")
+        # Echo back the DTMF tone to the caller
+        # await transport.send_dtmf({"tones": data["tone"], "duration": 100})
 
     @transport.event_handler("on_dialout_error")
     async def on_dialout_error(transport, data: Any):

@@ -41,6 +41,7 @@ class AgentRequest(BaseModel):
     token: str
     call_sid: str
     sip_uri: str
+    to_phone: str
 
 
 async def twilio_call_data_from_request(request: Request):
@@ -67,13 +68,16 @@ async def twilio_call_data_from_request(request: Request):
 
 
 async def create_daily_room(
-    call_data: TwilioCallData, session: aiohttp.ClientSession
+    call_data: TwilioCallData,
+    session: aiohttp.ClientSession,
+    sip_provider: str | None = None,
 ) -> DailyRoomConfig:
     """Create a Daily room configured for PSTN dial-in.
 
     Args:
         call_data: Call data containing caller phone number and call details
         session: Shared aiohttp session for making HTTP requests
+        sip_provider: Optional SIP provider name (e.g., "daily")
 
     Returns:
         DailyRoomConfig: Configuration object with room_url and token
@@ -82,7 +86,13 @@ async def create_daily_room(
         HTTPException: If room creation fails
     """
     try:
-        return await configure(session, sip_caller_phone=call_data.from_phone)
+        return await configure(
+            session,
+            sip_caller_phone=call_data.from_phone,
+            sip_provider=sip_provider,
+            enable_dialout=True,
+            room_geo="us-east-1",  # can set this to the same region as your Twilio number
+        )
     except Exception as e:
         logger.error(f"Error creating Daily room: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to create Daily room: {e!s}")
