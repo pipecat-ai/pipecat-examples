@@ -185,6 +185,23 @@ async def run_bot(
         logger.debug(f"Dial-out answered: {data}")
         dialout_manager.mark_successful()
 
+    @transport.event_handler("on_dialout_connected")
+    async def on_dialout_connected(transport, data):
+        logger.debug(f"Dial-out connected: {data}")
+
+    @transport.event_handler("on_dialout_stopped")
+    async def on_dialout_stopped(transport, data):
+        logger.debug(f"Dial-out stopped: {data}")
+        await task.cancel()
+
+    @transport.event_handler("on_dialout_warning")
+    async def on_dialout_warning(transport, data):
+        logger.warning(f"Dial-out warning: {data}")
+
+    @transport.event_handler("on_dtmf_event")
+    async def on_dtmf_event(transport, data):
+        logger.info(f"DTMF event: {data}")
+
     @transport.event_handler("on_dialout_error")
     async def on_dialout_error(transport, data: Any):
         logger.error(f"Dial-out error, retrying: {data}")

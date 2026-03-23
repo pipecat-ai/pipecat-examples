@@ -106,10 +106,31 @@ async def run_bot(transport: BaseTransport, handle_sigint: bool) -> None:
         logger.info(f"Client disconnected")
         await task.cancel()
 
+    @transport.event_handler("on_dialin_ready")
+    async def on_dialin_ready(transport, sip_endpoint):
+        logger.info(f"Dial-in ready: {sip_endpoint}")
+
+    @transport.event_handler("on_dialin_connected")
+    async def on_dialin_connected(transport, data):
+        logger.info(f"Dial-in connected: {data}")
+
+    @transport.event_handler("on_dialin_stopped")
+    async def on_dialin_stopped(transport, data):
+        logger.info(f"Dial-in stopped: {data}")
+        await task.cancel()
+
+    @transport.event_handler("on_dialin_warning")
+    async def on_dialin_warning(transport, data):
+        logger.warning(f"Dial-in warning: {data}")
+
     @transport.event_handler("on_dialin_error")
     async def on_dialin_error(transport, data):
         logger.error(f"Dial-in error: {data}")
         await task.cancel()
+
+    @transport.event_handler("on_dtmf_event")
+    async def on_dtmf_event(transport, data):
+        logger.info(f"DTMF event: {data}")
 
     runner = PipelineRunner(handle_sigint=handle_sigint)
     await runner.run(task)
@@ -138,6 +159,7 @@ async def bot(runner_args: RunnerArguments):
             call_id=request.dialin_settings.call_id,
             call_domain=request.dialin_settings.call_domain,
         )
+        logger.info(f"Starting dial-in bot, settings: {request.dialin_settings}")
 
         transport = DailyTransport(
             runner_args.room_url,
@@ -152,10 +174,14 @@ async def bot(runner_args: RunnerArguments):
             ),
         )
 
-        # Log caller information if available
+        # Log caller information if available (which number is calling)
         # You can use this to look up customer information to personalize the conversation
         if request.dialin_settings.From:
             logger.info(f"Handling call from: {request.dialin_settings.From}")
+        # Log callee information if available (which number was called)
+        # You can use this to load different prompts based on which number was called
+        if request.dialin_settings.To:
+            logger.info(f"Handling call to: {request.dialin_settings.To}")
 
         await run_bot(transport, runner_args.handle_sigint)
 

@@ -118,6 +118,19 @@ async def run_bot(transport: BaseTransport, request: AgentRequest, handle_sigint
             logger.error(f"Failed to forward call: {str(e)}")
             await task.cancel()
 
+    @transport.event_handler("on_dialin_connected")
+    async def on_dialin_connected(transport, data):
+        logger.info(f"Dial-in connected: {data}")
+
+    @transport.event_handler("on_dialin_stopped")
+    async def on_dialin_stopped(transport, data):
+        logger.info(f"Dial-in stopped: {data}")
+        await task.cancel()
+
+    @transport.event_handler("on_dialin_warning")
+    async def on_dialin_warning(transport, data):
+        logger.warning(f"Dial-in warning: {data}")
+
     @transport.event_handler("on_dialin_error")
     async def on_dialin_error(transport, data):
         logger.error(f"Dial-in error: {data}")
