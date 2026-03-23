@@ -260,13 +260,15 @@ async def bot(runner_args: RunnerArguments):
     token = body_data.get("token")
     call_id = body_data.get("callId")
     call_domain = body_data.get("callDomain")
+    from_phone = body_data.get("From")
+    to_phone = body_data.get("To")
 
     if not all([call_id, call_domain]):
         logger.error("Call ID and Call Domain are required in the body.")
         return None
 
     daily_dialin_settings = DailyDialinSettings(call_id=call_id, call_domain=call_domain)
-    logger.info(f"Starting dial-in bot, settings: {request.dialin_settings}")
+    logger.info(f"Starting dial-in bot, settings: call_id={call_id}, call_domain={call_domain}")
 
     transport = DailyTransport(
         room_url,
@@ -282,11 +284,11 @@ async def bot(runner_args: RunnerArguments):
 
     # Log caller information if available (which number is calling)
     # You can use this to look up customer information to personalize the conversation
-    if request.dialin_settings.From:
-        logger.info(f"Handling call from: {request.dialin_settings.From}")
+    if from_phone:
+        logger.info(f"Handling call from: {from_phone}")
     # Log callee information if available (which number was called)
     # You can use this to load different prompts based on which number was called
-    if request.dialin_settings.To:
-        logger.info(f"Handling call to: {request.dialin_settings.To}")
+    if to_phone:
+        logger.info(f"Handling call to: {to_phone}")
 
     await run_bot(transport, runner_args.handle_sigint)
