@@ -49,7 +49,7 @@ class VoiceChatClient {
     // Add placeholder message
     this.addConversationMessage(
       'Connect to start talking with your bot',
-      'placeholder'
+      'placeholder',
     );
   }
 
@@ -118,9 +118,9 @@ class VoiceChatClient {
       // Setup audio
       this.setupAudio();
 
-      // Connect using config
+      // Start bot and connect using config
       const connectParams = TRANSPORT_CONFIG[this.transportType];
-      await this.client.connect(connectParams);
+      await this.client.startBotAndConnect(connectParams);
     } catch (error) {
       this.addEvent('error', error.message);
       console.error('Connection error:', error);
