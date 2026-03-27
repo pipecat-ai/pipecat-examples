@@ -59,7 +59,6 @@ async def run_bot(websocket_client):
             voice="Puck",  # Aoede, Charon, Fenrir, Kore, Puck
             system_instruction=SYSTEM_INSTRUCTION,
         ),
-        system_instruction=SYSTEM_INSTRUCTION,
     )
 
     context = LLMContext(
