@@ -2,6 +2,8 @@
 
 This example shows how to use Daily to stream multiple simultaneous translations using a single transport. Daily provides custom tracks and in this example we will simultaneously translate incoming audio in English to Spanish, French and German, each of them being sent to a custom track.
 
+<img src="image.png" width="420px">
+
 ## Get started
 
 Create your virtual environment and install dependencies:
