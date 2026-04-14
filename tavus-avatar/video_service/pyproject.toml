@@ -1,0 +1,10 @@
+[project]
+name = "tavus-avatar-video-service"
+version = "0.1.0"
+description = "Tavus API to create an avatar video service layer"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "pipecat-ai[daily,webrtc,runner,cartesia,deepgram,google,silero,tavus,tracing]==0.0.108",
+    "python-dotenv",
+]

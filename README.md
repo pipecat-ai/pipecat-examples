@@ -58,6 +58,10 @@ Ready to explore more? These are two of the most useful examples for common use 
 - **[word-wrangler-gemini-live](word-wrangler-gemini-live/)** - Web & phone based voice AI word games using Gemini Live
 - **[aws-strands](aws-strands/)** - Use AWS Strands for multi-step tasks
 
+### **Video Avatars**
+
+- **[tavus-avatar](tavus-avatar/)** - AI-powered video avatars using Tavus (transport and video service modes)
+
 ### **Multimodal & Creative**
 
 - **[storytelling-chatbot](storytelling-chatbot/)** - Interactive storytelling experiences
