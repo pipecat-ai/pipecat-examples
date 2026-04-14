@@ -22,6 +22,7 @@ from pipecat.audio.vad.silero import SileroVADAnalyzer
 from pipecat.frames.frames import (
     CancelFrame,
     EndFrame,
+    EndTaskFrame,
     Frame,
     InterimTranscriptionFrame,
     InterruptionFrame,
@@ -47,7 +48,6 @@ from pipecat.processors.aggregators.llm_response_universal import (
 )
 from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
 from pipecat.processors.metrics.sentry import SentryMetrics
-from pipecat.processors.user_idle_processor import UserIdleProcessor
 from pipecat.serializers.protobuf import ProtobufFrameSerializer
 from pipecat.services.cartesia.tts import CartesiaTTSService
 from pipecat.services.deepgram.stt import DeepgramSTTService
@@ -165,6 +165,42 @@ class SimulateFreezeInput(FrameProcessor):
 OFFICE_SOUND_FILE = os.path.join(os.path.dirname(__file__), "office-ambience-24000-mono.mp3")
 
 
+class IdleHandler:
+    """Helper class to manage user idle retry logic."""
+
+    def __init__(self):
+        self._retry_count = 0
+
+    def reset(self):
+        """Reset the retry count when user becomes active."""
+        self._retry_count = 0
+
+    async def handle_idle(self, aggregator):
+        """Handle user idle event with escalating prompts."""
+        self._retry_count += 1
+
+        if self._retry_count == 1:
+            # First attempt: Add a gentle prompt to the conversation
+            message = {
+                "role": "developer",
+                "content": "The user has been quiet. Politely and briefly ask if they're still there.",
+            }
+            await aggregator.push_frame(LLMMessagesAppendFrame([message], run_llm=True))
+        elif self._retry_count == 2:
+            # Second attempt: More direct prompt
+            message = {
+                "role": "developer",
+                "content": "The user is still inactive. Ask if they'd like to continue our conversation.",
+            }
+            await aggregator.push_frame(LLMMessagesAppendFrame([message], run_llm=True))
+        else:
+            # Third attempt: End the conversation
+            await aggregator.push_frame(
+                TTSSpeakFrame("It seems like you're busy right now. Have a nice day!")
+            )
+            await aggregator.push_frame(EndTaskFrame(), FrameDirection.UPSTREAM)
+
+
 async def run_example(websocket_client):
     logger.info(f"Starting bot")
 
@@ -193,33 +229,6 @@ async def run_example(websocket_client):
 
     stt = DeepgramSTTService(api_key=os.getenv("DEEPGRAM_API_KEY"))
 
-    async def handle_user_idle(user_idle: UserIdleProcessor, retry_count: int) -> bool:
-        if retry_count == 1:
-            # First attempt: Add a gentle prompt to the conversation
-            message = {
-                "role": "system",
-                "content": "The user has been quiet. Politely and briefly ask if they're still there.",
-            }
-            await user_idle.push_frame(LLMMessagesAppendFrame([message], run_llm=True))
-            return True
-        elif retry_count == 2:
-            # Second attempt: More direct prompt
-            message = {
-                "role": "system",
-                "content": "The user is still inactive. Ask if they'd like to continue our conversation.",
-            }
-            await user_idle.push_frame(LLMMessagesAppendFrame([message], run_llm=True))
-            return True
-        else:
-            # Third attempt: End the conversation
-            await user_idle.push_frame(
-                TTSSpeakFrame("It seems like you're busy right now. Have a nice day!")
-            )
-            await task.queue_frame(EndFrame())
-            return False
-
-    user_idle = UserIdleProcessor(callback=handle_user_idle, timeout=10.0)
-
     tts = CartesiaTTSService(
         api_key=os.getenv("CARTESIA_API_KEY"),
         settings=CartesiaTTSService.Settings(
@@ -240,6 +249,7 @@ async def run_example(websocket_client):
     user_aggregator, assistant_aggregator = LLMContextAggregatorPair(
         context,
         user_params=LLMUserAggregatorParams(
+            user_idle_timeout=10.0,  # Detect user idle after 10 seconds
             vad_analyzer=SileroVADAnalyzer(),
         ),
     )
@@ -255,7 +265,6 @@ async def run_example(websocket_client):
                     stt,
                 ],
             ),
-            user_idle,
             user_aggregator,  # User responses
             llm,  # LLM
             tts,  # TTS
@@ -298,6 +307,18 @@ async def run_example(websocket_client):
             ),
         ],
     )
+
+    # Set up idle handling with retry logic
+    idle_handler = IdleHandler()
+
+    @user_aggregator.event_handler("on_user_turn_idle")
+    async def on_user_turn_idle(aggregator):
+        logger.info(f"User turn idle")
+        await idle_handler.handle_idle(aggregator)
+
+    @user_aggregator.event_handler("on_user_turn_started")
+    async def on_user_turn_started(aggregator, strategy):
+        idle_handler.reset()
 
     @transport.event_handler("on_client_connected")
     async def on_client_connected(transport, client):
