@@ -5,7 +5,7 @@ description = "Example for building voice AI bots with Pipecat built using Small
 requires-python = ">=3.11"
 dependencies = [
     "pipecat-ai[cartesia,daily,deepgram,openai,runner,silero,webrtc]>=1.0.0",
-    "pipecatcloud>=0.2.20",
+    "pipecatcloud>=0.4.4",
 ]
 
 [dependency-groups]

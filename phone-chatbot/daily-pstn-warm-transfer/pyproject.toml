@@ -5,7 +5,7 @@ description = "Daily PSTN Warm Transfer example with hold music"
 requires-python = ">=3.11"
 dependencies = [
     "pipecat-ai[daily,deepgram,cartesia,openai,silero,runner,soundfile]>=1.0.0",
-    "pipecatcloud>=0.2.20",
+    "pipecatcloud>=0.4.4",
 ]
 
 [dependency-groups]

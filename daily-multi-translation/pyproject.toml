@@ -6,6 +6,6 @@ readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
   "pipecat-ai[daily,webrtc,websocket,cartesia,google,silero,deepgram,runner,soundfile]>=1.0.0",
-  "pipecatcloud>=0.2.20",
+  "pipecatcloud>=0.4.4",
   "aiofiles"
 ]
