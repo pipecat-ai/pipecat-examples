@@ -140,7 +140,9 @@ async def run_bot(transport: BaseTransport, request: AgentRequest, handle_sigint
     async def on_dtmf_event(transport, data):
         logger.info(f"DTMF event: {data}")
         # Echo back the DTMF tone to the caller
-        # await transport.send_dtmf({"tones": data["tone"], "digitDurationMs": 100})
+        # await transport._client.send_dtmf(
+        #     {"sessionId": data["sessionId"], "tones": data["tone"], "digitDurationMs": 100}
+        # )
 
     @transport.event_handler("on_client_connected")
     async def on_client_connected(transport, client):
