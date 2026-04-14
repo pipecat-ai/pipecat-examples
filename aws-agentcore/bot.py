@@ -9,16 +9,17 @@ import os
 from dotenv import load_dotenv
 from loguru import logger
 from pipecat.audio.vad.silero import SileroVADAnalyzer
-from pipecat.frames.frames import LLMRunFrame, TranscriptionMessage
+from pipecat.frames.frames import LLMRunFrame
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineParams, PipelineTask
 from pipecat.processors.aggregators.llm_context import LLMContext
 from pipecat.processors.aggregators.llm_response_universal import (
+    AssistantTurnStoppedMessage,
     LLMContextAggregatorPair,
     LLMUserAggregatorParams,
+    UserTurnStoppedMessage,
 )
-from pipecat.processors.transcript_processor import TranscriptProcessor
 from pipecat.runner.types import RunnerArguments
 from pipecat.runner.utils import create_transport
 from pipecat.services.aws.agent_core import AWSAgentCoreProcessor
@@ -64,17 +65,6 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
 
     agent = AWSAgentCoreProcessor(agentArn=os.getenv("AWS_AGENT_ARN"))
 
-    transcript = TranscriptProcessor()
-
-    # Register event handler for transcript updates
-    @transcript.event_handler("on_transcript_update")
-    async def on_transcript_update(processor, frame):
-        for msg in frame.messages:
-            if isinstance(msg, TranscriptionMessage):
-                timestamp = f"[{msg.timestamp}] " if msg.timestamp else ""
-                line = f"{timestamp}{msg.role}: {msg.content}"
-                logger.info(f"Transcript: {line}")
-
     messages = [
         {"role": "user", "content": "Find the first 10 prime numbers greater than 1000"},
     ]
@@ -91,12 +81,10 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
         [
             transport.input(),
             stt,
-            transcript.user(),  # User transcripts
             user_aggregator,
             agent,
             tts,
             transport.output(),
-            transcript.assistant(),  # Assistant transcripts
             assistant_aggregator,
         ]
     )
@@ -120,6 +108,18 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     async def on_client_disconnected(transport, client):
         logger.info(f"Client disconnected")
         await task.cancel()
+
+    @user_aggregator.event_handler("on_user_turn_stopped")
+    async def on_user_turn_stopped(aggregator, strategy, message: UserTurnStoppedMessage):
+        timestamp = f"[{message.timestamp}] " if message.timestamp else ""
+        line = f"{timestamp}user: {message.content}"
+        logger.info(f"Transcript: {line}")
+
+    @assistant_aggregator.event_handler("on_assistant_turn_stopped")
+    async def on_assistant_turn_stopped(aggregator, message: AssistantTurnStoppedMessage):
+        timestamp = f"[{message.timestamp}] " if message.timestamp else ""
+        line = f"{timestamp}assistant: {message.content}"
+        logger.info(f"Transcript: {line}")
 
     runner = PipelineRunner(handle_sigint=runner_args.handle_sigint)
 
