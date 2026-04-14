@@ -52,7 +52,6 @@ from pipecat.runner.utils import create_transport
 from pipecat.services.google.gemini_live.llm import (
     GeminiLiveLLMService,
     GeminiModalities,
-    InputParams,
 )
 from pipecat.services.google.tts import GoogleTTSService
 from pipecat.transports.base_transport import BaseTransport, TransportParams

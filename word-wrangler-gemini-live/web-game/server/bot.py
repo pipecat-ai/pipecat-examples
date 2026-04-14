@@ -23,7 +23,7 @@ from pipecat.runner.types import RunnerArguments
 from pipecat.runner.utils import create_transport
 from pipecat.services.google.gemini_live.llm import GeminiLiveLLMService
 from pipecat.transports.daily.transport import DailyParams, DailyTransport
-from pipecat.turns.mute import MuteUntilFirstBotCompleteUserMuteStrategy
+from pipecat.turns.user_mute import MuteUntilFirstBotCompleteUserMuteStrategy
 
 load_dotenv(override=True)
 

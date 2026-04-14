@@ -2,7 +2,7 @@
 name = "agentcore-pipecat-websocket"
 version = "0.1.0"
 description = "Example for building Pipecat bots deployable to Amazon Bedrock AgentCore using WebSockets for communication"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dependencies = [
 ]
 

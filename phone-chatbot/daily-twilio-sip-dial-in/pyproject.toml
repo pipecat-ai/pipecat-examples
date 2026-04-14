@@ -2,10 +2,10 @@
 name = "daily-twilio-sip-dial-in"
 version = "0.1.0"
 description = "Daily SIP + Twilio Dial-in example"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dependencies = [
-    "pipecat-ai[daily,deepgram,cartesia,openai,silero,runner]>=0.0.105",
-    "pipecatcloud>=0.2.20",
+    "pipecat-ai[daily,deepgram,cartesia,openai,silero,runner]>=1.0.0",
+    "pipecatcloud>=0.4.4",
     "twilio",
 ]
 

@@ -2,7 +2,7 @@
 name = "fastapi-webhook-server"
 version = "0.1.0"
 description = "Pipecat example - fastapi-webhook-server"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dependencies = [
     "fastapi",
     "uvicorn",

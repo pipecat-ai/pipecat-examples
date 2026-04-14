@@ -2,10 +2,10 @@
 name = "runner-examples"
 version = "0.1.0"
 description = "Configuration for runner examples"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dependencies = [
-    "pipecat-ai[daily,deepgram,cartesia,openai,runner,silero,webrtc,websocket]>=0.0.105",
-    "pipecatcloud",
+    "pipecat-ai[daily,deepgram,cartesia,openai,runner,silero,webrtc,websocket]>=1.0.0",
+    "pipecatcloud>=0.4.4",
 ]
 
 [dependency-groups]

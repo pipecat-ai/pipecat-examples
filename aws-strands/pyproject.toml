@@ -2,12 +2,12 @@
 name = "aws-strands"
 version = "0.1.0"
 description = "Pipecat example - aws-strands"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dependencies = [
     "fastapi",
     "uvicorn",
     "python-dotenv",
-    "pipecat-ai[webrtc,daily,deepgram,cartesia,silero]>=0.0.105",
+    "pipecat-ai[webrtc,daily,deepgram,cartesia,silero]>=1.0.0",
     "strands-agents",
 ]
 
