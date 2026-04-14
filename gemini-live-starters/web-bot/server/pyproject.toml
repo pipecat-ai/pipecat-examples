@@ -2,9 +2,9 @@
 name = "gemini-screen-ui-kit"
 version = "0.1.0"
 description = "Pipecat Example showcasing Gemini Live with screen share capabilities"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dependencies = [
-    "pipecat-ai[webrtc,daily,silero,google,runner]>=0.0.105",
+    "pipecat-ai[webrtc,daily,silero,google,runner]>=1.0.0",
     "pipecatcloud>=0.2.18"
 ]
 

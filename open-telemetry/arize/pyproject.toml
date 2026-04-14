@@ -2,7 +2,7 @@
 name = "pipecat-open-inference-tracing"
 version = "0.1.0"
 description = "A Pipecat example using OpenInference tracing"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dependencies = [
     "arize-otel>=0.11.0",
     "openinference-instrumentation>=0.1.42",

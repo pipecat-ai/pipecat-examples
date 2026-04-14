@@ -2,7 +2,7 @@
 name = "agents"
 version = "0.1.0"
 description = "Pipecat example - agents"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dependencies = [
     "bedrock-agentcore",
     "strands-agents",

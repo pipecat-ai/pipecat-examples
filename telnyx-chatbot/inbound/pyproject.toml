@@ -3,8 +3,8 @@ name = "telnyx-chatbot-dial-in"
 version = "0.1.0"
 description = "Telnyx dial-in example for Pipecat"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dependencies = [
-  "pipecat-ai[websocket,cartesia,openai,silero,deepgram,runner,local-smart-turn-v3]>=0.0.105",
+  "pipecat-ai[websocket,cartesia,openai,silero,deepgram,runner,local-smart-turn-v3]>=1.0.0",
   "pipecatcloud>=0.2.7"
 ]

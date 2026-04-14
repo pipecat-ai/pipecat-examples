@@ -2,12 +2,12 @@
 name = "freeze-test"
 version = "0.1.0"
 description = "Pipecat example - freeze-test"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dependencies = [
     "python-dotenv",
     "fastapi[all]",
     "uvicorn",
-    "pipecat-ai[silero,websocket,openai,deepgram,cartesia,sentry,soundfile]>=0.0.105",
+    "pipecat-ai[silero,websocket,openai,deepgram,cartesia,sentry,soundfile]>=1.0.0",
 ]
 
 [dependency-groups]

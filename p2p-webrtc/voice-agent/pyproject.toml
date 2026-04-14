@@ -2,12 +2,12 @@
 name = "voice-agent"
 version = "0.1.0"
 description = "Pipecat example - voice-agent"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dependencies = [
     "python-dotenv",
     "fastapi[all]",
     "uvicorn",
-    "pipecat-ai[google,silero, webrtc]>=0.0.105",
+    "pipecat-ai[google,silero, webrtc]>=1.0.0",
 ]
 
 [dependency-groups]

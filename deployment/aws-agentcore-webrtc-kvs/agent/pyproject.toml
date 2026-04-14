@@ -2,7 +2,7 @@
 name = "agentcore-pipecat-webrtc-kvs-agent"
 version = "0.1.0"
 description = "Pipecat bot agent for Amazon Bedrock AgentCore with KVS managed TURN"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dependencies = [
     "aiohttp",
     "boto3",
