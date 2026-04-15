@@ -439,24 +439,53 @@ async def run_bot(
 
     @transport.event_handler("on_dialout_connected")
     async def on_dialout_connected(transport, data) -> None:
-        logger.info(f"Dialout connected (ringing): {data}")
+        logger.info(f"Supervisor dial-out connected (ringing): {data}")
         # Stop hold music so customer hears the ringing
         await task.queue_frame(MixerEnableFrame(False))
 
     @transport.event_handler("on_dialout_answered")
     async def on_dialout_answered(transport, data) -> None:
-        logger.info(f"Dialout answered: {data}")
+        logger.info(f"Supervisor dial-out answered: {data}")
         await task.queue_frame(DialoutAnsweredFrame())
 
     @transport.event_handler("on_dialout_stopped")
     async def on_dialout_stopped(transport, data) -> None:
-        logger.info(f"Dialout stopped: {data}")
+        logger.info(f"Supervisor dial-out stopped: {data}")
         await task.queue_frame(DialoutStoppedFrame())
+
+    @transport.event_handler("on_dialout_warning")
+    async def on_dialout_warning(transport, data) -> None:
+        logger.warning(f"Supervisor dial-out warning: {data}")
 
     @transport.event_handler("on_dialout_error")
     async def on_dialout_error(transport, data) -> None:
-        logger.error(f"Dialout error: {data}")
+        logger.error(f"Supervisor dial-out error: {data}")
+
         await task.queue_frame(DialoutErrorFrame())
+
+    @transport.event_handler("on_dialin_ready")
+    async def on_dialin_ready(transport, sip_endpoint) -> None:
+        logger.info(f"Dial-in ready: {sip_endpoint}")
+
+    @transport.event_handler("on_dialin_connected")
+    async def on_dialin_connected(transport, data) -> None:
+        logger.info(f"Dial-in connected: {data}")
+
+    @transport.event_handler("on_dialin_stopped")
+    async def on_dialin_stopped(transport, data) -> None:
+        logger.info(f"Dial-in stopped: {data}")
+
+    @transport.event_handler("on_dialin_warning")
+    async def on_dialin_warning(transport, data) -> None:
+        logger.warning(f"Dial-in warning: {data}")
+
+    @transport.event_handler("on_dialin_error")
+    async def on_dialin_error(transport, data) -> None:
+        logger.error(f"Dial-in error: {data}")
+
+    @transport.event_handler("on_dtmf_event")
+    async def on_dtmf_event(transport, data) -> None:
+        logger.info(f"DTMF event: {data}")
 
     @transport.event_handler("on_participant_joined")
     async def on_participant_joined(transport, participant) -> None:

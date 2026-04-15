@@ -184,6 +184,27 @@ Available functions:
         # Bot answers the phone and greets the user
         await task.queue_frames([LLMRunFrame()])
 
+    @transport.event_handler("on_dialin_ready")
+    async def on_dialin_ready(transport, sip_endpoint):
+        logger.info(f"Dial-in ready: {sip_endpoint}")
+
+    @transport.event_handler("on_dialin_connected")
+    async def on_dialin_connected(transport, data):
+        logger.info(f"Dial-in connected: {data}")
+
+    @transport.event_handler("on_dialin_stopped")
+    async def on_dialin_stopped(transport, data):
+        logger.info(f"Dial-in stopped: {data}")
+
+    @transport.event_handler("on_dialin_warning")
+    async def on_dialin_warning(transport, data):
+        logger.warning(f"Dial-in warning: {data}")
+
+    @transport.event_handler("on_dialin_error")
+    async def on_dialin_error(transport, data):
+        logger.error(f"Dial-in error: {data}")
+        await task.cancel()
+
     @transport.event_handler("on_dialout_answered")
     async def on_dialout_answered(transport, data):
         logger.info(f"Operator answered, transferring call: {data}")
@@ -191,13 +212,33 @@ Available functions:
         # await task.cancel()
         await task.queue_frames([EndFrame()])
 
+    @transport.event_handler("on_dialout_connected")
+    async def on_dialout_connected(transport, data):
+        logger.info(f"Operator dial-out connected: {data}")
+
+    @transport.event_handler("on_dialout_stopped")
+    async def on_dialout_stopped(transport, data):
+        logger.info(f"Operator dial-out stopped: {data}")
+        # Inform the customer that transfer stopped
+        content = "I'm sorry, but I'm unable to connect you with a supervisor at this time. Is there anything else I can help you with?"
+        message = {"role": "user", "content": content}
+        await task.queue_frames([LLMMessagesAppendFrame([message], run_llm=True)])
+
+    @transport.event_handler("on_dialout_warning")
+    async def on_dialout_warning(transport, data):
+        logger.warning(f"Operator dial-out warning: {data}")
+
     @transport.event_handler("on_dialout_error")
     async def on_dialout_error(transport, data):
-        logger.error(f"Operator dialout error: {data}")
+        logger.error(f"Operator dial-out error: {data}")
         # Inform the customer that transfer failed
         content = "I'm sorry, but I'm unable to connect you with a supervisor at this time. Is there anything else I can help you with?"
         message = {"role": "user", "content": content}
         await task.queue_frames([LLMMessagesAppendFrame([message], run_llm=True)])
+
+    @transport.event_handler("on_dtmf_event")
+    async def on_dtmf_event(transport, data):
+        logger.info(f"DTMF event: {data}")
 
     @transport.event_handler("on_participant_left")
     async def on_participant_left(transport, participant, reason):
@@ -219,12 +260,15 @@ async def bot(runner_args: RunnerArguments):
     token = body_data.get("token")
     call_id = body_data.get("callId")
     call_domain = body_data.get("callDomain")
+    from_phone = body_data.get("From")
+    to_phone = body_data.get("To")
 
     if not all([call_id, call_domain]):
         logger.error("Call ID and Call Domain are required in the body.")
         return None
 
     daily_dialin_settings = DailyDialinSettings(call_id=call_id, call_domain=call_domain)
+    logger.info(f"Starting dial-in bot, settings: call_id={call_id}, call_domain={call_domain}")
 
     transport = DailyTransport(
         room_url,
@@ -237,5 +281,14 @@ async def bot(runner_args: RunnerArguments):
             audio_out_enabled=True,
         ),
     )
+
+    # Log caller information if available (which number is calling)
+    # You can use this to look up customer information to personalize the conversation
+    if from_phone:
+        logger.info(f"Handling call from: {from_phone}")
+    # Log callee information if available (which number was called)
+    # You can use this to load different prompts based on which number was called
+    if to_phone:
+        logger.info(f"Handling call to: {to_phone}")
 
     await run_bot(transport, runner_args.handle_sigint)
