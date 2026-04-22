@@ -10,20 +10,15 @@ A collection of example applications built with [Pipecat](https://github.com/pip
 
 **Learning examples** are in the main Pipecat repo, **intermediate and advanced examples** are here.
 
-Start with the [quickstart example](https://github.com/pipecat-ai/pipecat/tree/main/examples/quickstart) in the main Pipecat repo to get your first bot running in 5 minutes.
+Start with the [quickstart example](https://docs.pipecat.ai/pipecat/get-started/quickstart) to get your first bot running in 5 minutes.
 
-Then continue learning with these starter examples, located in the Pipecat repo:
-
-- **[client-server-web example](https://github.com/pipecat-ai/pipecat/tree/main/examples/client-server-web)**: Learn client/server architecture with web clients
-- **[phone-bot-twilio](https://github.com/pipecat-ai/pipecat/tree/main/examples/phone-bot-twilio)**: Learn how to connect your bot to a phone number using Twilio
-
-Once you understand the basics, check out the examples below.
+Then use the [Pipecat CLI](https://docs.pipecat.ai/pipecat/get-started/build-your-next-bot) to scaffold your first project or learn more from the demos in this repo.
 
 ## Prerequisites
 
 Most examples require:
 
-- Python 3.10 or newer
+- Python 3.11 or newer
 - API keys for AI services (OpenAI, Deepgram, Cartesia, etc.)
 - Additional service-specific requirements (see individual example READMEs)
 
