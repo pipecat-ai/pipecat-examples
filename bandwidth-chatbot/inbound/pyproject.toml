@@ -1,0 +1,12 @@
+[project]
+name = "bandwidth-chatbot-dial-in"
+version = "0.1.0"
+description = "Bandwidth dial-in example for Pipecat"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "pipecat-ai[websocket,openai,silero,local-smart-turn-v3]>=1.1.0",
+  "fastapi>=0.118.0",
+  "uvicorn>=0.32.0",
+  "python-dotenv>=1.0.0",
+]
