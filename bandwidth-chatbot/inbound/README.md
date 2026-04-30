@@ -34,7 +34,7 @@ and OpenAI for the entire AI stack (Realtime STT + LLM + TTS).
 cd inbound
 uv sync
 cp env.example .env
-# fill in OPENAI_API_KEY, BANDWIDTH_*, NGROK_PUBLIC_URL
+# fill in OPENAI_API_KEY and BANDWIDTH_*
 ```
 
 ## Local development
@@ -42,21 +42,23 @@ cp env.example .env
 1. **Start ngrok** in a separate terminal:
 
    ```sh
-   ngrok http 8000
+   ngrok http 7860
    ```
-
-   Copy the HTTPS forwarding URL into `NGROK_PUBLIC_URL` in your `.env`.
 
 2. **Configure your Voice Application** in the Bandwidth dashboard (or via the
-   `band` CLI) so its `CallInitiatedCallbackUrl` points at
-   `https://<your-ngrok-host>/incoming-call`. Make sure the phone number's VCP
-   references that voice application.
+   `band` CLI) so its `CallInitiatedCallbackUrl` points at the ngrok HTTPS
+   URL (e.g. `https://your-subdomain.ngrok-free.app/`). The bot's runner
+   serves the BXML response from the root path. Make sure the phone number's
+   VCP references that voice application.
 
-3. **Run the server**:
+3. **Run the bot**:
 
    ```sh
-   uv run server.py
+   uv run bot.py -t bandwidth -x your-subdomain.ngrok-free.app
    ```
+
+   The runner starts a FastAPI server on port 7860 and routes Bandwidth's
+   inbound webhook + media-stream WebSocket to the bot.
 
 4. **Call your Bandwidth number.** The bot will greet you. The pipeline is
    tuned for sub-second turn-around once the OpenAI sessions warm up; the
@@ -65,35 +67,36 @@ cp env.example .env
 
 ## How it works
 
-Two endpoints in `server.py`:
+The Pipecat runner provides the FastAPI server, the BXML response endpoint,
+and the WebSocket endpoint. `bot.py` only contains the bot logic:
 
-- `POST /incoming-call` — Bandwidth's voice app posts here on inbound calls.
-  We respond with BXML opening a bidirectional media stream:
+1. Bandwidth POSTs to `/` when a call comes in. The runner returns BXML that
+   opens a bidirectional WebSocket back to `/ws`:
 
-  ```xml
-  <Response>
-    <StartStream destination="wss://<ngrok>/ws" mode="bidirectional" tracks="inbound"/>
-    <Pause duration="86400"/>
-  </Response>
-  ```
+   ```xml
+   <Response>
+     <StartStream destination="wss://<ngrok>/ws" mode="bidirectional" tracks="inbound"/>
+     <Pause duration="86400"/>
+   </Response>
+   ```
 
-  The `<Pause>` keeps the call alive while the WebSocket runs.
+2. Bandwidth opens the WebSocket. The runner calls `bot(runner_args)`; we
+   call `parse_telephony_websocket` to extract `streamId` / `callId` /
+   `accountId` from the first `start` event, instantiate
+   `BandwidthFrameSerializer`, wire it to a `FastAPIWebsocketTransport`, and
+   run the Pipecat pipeline:
 
-- `WebSocket /ws` — Bandwidth opens this and starts streaming audio. We
-  parse the first `start` event for `streamId` / `callId` / `accountId`,
-  instantiate `BandwidthFrameSerializer`, wire it to a
-  `FastAPIWebsocketTransport`, and run the Pipecat pipeline:
+   ```
+   WebSocket → STT → LLMUserAggregator → LLM → TTS → WebSocket → LLMAssistantAggregator
+   ```
 
-  ```
-  WebSocket → STT → LLMUserAggregator → LLM → TTS → WebSocket → LLMAssistantAggregator
-  ```
-
-When the caller hangs up, the serializer terminates the call via the
-Bandwidth Voice API (OAuth client_credentials → Bearer → `POST /accounts/{id}/calls/{id}` with `state: completed`).
+3. When the caller hangs up, the serializer terminates the call via the
+   Bandwidth Voice API (OAuth client_credentials → Bearer →
+   `POST /accounts/{id}/calls/{id}` with `state: completed`).
 
 ## Audio quality
 
-The default uses PCMU 8kHz on the wire (matches Twilio/Telnyx parity). To
+The default uses PCMU 8 kHz on the wire (matches Twilio/Telnyx parity). To
 take advantage of Bandwidth's higher-fidelity PCM outbound, pass
 `outbound_encoding="PCM"` and `outbound_pcm_sample_rate=24000` to
 `BandwidthFrameSerializer`.
