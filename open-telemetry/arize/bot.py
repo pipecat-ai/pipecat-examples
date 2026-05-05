@@ -10,6 +10,7 @@ from datetime import datetime
 from dotenv import load_dotenv
 from loguru import logger
 from openinference.instrumentation.pipecat import PipecatInstrumentor
+from openinference.instrumentation.pipecat._observer import OpenInferenceObserver
 from pipecat.adapters.schemas.function_schema import FunctionSchema
 from pipecat.adapters.schemas.tools_schema import ToolsSchema
 from pipecat.audio.vad.silero import SileroVADAnalyzer
@@ -22,6 +23,7 @@ from pipecat.processors.aggregators.llm_response_universal import (
     LLMContextAggregatorPair,
     LLMUserAggregatorParams,
 )
+from pipecat.processors.audio.audio_buffer_processor import AudioBufferProcessor
 from pipecat.runner.types import RunnerArguments
 from pipecat.runner.utils import create_transport
 from pipecat.services.cartesia.tts import CartesiaTTSService
@@ -31,6 +33,8 @@ from pipecat.services.llm_service import FunctionCallParams
 from pipecat.transports.base_transport import BaseTransport, TransportParams
 from pipecat.transports.daily.transport import DailyParams
 from pipecat.transports.websocket.fastapi import FastAPIWebsocketParams
+
+from bot_utils.turn_audio_uploader import TurnAudioUploader
 
 load_dotenv(override=True)
 
@@ -148,6 +152,16 @@ async def run_bot(transport: BaseTransport):
         ),
     )
 
+    # enable_turn_audio=True is required for on_user_turn_audio_data /
+    # on_bot_turn_audio_data events. buffer_size=0 disables the merged-audio
+    # event since we only want per-turn segments.
+    audio_buffer = AudioBufferProcessor(buffer_size=0, enable_turn_audio=True)
+
+    audio_uploader = TurnAudioUploader(
+        conversation_id=conversation_id,
+        s3_key_prefix=os.getenv("AWS_S3_PREFIX", "pipecat-turn-audio"),
+    )
+
     pipeline = Pipeline(
         [
             transport.input(),
@@ -156,6 +170,7 @@ async def run_bot(transport: BaseTransport):
             llm,
             tts,
             transport.output(),
+            audio_buffer,
             assistant_aggregator,
         ]
     )
@@ -170,9 +185,45 @@ async def run_bot(transport: BaseTransport):
         conversation_id=conversation_id,
     )
 
+    # PipecatInstrumentor.instrument() wraps PipelineTask.__init__ to auto-inject
+    # an OpenInferenceObserver. Look it up so we can set attributes on its
+    # _turn_span from the audio_buffer event handlers.
+    # this is hacky - just for POC.
+    oi_observer = next(
+        (o for o in task._observer._observers if isinstance(o, OpenInferenceObserver)),
+        None,
+    )
+    if oi_observer is None:
+        raise RuntimeError("OpenInferenceObserver not found on PipelineTask")
+
+    @audio_buffer.event_handler("on_user_turn_audio_data")
+    async def on_user_turn_audio_data(buffer, audio, sample_rate, num_channels):
+        if oi_observer._turn_span is None:
+            logger.warning("No active turn span; skipping user audio attribute")
+            return
+        turn_number = oi_observer._turn_count
+        url = audio_uploader.get_presigned_url_and_upload(
+            audio, sample_rate, num_channels, turn_number, role="user"
+        )
+        oi_observer._turn_span.set_attribute("audio.user.url", url)
+        logger.info(f"Turn {turn_number} user audio URL set on span")
+
+    @audio_buffer.event_handler("on_bot_turn_audio_data")
+    async def on_bot_turn_audio_data(buffer, audio, sample_rate, num_channels):
+        if oi_observer._turn_span is None:
+            logger.warning("No active turn span; skipping bot audio attribute")
+            return
+        turn_number = oi_observer._turn_count
+        url = audio_uploader.get_presigned_url_and_upload(
+            audio, sample_rate, num_channels, turn_number, role="bot"
+        )
+        oi_observer._turn_span.set_attribute("audio.bot.url", url)
+        logger.info(f"Turn {turn_number} bot audio URL set on span")
+
     @transport.event_handler("on_client_connected")
     async def on_client_connected(transport, client):
         logger.info(f"Client connected")
+        await audio_buffer.start_recording()
         # Kick off the conversation.
         context.add_message({"role": "user", "content": "Please introduce yourself to the user."})
         await task.queue_frames([LLMRunFrame()])
