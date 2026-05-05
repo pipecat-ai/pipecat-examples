@@ -119,8 +119,9 @@ async def bot_connect(request: Request) -> Dict[Any, Any]:
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to start subprocess: {e}")
 
-    # Return the authentication bundle in format expected by DailyTransport
-    return {"room_url": room_url, "token": token}
+    # Return the authentication bundle in the shape expected by the Pipecat
+    # client SDK + DailyTransport (DailyTransportConnectionParams: {url, token}).
+    return {"url": room_url, "token": token}
 
 
 if __name__ == "__main__":

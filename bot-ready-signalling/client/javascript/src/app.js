@@ -4,57 +4,46 @@
  * SPDX-License-Identifier: BSD 2-Clause License
  */
 
-import Daily from "@daily-co/daily-js";
+import { PipecatClient } from "@pipecat-ai/client-js";
+import { DailyTransport } from "@pipecat-ai/daily-transport";
 
 /**
  * ChatbotClient handles the connection and media management for a real-time
- * voice interaction with an AI bot.
+ * voice interaction with an AI bot using the Pipecat client SDK.
+ *
+ * The bot-ready handshake is handled by RTVI: the SDK signals client-ready
+ * automatically once the transport reaches the `ready` state, the bot replies
+ * with `bot-ready`, and only then does the bot push its first TTS frame. No
+ * manual sendAppMessage / "playable" plumbing is needed.
  */
 class ChatbotClient {
   constructor() {
-    // Initialize client state
-    this.dailyCallObject = null;
+    this.pcClient = null;
+    this.botAudio = null;
     this.setupDOMElements();
     this.setupEventListeners();
   }
 
-  /**
-   * Set up references to DOM elements and create necessary media elements
-   */
   setupDOMElements() {
-    // Get references to UI control elements
     this.connectBtn = document.getElementById('connect-btn');
     this.disconnectBtn = document.getElementById('disconnect-btn');
     this.statusSpan = document.getElementById('connection-status');
     this.debugLog = document.getElementById('debug-log');
-
-    // Create an audio element for bot's voice output
-    this.botAudio = document.createElement('audio');
-    this.botAudio.autoplay = true;
-    this.botAudio.playsInline = true;
-    document.body.appendChild(this.botAudio);
   }
 
-  /**
-   * Set up event listeners for connect/disconnect buttons
-   */
   setupEventListeners() {
     this.connectBtn.addEventListener('click', () => this.connect());
     this.disconnectBtn.addEventListener('click', () => this.disconnect());
   }
 
-  /**
-   * Add a timestamped message to the debug log
-   */
   log(message) {
     const entry = document.createElement('div');
     entry.textContent = `${new Date().toISOString()} - ${message}`;
 
-    // Add styling based on message type
     if (message.startsWith('User: ')) {
-      entry.style.color = '#2196F3'; // blue for user
+      entry.style.color = '#2196F3';
     } else if (message.startsWith('Bot: ')) {
-      entry.style.color = '#4CAF50'; // green for bot
+      entry.style.color = '#4CAF50';
     }
 
     this.debugLog.appendChild(entry);
@@ -62,124 +51,85 @@ class ChatbotClient {
     console.log(message);
   }
 
-  /**
-   * Update the connection status display
-   */
   updateStatus(status) {
     this.statusSpan.textContent = status;
     this.log(`Status: ${status}`);
   }
 
-  handleEventToConsole (evt) {
-    this.log(`Received event: ${evt.action}`);
-  };
-
   /**
-   * Set up listeners for track events (start/stop)
-   * This handles new tracks being added during the session
+   * Attach the bot's audio track to a hidden <audio> element so it plays back.
+   * The Pipecat client SDK fires onTrackStarted for every remote track.
    */
-  setupTrackListeners() {
-    if (!this.dailyCallObject) return;
+  handleBotAudio(track, participant) {
+    if (participant?.local || track.kind !== 'audio') return;
 
-    this.dailyCallObject.on("joined-meeting", () => {
-      this.updateStatus('Connected');
-      this.connectBtn.disabled = true;
-      this.disconnectBtn.disabled = false;
-      this.log('Client connected');
-    });
-    this.dailyCallObject.on("track-started", (evt) => {
-      if (evt.track.kind === "audio" && evt.participant.local === false) {
-        this.log("Audio track started.")
-        this.setupAudioTrack(evt.track);
-      }
-    });
-    this.dailyCallObject.on("track-stopped", this.handleEventToConsole.bind(this));
-    this.dailyCallObject.on("participant-joined", this.handleEventToConsole.bind(this));
-    this.dailyCallObject.on("participant-updated", this.handleEventToConsole.bind(this));
-    this.dailyCallObject.on("participant-left", () => {
-      // When the bot leaves, we are also disconnecting from the call
-      this.disconnect()
-    });
-    this.dailyCallObject.on("left-meeting", () => {
-      this.updateStatus('Disconnected');
-      this.connectBtn.disabled = false;
-      this.disconnectBtn.disabled = true;
-      this.log('Client disconnected');
-    });
-    this.dailyCallObject.on("error", this.handleEventToConsole.bind(this));
-  }
+    this.log('Bot audio track started.');
 
-  /**
-   * Set up an audio track for playback
-   * Handles both initial setup and track updates
-   */
-  setupAudioTrack(track) {
-    this.log(`Setting up audio track, track state: ${track.readyState}, muted: ${track.muted}`);
-
-    // Check if we're already playing this track
-    if (this.botAudio.srcObject) {
-      const oldTrack = this.botAudio.srcObject.getAudioTracks()[0];
-      if (oldTrack?.id === track.id) return;
+    if (!this.botAudio) {
+      this.botAudio = document.createElement('audio');
+      this.botAudio.autoplay = true;
+      this.botAudio.playsInline = true;
+      document.body.appendChild(this.botAudio);
     }
-    // Create a new MediaStream with the track and set it as the audio source
+
     this.botAudio.srcObject = new MediaStream([track]);
-    this.botAudio.onplaying = async (event) => {
-      this.log("onplaying")
-      this.log("Will send the audio message to play the audio at the next tick")
-      this.dailyCallObject.sendAppMessage("playable")
+  }
+
+  removeBotAudio() {
+    if (this.botAudio) {
+      const stream = this.botAudio.srcObject;
+      if (stream) {
+        stream.getTracks().forEach((t) => t.stop());
+      }
+      this.botAudio.srcObject = null;
+      this.botAudio.remove();
+      this.botAudio = null;
     }
   }
 
-  async fetchRoomInfo() {
-    let connectUrl = '/connect'
-    let res = await fetch(connectUrl, {
-      method: "POST",
-      mode: "cors",
-      headers: new Headers({
-        "Content-Type": "application/json"
-      }),
-    })
-    if (res.ok) {
-      return res.json();
-    }
-  }
-
-  /**
-   * Initialize and connect to the bot
-   * This sets up the RTVI client, initializes devices, and establishes the connection
-   */
   async connect() {
     try {
-      // Initialize the client
-      this.dailyCallObject = Daily.createCallObject({
-        subscribeToTracksAutomatically: true,
+      this.pcClient = new PipecatClient({
+        transport: new DailyTransport(),
+        enableMic: true,
+        enableCam: false,
+        callbacks: {
+          onTransportStateChanged: (state) => {
+            this.updateStatus(state);
+            const isConnected = state === 'ready';
+            this.connectBtn.disabled = state !== 'idle' && state !== 'disconnected';
+            this.disconnectBtn.disabled = !isConnected;
+          },
+          onBotReady: () => {
+            this.log('Bot ready: greeting will play next.');
+          },
+          onTrackStarted: (track, participant) => this.handleBotAudio(track, participant),
+          onDisconnected: () => {
+            this.log('Disconnected from bot.');
+            this.removeBotAudio();
+            this.connectBtn.disabled = false;
+            this.disconnectBtn.disabled = true;
+          },
+          onError: (message) => {
+            this.log(`Error: ${message?.data?.message || message}`);
+          },
+        },
       });
 
-      // Set up listeners for media track events
-      this.setupTrackListeners();
+      // Expose for debugging.
+      window.pcClient = this.pcClient;
 
       this.log('Creating the bot...');
-      let roomInfo = await this.fetchRoomInfo()
-
-      // Connect to the bot
-      this.log('Connecting to bot...');
-      // Only for making debugger easier
-      window.callObject = this.dailyCallObject;
-      await this.dailyCallObject.join({
-        url: roomInfo.room_url,
-      });
-
-      this.log('Connection complete');
+      await this.pcClient.startBotAndConnect({ endpoint: '/connect' });
+      this.log('Connection complete.');
     } catch (error) {
-      // Handle any errors during connection
       this.log(`Error connecting: ${error.message}`);
       this.log(`Error stack: ${error.stack}`);
       this.updateStatus('Error');
 
-      // Clean up if there's an error
-      if (this.dailyCallObject) {
+      if (this.pcClient) {
         try {
-          await this.dailyCallObject.leave();
+          await this.pcClient.disconnect();
         } catch (disconnectError) {
           this.log(`Error during disconnect: ${disconnectError.message}`);
         }
@@ -187,30 +137,20 @@ class ChatbotClient {
     }
   }
 
-  /**
-   * Disconnect from the bot and clean up media resources
-   */
   async disconnect() {
-    if (this.dailyCallObject) {
+    if (this.pcClient) {
       try {
-        // Disconnect the RTVI client
-        await this.dailyCallObject.leave();
-        await this.dailyCallObject.destroy();
-        this.dailyCallObject = null;
-
-        // Clean up audio
-        if (this.botAudio.srcObject) {
-          this.botAudio.srcObject.getTracks().forEach((track) => track.stop());
-          this.botAudio.srcObject = null;
-        }
+        await this.pcClient.disconnect();
       } catch (error) {
         this.log(`Error disconnecting: ${error.message}`);
+      } finally {
+        this.pcClient = null;
+        this.removeBotAudio();
       }
     }
   }
 }
 
-// Initialize the client when the page loads
 window.addEventListener('DOMContentLoaded', () => {
   new ChatbotClient();
 });
