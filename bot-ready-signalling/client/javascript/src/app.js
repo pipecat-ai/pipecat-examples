@@ -115,7 +115,12 @@ class ChatbotClient {
             this.disconnectBtn.disabled = true;
           },
           onError: (message) => {
-            this.log(`Error: ${message?.data?.message || message}`);
+            const detail =
+              message?.data?.message ??
+              (typeof message?.data === 'string' ? message.data : null) ??
+              message?.message ??
+              JSON.stringify(message);
+            this.log(`Error: ${detail}`);
           },
         },
       });
