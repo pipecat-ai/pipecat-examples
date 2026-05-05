@@ -29,7 +29,9 @@
     "@babel/core": "^7.28.5"
   },
   "private": true,
-  "resolutions": {
-    "@daily-co/react-native-webrtc/debug": "^4.0.0"
+  "overrides": {
+    "@daily-co/react-native-webrtc": {
+      "debug": "^4.0.0"
+    }
   }
 }

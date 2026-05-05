@@ -109,6 +109,8 @@ class ChatbotClient {
           onDisconnected: () => {
             this.log('Disconnected from bot.');
             this.removeBotAudio();
+            this.pcClient = null;
+            window.pcClient = null;
             this.connectBtn.disabled = false;
             this.disconnectBtn.disabled = true;
           },
@@ -136,6 +138,12 @@ class ChatbotClient {
           this.log(`Error during disconnect: ${disconnectError.message}`);
         }
       }
+
+      this.pcClient = null;
+      window.pcClient = null;
+      this.removeBotAudio();
+      this.connectBtn.disabled = false;
+      this.disconnectBtn.disabled = true;
     }
   }
 
