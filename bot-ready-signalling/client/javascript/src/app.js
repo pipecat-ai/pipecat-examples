@@ -88,6 +88,8 @@ class ChatbotClient {
   }
 
   async connect() {
+    if (this.pcClient) return;
+
     try {
       this.pcClient = new PipecatClient({
         transport: new DailyTransport(),
