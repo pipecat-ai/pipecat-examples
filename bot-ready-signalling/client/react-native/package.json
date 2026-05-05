@@ -11,7 +11,7 @@
     "@daily-co/config-plugin-rn-daily-js": "0.0.11",
     "@daily-co/react-native-daily-js": "^0.82.0",
     "@daily-co/react-native-webrtc": "^124.0.6-daily.1",
-    "@pipecat-ai/client-js": "^1.6.0",
+    "@pipecat-ai/client-js": "^1.8.0",
     "@pipecat-ai/react-native-daily-transport": "^1.6.0",
     "@react-native-async-storage/async-storage": "1.24.0",
     "expo": "~54.0.21",
