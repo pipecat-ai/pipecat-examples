@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Button, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { PipecatClient } from '@pipecat-ai/client-js';
 import { RNDailyTransport } from '@pipecat-ai/react-native-daily-transport';
-import { API_BASE_URL } from '@env';
 
 /**
  * CallScreen wraps Pipecat's React Native client.
@@ -65,7 +64,7 @@ const CallScreen = () => {
     try {
       log('Connecting to bot...');
       await client.startBotAndConnect({
-        endpoint: `${API_BASE_URL}/connect`,
+        endpoint: `${process.env.EXPO_PUBLIC_BASE_URL}/connect`,
       });
       log('Connection complete.');
     } catch (error) {
