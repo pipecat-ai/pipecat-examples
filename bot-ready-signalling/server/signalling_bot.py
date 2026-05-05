@@ -7,12 +7,11 @@
 import asyncio
 import os
 import sys
-from dataclasses import dataclass
 
 import aiohttp
 from dotenv import load_dotenv
 from loguru import logger
-from pipecat.frames.frames import AudioRawFrame, EndFrame, OutputAudioRawFrame, TTSSpeakFrame
+from pipecat.frames.frames import EndFrame, TTSSpeakFrame
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineTask
@@ -27,39 +26,15 @@ logger.remove(0)
 logger.add(sys.stderr, level="DEBUG")
 
 
-@dataclass
-class SilenceFrame(OutputAudioRawFrame):
-    def __init__(
-        self,
-        *,
-        sample_rate: int,
-        duration: float,
-    ):
-        # Initialize the parent class with the silent frame's data
-        super().__init__(
-            audio=self.create_silent_audio_frame(sample_rate, 1, duration).audio,
-            sample_rate=sample_rate,
-            num_channels=1,
-        )
-
-    @staticmethod
-    def create_silent_audio_frame(
-        sample_rate: int, num_channels: int, duration: float
-    ) -> AudioRawFrame:
-        """Create an AudioRawFrame containing silence."""
-        frame_size = num_channels * 2  # 2 bytes per sample for 16-bit audio
-        total_frames = int(sample_rate * duration)
-        total_bytes = total_frames * frame_size
-        silent_audio = bytes(total_bytes)  # Create a byte array filled with zeros
-        return AudioRawFrame(audio=silent_audio, sample_rate=sample_rate, num_channels=num_channels)
-
-
 async def main():
     async with aiohttp.ClientSession() as session:
         (room_url, _) = await configure(session)
 
         transport = DailyTransport(
-            room_url, None, "Say One Thing", DailyParams(audio_out_enabled=True)
+            room_url,
+            None,
+            "Say One Thing",
+            DailyParams(audio_in_enabled=True, audio_out_enabled=True),
         )
 
         tts = CartesiaTTSService(
@@ -71,21 +46,18 @@ async def main():
 
         runner = PipelineRunner()
 
-        task = PipelineTask(Pipeline([tts, transport.output()]))
+        pipeline = Pipeline([transport.input(), tts, transport.output()])
+        task = PipelineTask(pipeline)
 
-        # Register an event handler so we can play the audio when we receive a specific message
-        @transport.event_handler("on_app_message")
-        async def on_app_message(transport, message, sender):
-            logger.debug(f"Received app message: {message} - {sender}")
-            if "playable" not in message:
-                return
+        # RTVIProcessor is auto-attached to PipelineTask, and the default
+        # on_client_ready handler calls set_bot_ready() for us. We just hook in
+        # to push the greeting once the client signals it is ready, so the
+        # first words of TTS are never clipped.
+        @task.rtvi.event_handler("on_client_ready")
+        async def on_client_ready(rtvi):
             await task.queue_frames(
                 [
-                    SilenceFrame(
-                        sample_rate=task.params.audio_out_sample_rate,
-                        duration=0.5,
-                    ),
-                    TTSSpeakFrame(f"Hello there, how are you doing today ?"),
+                    TTSSpeakFrame("Hello there, how are you doing today?"),
                     EndFrame(),
                 ]
             )

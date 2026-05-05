@@ -56,5 +56,10 @@ Run the following command:
 npm run ios
 ```
 
-#### Connect to the server
-Use the http://localhost:5173 in your app.
+#### How the bot-ready handshake works
+
+The Pipecat React Native client signals `client-ready` automatically once the
+transport reaches the `ready` state. The bot's `on_client_ready` handler then
+calls `set_bot_ready()` and pushes the first `TTSSpeakFrame`, so the greeting
+is never clipped. The previous `sendAppMessage("playable")` workaround is no
+longer needed.

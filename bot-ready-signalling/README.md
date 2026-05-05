@@ -1,8 +1,16 @@
 # Bot ready signaling
 
-A simple Pipecat example demonstrating how to handle signaling between the client and the bot,
-ensuring that the bot starts sending audio only when the client is available,
-thereby avoiding the risk of cutting off the beginning of the audio.
+A simple Pipecat example demonstrating how to handle signaling between the
+client and the bot, ensuring that the bot starts sending audio only after the
+client is ready to play it, so the first words of the greeting are never
+clipped.
+
+The handshake uses the standard RTVI `client-ready` / `bot-ready` flow that
+ships with Pipecat: `RTVIProcessor` is auto-attached to every `PipelineTask`,
+the Pipecat client SDK signals `client-ready` once the transport reaches the
+`ready` state, and the bot's `on_client_ready` handler calls `set_bot_ready()`
+and pushes the first `TTSSpeakFrame`. No custom `sendAppMessage` plumbing is
+needed.
 
 ## Quick Start
 
