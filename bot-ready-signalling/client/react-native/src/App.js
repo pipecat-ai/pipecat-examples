@@ -51,6 +51,8 @@ const CallScreen = () => {
         onDisconnected: () => {
           log('Disconnected from bot.');
           setIsConnected(false);
+          setConnectionStatus('disconnected');
+          clientRef.current = null;
         },
         onError: (error) => {
           log(`Error: ${error?.data?.message || error?.message || error}`);

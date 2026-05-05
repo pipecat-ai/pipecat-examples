@@ -5,6 +5,8 @@ with the [Daily transport](https://docs.pipecat.ai/api-reference/client/js/trans
 
 ## Setup
 
+> Requires Node 22+ (`@daily-co/daily-js` declares `engines.node >= 22.14.0`). A `.nvmrc` is included; run `nvm use` if you use nvm.
+
 1. Run the bot server. See the [top-level README](../../README.md).
 
 2. Navigate to the `client/javascript` directory:

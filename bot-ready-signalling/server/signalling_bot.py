@@ -28,11 +28,11 @@ logger.add(sys.stderr, level="DEBUG")
 
 async def main():
     async with aiohttp.ClientSession() as session:
-        (room_url, _) = await configure(session)
+        (room_url, token) = await configure(session)
 
         transport = DailyTransport(
             room_url,
-            None,
+            token,
             "Say One Thing",
             DailyParams(audio_in_enabled=True, audio_out_enabled=True),
         )
