@@ -4,6 +4,8 @@ This demo showcases [Arize](https://arize.com/) tracing integration for Pipecat 
 
 One can run this demo using Arize's hosted backend or self-hosted Phoenix or local development Phoenix server. This example covers Arize and local dev Phoenix.
 
+Each conversation turn span also carries `audio.user.url` and `audio.bot.url` attributes pointing to S3-hosted WAVs of just that turn's user utterance and bot reply. `AudioBufferProcessor(enable_turn_audio=True)` fires `on_user_turn_audio_data` / `on_bot_turn_audio_data`; for each event we generate a presigned S3 GET URL synchronously, set it on the active `OpenInferenceObserver._turn_span`, and kick off the actual `put_object` upload as a background task.
+
 ![](./arize.png)
 
 ## General Setup
@@ -64,6 +66,51 @@ PHOENIX_SPACE_ID=
 PHOENIX_API_KEY=
 PHOENIX_COLLECTOR_ENDPOINT=http://localhost:6006
 ```
+
+## AWS S3 Setup (for per-turn audio links)
+
+The example uses a **long-lived IAM user** (not assumed-role / STS) so presigned URLs are valid for up to 7 days.
+
+Run the helper script to create the bucket (if it doesn't already exist) and an IAM user with the minimal `s3:PutObject` + `s3:GetObject` policy, and emit access keys:
+
+```bash
+AWS_PROFILE=your_aws_profile ./create_s3_user.sh <BUCKET_NAME>
+```
+
+Requires `aws` CLI and `jq`. Add the printed `AWS_*` vars to your `.env`:
+
+```
+AWS_ACCESS_KEY_ID=
+AWS_SECRET_ACCESS_KEY=
+AWS_DEFAULT_REGION=us-west-2
+AWS_BUCKET_NAME=
+# Optional path prefix inside the bucket (default: pipecat-turn-audio)
+AWS_S3_PREFIX=pipecat-turn-audio
+```
+
+To create the user manually instead, attach this inline policy (substitute `<BUCKET>`):
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [{
+    "Effect": "Allow",
+    "Action": ["s3:PutObject", "s3:GetObject"],
+    "Resource": "arn:aws:s3:::<BUCKET>/*"
+  }]
+}
+```
+
+S3 layout per conversation:
+
+```
+s3://<bucket>/<prefix>/<conversation_id>/turn-0001/user.wav
+s3://<bucket>/<prefix>/<conversation_id>/turn-0001/bot.wav
+s3://<bucket>/<prefix>/<conversation_id>/turn-0002/user.wav
+...
+```
+
+In the Arize (or Phoenix) trace UI, open a `pipecat.conversation.turn` span and look at its `audio.user.url` / `audio.bot.url` attributes — clickable HTTPS links signed for 7 days by default.
 
 ## Run the Demo
 

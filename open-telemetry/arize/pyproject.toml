@@ -5,6 +5,7 @@ description = "A Pipecat example using OpenInference tracing"
 requires-python = ">=3.11"
 dependencies = [
     "arize-otel>=0.11.0",
+    "boto3>=1.34.0",
     "openinference-instrumentation>=0.1.42",
     "openinference-instrumentation-pipecat>=0.1.0",
     "pipecat-ai[cartesia,daily,deepgram,google,runner,silero,webrtc,websocket]>=0.0.100",
