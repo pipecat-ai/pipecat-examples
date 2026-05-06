@@ -56,6 +56,11 @@ Run the following command:
 npm run ios
 ```
 
+The app calls `POST $EXPO_PUBLIC_BASE_URL/start` (the Pipecat-provided
+runner), which spins up a fresh Daily room + meeting token and starts the
+bot. To pin a fixed room instead, set `DAILY_ROOM_URL` in `server/.env`
+before starting the server.
+
 #### How the bot-ready handshake works
 
 The Pipecat React Native client signals `client-ready` automatically once the

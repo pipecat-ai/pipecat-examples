@@ -64,7 +64,8 @@ const CallScreen = () => {
     try {
       log('Connecting to bot...');
       await client.startBotAndConnect({
-        endpoint: `${process.env.EXPO_PUBLIC_BASE_URL}/connect`,
+        endpoint: `${process.env.EXPO_PUBLIC_BASE_URL}/start`,
+        requestData: { createDailyRoom: true },
       });
       log('Connection complete.');
     } catch (error) {

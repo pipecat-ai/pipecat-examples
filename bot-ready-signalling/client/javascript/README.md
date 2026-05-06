@@ -29,6 +29,11 @@ npm run dev
 
 5. Visit http://localhost:5173 in your browser, then click **Connect**.
 
+   The page calls `POST http://localhost:7860/start` (the Pipecat-provided
+   runner), which spins up a fresh Daily room + meeting token and starts the
+   bot. To pin a fixed room instead, set `DAILY_ROOM_URL` in `server/.env`
+   before starting the server.
+
 ## How the bot-ready handshake works
 
 The Pipecat JavaScript client signals `client-ready` automatically once the
