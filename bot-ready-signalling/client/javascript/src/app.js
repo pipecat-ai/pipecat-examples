@@ -129,7 +129,10 @@ class ChatbotClient {
       window.pcClient = this.pcClient;
 
       this.log('Creating the bot...');
-      await this.pcClient.startBotAndConnect({ endpoint: '/connect' });
+      await this.pcClient.startBotAndConnect({
+        endpoint: '/start',
+        requestData: { createDailyRoom: true },
+      });
       this.log('Connection complete.');
     } catch (error) {
       this.log(`Error connecting: ${error.message}`);

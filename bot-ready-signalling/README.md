@@ -38,8 +38,11 @@ needed.
 
 4. Start the server:
    ```bash
-   uv run server.py
+   uv run bot.py -t daily
    ```
+
+   This boots the Pipecat-provided FastAPI runner on `http://localhost:7860`,
+   which exposes the `/start` endpoint the JS / RN clients call.
 
 ### Next, connect using the client app:
 
