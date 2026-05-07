@@ -38,8 +38,13 @@ from bot_utils.turn_audio_uploader import TurnAudioUploader
 
 load_dotenv(override=True)
 
-conversation_id = f"pipecat-test-conversation-001_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-debug_log_filename = os.path.join(os.getcwd(), f"{conversation_id}.log")
+# One debug log file per process startup. The PipecatInstrumentor wraps
+# PipelineTask.__init__ globally and writes all conversation logs to this
+# file. Per-conversation `conversation_id` is generated inside run_bot()
+# (which fires once per client connection) so tracing spans aren't shared
+# across runs of a long-lived server.
+_process_started = datetime.now().strftime("%Y%m%d_%H%M%S")
+debug_log_filename = os.path.join(os.getcwd(), f"pipecat-debug_{_process_started}.log")
 print(f"debug_log_filename: {debug_log_filename}")
 
 
@@ -91,7 +96,11 @@ transport_params = {
 
 
 async def run_bot(transport: BaseTransport):
-    logger.info(f"Starting bot")
+    # Generate a fresh conversation_id per client connection so each call
+    # produces its own group of trace spans (no leakage across runs of a
+    # long-lived server).
+    conversation_id = f"pipecat-test-conversation-001_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+    logger.info(f"Starting bot, conversation_id={conversation_id}")
 
     stt = DeepgramSTTService(api_key=os.getenv("DEEPGRAM_API_KEY"))
 

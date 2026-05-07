@@ -45,12 +45,13 @@ from pipecat.turns.user_stop.external_user_turn_stop_strategy import (
 )
 from pipecat.turns.user_turn_strategies import UserTurnStrategies
 
+from bot_utils.openai_realtime_turn_observer import AudioTurnObserver
 from bot_utils.turn_audio_uploader import TurnAudioUploader
 
 load_dotenv(override=True)
 
-conversation_id = f"pipecat-test-conversation-001_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-debug_log_filename = os.path.join(os.getcwd(), f"{conversation_id}.log")
+_process_started = datetime.now().strftime("%Y%m%d_%H%M%S")
+debug_log_filename = os.path.join(os.getcwd(), f"pipecat-debug_{_process_started}.log")
 print(f"debug_log_filename: {debug_log_filename}")
 
 
@@ -105,13 +106,14 @@ transport_params = {
 
 
 async def run_bot(transport: BaseTransport):
-    logger.info(f"Starting bot")
+    # Generate a fresh conversation_id per client connection
+    conversation_id = f"pipecat-test-conversation-001_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+    logger.info(f"Starting bot, conversation_id={conversation_id}")
 
     # OpenAI Realtime replaces STT + LLM + TTS in one service.
     llm = OpenAIRealtimeLLMService(
         api_key=os.getenv("OPENAI_API_KEY"),
         settings=OpenAIRealtimeLLMService.Settings(
-            # model="gpt-realtime",
             system_instruction="You are a helpful LLM in a WebRTC call. Your goal is to demonstrate your capabilities in a succinct way. Your output will be converted to audio so don't include special characters in your answers. Respond to what the user said in a creative and helpful way.",
             session_properties=SessionProperties(
                 audio=AudioConfiguration(
@@ -158,21 +160,18 @@ async def run_bot(transport: BaseTransport):
         user_params=LLMUserAggregatorParams(
             user_turn_strategies=UserTurnStrategies(
                 start=[VADUserTurnStartStrategy(enable_user_speaking_frames=False)],
-                # ExternalUserTurnStopStrategy hardcodes enable_user_speaking_frames=False
-                # itself — don't pass it.
                 stop=[ExternalUserTurnStopStrategy()],
             ),
         ),
     )
 
-    # Two AudioBufferProcessors: user_audio_buffer is placed BEFORE the LLM so
-    # it only sees transport-emitted UserStoppedSpeakingFrames (one per turn,
-    # from Silero on the transport). The realtime service emits its own chunked
-    # server-VAD speech frames downstream, which would re-trigger
-    # on_user_turn_audio_data multiple times if a single buffer sat after it.
-    # bot_audio_buffer is placed AFTER transport.output() to capture
-    # TTSAudioRawFrame / BotStoppedSpeakingFrame.
-    user_audio_buffer = AudioBufferProcessor(buffer_size=0, enable_turn_audio=True)
+    # bot_audio_buffer captures bot output audio per turn via VAD-driven
+    # BotStoppedSpeakingFrame — that signal is reliable because the bot is
+    # our own creation. User audio is NOT captured by an AudioBufferProcessor:
+    # VAD-driven user-turn detection is unreliable against OpenAI Realtime's
+    # chunked server-VAD frames and end-of-response interruption broadcasts.
+    # Instead, the AudioTurnObserver buffers user audio internally
+    # between BotStoppedSpeakingFrame and the next BotStartedSpeakingFrame.
     bot_audio_buffer = AudioBufferProcessor(buffer_size=0, enable_turn_audio=True)
 
     audio_uploader = TurnAudioUploader(
@@ -183,7 +182,6 @@ async def run_bot(transport: BaseTransport):
     pipeline = Pipeline(
         [
             transport.input(),
-            user_audio_buffer,
             user_aggregator,
             llm,
             transport.output(),
@@ -200,11 +198,12 @@ async def run_bot(transport: BaseTransport):
         ),
         conversation_id=conversation_id,
     )
+    
+    # this is kind of ugly - just for POC.
 
     # PipecatInstrumentor.instrument() wraps PipelineTask.__init__ to auto-inject
     # an OpenInferenceObserver. Look it up so we can set attributes on its
     # _turn_span from the audio_buffer event handlers.
-    # this is kind of ugly - just for POC.
     oi_observer = next(
         (o for o in task._observer._observers if isinstance(o, OpenInferenceObserver)),
         None,
@@ -212,17 +211,21 @@ async def run_bot(transport: BaseTransport):
     if oi_observer is None:
         raise RuntimeError("OpenInferenceObserver not found on PipelineTask")
 
-    @user_audio_buffer.event_handler("on_user_turn_audio_data")
-    async def on_user_turn_audio_data(buffer, audio, sample_rate, num_channels):
-        if oi_observer._turn_span is None:
-            logger.warning("No active turn span; skipping user audio attribute")
-            return
-        turn_number = oi_observer._turn_count
-        url = audio_uploader.get_presigned_url_and_upload(
-            audio, sample_rate, num_channels, turn_number, role="user"
-        )
-        oi_observer._turn_span.set_attribute("audio.user.url", url)
-        logger.info(f"Turn {turn_number} user audio URL set on span")
+    # and then this is _really_ ugly - just for POC.
+
+    # Swap the auto-injected observer's class to our user-first variant. Each
+    # turn span then represents (user audio + bot audio) in chronological
+    # order — matching Pipecat's user-then-bot turn convention. Bot-speaks-
+    # first conversations get a "half" turn 1 with only bot audio; subsequent
+    # turns pair the user response to the previous bot utterance with the
+    # current bot utterance. State (tracer, conversation_id, etc.) is
+    # preserved across the __class__ swap; only method resolution changes.
+    # Done before the runner starts, so no frames have been processed under
+    # the original class yet.
+    oi_observer.__class__ = AudioTurnObserver
+    # The observer buffers user audio internally and uploads + stamps the URL
+    # at turn boundaries. It needs the uploader as an instance attribute.
+    oi_observer.audio_uploader = audio_uploader
 
     @bot_audio_buffer.event_handler("on_bot_turn_audio_data")
     async def on_bot_turn_audio_data(buffer, audio, sample_rate, num_channels):
@@ -239,7 +242,6 @@ async def run_bot(transport: BaseTransport):
     @transport.event_handler("on_client_connected")
     async def on_client_connected(transport, client):
         logger.info(f"Client connected")
-        await user_audio_buffer.start_recording()
         await bot_audio_buffer.start_recording()
         context.add_message({"role": "user", "content": "Please introduce yourself to the user."})
         await task.queue_frames([LLMRunFrame()])

@@ -10,6 +10,23 @@ The end-to-end flow:
 2. For each event we generate a presigned S3 GET URL **synchronously** (no S3 round-trip) using a deterministic key, set it as an attribute on the active `OpenInferenceObserver._turn_span`, and kick off the actual `put_object` upload as a background task.
 3. The Arize/Phoenix span carries the URL immediately — the link starts working as soon as the upload lands.
 
+### Custom turn observer (`OpenAIRealtimeTurnObserver`)
+
+Default `OpenInferenceObserver` (via `TurnTrackingObserver`) defines a turn as `(user-utterance, bot-reply)` with VAD-driven boundaries. That model breaks against OpenAI's Realtime API:
+
+- `OpenAIRealtimeLLMService.broadcast_interruption` fires at end of every bot reply and propagates a `UserStartedSpeakingFrame` even when no user has spoken — the default observer reads this as an interruption and ends the turn early, shifting every audio attribute one turn off.
+- The default observer also auto-starts turn 1 on `StartFrame`, before the bot has produced any audio.
+
+`bot_utils/openai_realtime_turn_observer.py` defines `OpenAIRealtimeTurnObserver`, a subclass of `OpenInferenceObserver` that redefines a turn as **"bot utterance + everything until the next bot starts speaking"**. Boundaries:
+
+- Turn STARTS on the first `BotStartedSpeakingFrame` (or adopts a turn that was auto-started by a service frame).
+- Turn ENDS on the *next* `BotStartedSpeakingFrame` after the bot has already spoken in the current turn.
+- `UserStartedSpeakingFrame` and `UserStoppedSpeakingFrame` are mid-turn events — completely ignored. This is what makes the interruption-broadcast a no-op.
+
+The observer is wired in via a `__class__` swap on the auto-injected observer instance (`oi_observer.__class__ = OpenAIRealtimeTurnObserver`) right after `PipelineTask` is constructed and before the runner starts. State is preserved; only method resolution changes.
+
+This is **OpenAI-Realtime-specific**. Gemini Live and other speech-to-speech services emit different frame patterns and need their own observer.
+
 ## Prerequisites
 
 - Python 3.11+
