@@ -184,7 +184,7 @@ async def run_bot(transport: BaseTransport):
         ),
         conversation_id=conversation_id,
     )
-    
+
     # this is kind of ugly - just for POC.
 
     # PipecatInstrumentor.instrument() wraps PipelineTask.__init__ to auto-inject

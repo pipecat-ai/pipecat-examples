@@ -4,7 +4,7 @@
 # SPDX-License-Identifier: BSD 2-Clause License
 #
 
-"""Turn-tracking observers tuned for OpenAI Realtime.
+"""Turn-tracking observer tuned for OpenAI Realtime.
 
 Pipecat's default `OpenInferenceObserver` (via `TurnTrackingObserver`) defines
 a turn as `(user-utterance, bot-reply)` and uses VAD-driven
@@ -23,39 +23,34 @@ That model breaks against OpenAI's Realtime API:
    `TurnTrackingObserver` auto-starts turn 1 on `StartFrame`, before the
    bot has produced any audio.
 
-This module provides two observer classes that fix both issues. They share
-the same boundary mechanism — turn ENDS when the bot starts speaking
-*again* after having spoken in the current turn — but pair user/bot audio
-into turns in two different ways:
-
-### `AudioTurnObserver` (recommended; matches Pipecat convention)
-
-Each turn = `(user audio + bot audio)`, in chronological order.
+`AudioTurnObserver` fixes both issues. Each turn span carries
+`(user audio + bot audio)` in chronological order — matching Pipecat's
+user-then-bot convention.
 
 - For user-speaks-first: turn 1 = (user 1 + bot 1), turn 2 = (user 2 + bot 2), …
 - For bot-speaks-first: turn 1 = (— + bot 1), turn 2 = (user 1 + bot 2), …
 
-### `BotFirstTurnObserver` (alternate)
+### Boundaries
 
-Each turn = `(bot audio + user response to that bot)`. Best for
-bot-speaks-first conversations anchored to bot utterances.
+- Turn STARTS on the first `BotStartedSpeakingFrame` (or adopts a turn
+  that was auto-started by a service frame).
+- Turn ENDS on the *next* `BotStartedSpeakingFrame` after the bot has
+  already spoken in the current turn.
+- `UserStartedSpeakingFrame` and `UserStoppedSpeakingFrame` are mid-turn
+  events — completely ignored. This is what makes the interruption-
+  broadcast phantom frames a no-op.
 
 ### Pre-padding (only on interruption)
 
-Both observers maintain a rolling buffer of the last
-`_pre_pad_seconds_on_interrupt` seconds of input audio at all times.
-That buffer is prepended to the per-turn user buffer **only when the
-upcoming `BotStoppedSpeakingFrame` is the result of an interruption** —
-i.e. the user cut off the bot mid-utterance, so user speech started
-during the bot's audio and would otherwise be clipped.
+A rolling buffer of the last `_pre_pad_seconds_on_interrupt` seconds of
+input audio is maintained at all times. It is prepended to the per-turn
+user buffer **only when the upcoming `BotStoppedSpeakingFrame` is the
+result of an interruption** — i.e. the user cut the bot off
+mid-utterance, so their speech started during the bot's audio and would
+otherwise be clipped. When the user waits politely for the bot to
+finish, recording flips on with an empty buffer (no pre-roll bot tail).
 
-When the user instead waits politely for the bot to finish, the
-`BotStoppedSpeakingFrame` is a "natural stop" (no preceding
-`InterruptionFrame`), and recording flips on with an empty buffer.
-User speech is captured cleanly from when they actually start speaking.
-
-Detection: `FrameProcessor.broadcast_interruption()` (called by
-`OpenAIRealtimeLLMService` when the user interrupts) emits a
+Detection: `FrameProcessor.broadcast_interruption()` emits an
 `InterruptionFrame` downstream. We track its arrival between
 `BotStartedSpeakingFrame` and `BotStoppedSpeakingFrame` to flag the
 upcoming bot-stop as interrupted.
@@ -71,10 +66,9 @@ pre-pad and no real speech is filtered out).
 ### Trailing user audio after the last bot reply
 
 If the conversation ends after a bot reply with the user still speaking
-(no further bot reply to anchor a new turn), `AudioTurnObserver`
-opens a half-turn at end-of-pipeline and attaches the trailing user
-audio to it — rather than overwriting the previous turn's user URL.
-`BotFirstTurnObserver` does not need this.
+(no further bot reply to anchor a new turn), the observer opens a
+half-turn at end-of-pipeline and attaches the trailing user audio to
+it — rather than overwriting the previous turn's user URL.
 
 ### Why user audio lives in the observer, not an `AudioBufferProcessor`
 
@@ -94,9 +88,9 @@ oi_observer.__class__ = AudioTurnObserver
 oi_observer.audio_uploader = AudioTurnUploader(...)
 ```
 
-These observers are tuned for OpenAI Realtime's specific frame patterns.
-Other speech-to-speech services emit different signals and need their
-own observer tuning.
+This observer is tuned for OpenAI Realtime's specific frame patterns.
+Other speech-to-speech services emit different signals and may need
+their own observer tuning.
 """
 
 from openinference.instrumentation.pipecat._observer import OpenInferenceObserver
@@ -111,23 +105,15 @@ from pipecat.frames.frames import (
 from pipecat.observers.base_observer import FramePushed
 
 
-class _AudioTurnObserverBase(OpenInferenceObserver):
-    """Shared base class for the two turn-pairing strategies.
+class AudioTurnObserver(OpenInferenceObserver):
+    """User-then-bot turn pairing for speech-to-speech LLMs.
 
-    Subclasses parameterize via two class attributes:
-    - ``_initial_user_audio_recording``: whether to start recording user
-      audio before the first bot utterance.
-    - ``_flush_before_end_start``: whether to flush user audio onto the
-      OLD turn (True, bot-first) or the NEW turn (False, user-first).
+    See module docstring for full design notes.
     """
 
     # Set externally after the __class__ swap, e.g.
     #   oi_observer.audio_uploader = AudioTurnUploader(...)
     audio_uploader = None
-
-    # Strategy parameters (override in subclasses).
-    _initial_user_audio_recording: bool = False
-    _flush_before_end_start: bool = True
 
     # When the user interrupts the bot mid-utterance, prepend this many
     # seconds of audio that was captured BEFORE bot-stop (rolling buffer)
@@ -157,7 +143,9 @@ class _AudioTurnObserverBase(OpenInferenceObserver):
             self._user_audio_rolling = bytearray()
             self._user_audio_sample_rate = 16000
             self._user_audio_num_channels = 1
-            self._user_audio_recording = self._initial_user_audio_recording
+            # Recording starts ON so user-speaks-first conversations capture
+            # the initial user utterance before any bot has spoken.
+            self._user_audio_recording = True
             # True when the per-turn buffer was seeded with pre-pad bytes.
             # Used by `_flush_user_audio` to compute a higher byte threshold
             # so that a buffer containing ONLY pre-pad (no real speech) gets
@@ -205,10 +193,6 @@ class _AudioTurnObserverBase(OpenInferenceObserver):
                 if not self._is_bot_speaking:
                     self._user_audio_recording = False
 
-                    if self._flush_before_end_start:
-                        # Bot-first pairing: flush onto OLD turn.
-                        self._flush_user_audio()
-
                     if self._is_turn_active and self._has_bot_spoken:
                         await self._end_turn(data, was_interrupted=False)
                         await self._start_turn(data)
@@ -216,9 +200,9 @@ class _AudioTurnObserverBase(OpenInferenceObserver):
                         await self._start_turn(data)
                     # else: adopt auto-started turn.
 
-                    if not self._flush_before_end_start:
-                        # User-first pairing: flush onto NEW turn.
-                        self._flush_user_audio()
+                    # User-then-bot pairing: flush user audio captured before
+                    # this bot reply onto the NEW turn span.
+                    self._flush_user_audio()
 
                     self._is_bot_speaking = True
                     self._has_bot_spoken = True
@@ -246,21 +230,16 @@ class _AudioTurnObserverBase(OpenInferenceObserver):
                     has_trailing_audio = (
                         len(self._user_audio_buffer) >= self._flush_threshold_bytes()
                     )
-                    if (
-                        not self._flush_before_end_start
-                        and has_trailing_audio
-                        and self._has_bot_spoken
-                    ):
-                        # User-first pairing with trailing user audio after
-                        # the last bot reply: open a new half-turn for it
-                        # rather than overwriting the current turn's user URL.
+                    if has_trailing_audio and self._has_bot_spoken:
+                        # Trailing user audio after the last bot reply: open a
+                        # new half-turn for it rather than overwriting the
+                        # current turn's user URL.
                         await self._end_turn(data, was_interrupted=False)
                         await self._start_turn(data)
                         self._flush_user_audio()
                         await self._end_turn(data, was_interrupted=True)
                     else:
-                        # Bot-first pairing (current turn correctly takes the
-                        # user response), or no trailing speech at all.
+                        # No trailing speech — just close the current turn.
                         self._flush_user_audio()
                         await self._end_turn(data, was_interrupted=True)
             # Deliberately ignore: StartFrame, UserStartedSpeakingFrame,
@@ -274,8 +253,8 @@ class _AudioTurnObserverBase(OpenInferenceObserver):
         If pre-pad was prepended (interrupted bot-stop), buffer always
         has pre_pad bytes — so the threshold accounts for that and adds
         `_min_user_audio_bytes` of real speech on top. Without pre-pad
-        (natural bot-stop, or initial pipeline-start window in user-first),
-        the threshold is just `_min_user_audio_bytes`.
+        (natural bot-stop, or initial pipeline-start window), the
+        threshold is just `_min_user_audio_bytes`.
         """
         extra = self._pre_pad_bytes() if self._buffer_has_pre_pad else 0
         return extra + self._min_user_audio_bytes
@@ -326,40 +305,3 @@ class _AudioTurnObserverBase(OpenInferenceObserver):
         # Clear the speaking flag; do NOT schedule turn end. The next
         # BotStartedSpeakingFrame is what closes the current turn.
         self._is_bot_speaking = False
-
-
-class AudioTurnObserver(_AudioTurnObserverBase):
-    """User-then-bot turn pairing (matches Pipecat convention).
-
-    Each turn span carries ``(user audio + bot audio)``, with user audio
-    being the audio captured BEFORE the bot's reply in that turn. Works
-    for both bot-speaks-first and user-speaks-first conversations:
-
-    - Bot-first kickoff: turn 1 has only bot audio (no user — VAD
-      filtering suppresses silent pre-bot capture); subsequent turns
-      pair the user's response to the previous bot utterance with the
-      current bot utterance.
-    - User-first kickoff: turn 1 = (user 1 + bot 1), turn 2 = (user 2 + bot 2), …
-    - Trailing user audio after the last bot reply (user keeps talking
-      then disconnects) opens a final half-turn rather than overwriting
-      the previous turn's user URL.
-    """
-
-    _initial_user_audio_recording = True
-    _flush_before_end_start = False
-
-
-class BotFirstTurnObserver(_AudioTurnObserverBase):
-    """Bot-then-user turn pairing (alternate strategy).
-
-    Each turn span carries ``(bot audio + user response to that bot)``.
-    Best suited for bot-speaks-first conversations where you want each
-    turn anchored to a bot utterance and its user response. Trailing
-    user audio after the last bot reply attaches to the current
-    (still-open) turn naturally — no half-turn needed.
-    """
-
-    _initial_user_audio_recording = False
-    _flush_before_end_start = True
-
-

@@ -64,7 +64,9 @@ def probe_wav(url: str) -> tuple[int, int]:
 
 def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    parser.add_argument("conversation_id", nargs="?", help="conversation_id to verify; defaults to latest")
+    parser.add_argument(
+        "conversation_id", nargs="?", help="conversation_id to verify; defaults to latest"
+    )
     args = parser.parse_args(argv[1:])
 
     client = PhoenixClient(base_url=PHOENIX_ENDPOINT)
@@ -188,7 +190,9 @@ def main(argv: list[str]) -> int:
                 # does, the upload happened but the span attribute didn't get
                 # set (audio-handler / observer bug). If it doesn't, the audio
                 # buffer never fired for this turn.
-                turn_str = f"{turn_number:04d}" if isinstance(turn_number, int) else str(turn_number)
+                turn_str = (
+                    f"{turn_number:04d}" if isinstance(turn_number, int) else str(turn_number)
+                )
                 key = f"{prefix}/{conversation_id}/turn-{turn_str}/{role}.wav"
                 print(f"    no URL on span — expected: s3://{bucket}/{key}")
                 print(f"    check with: aws s3 ls s3://{bucket}/{key}")

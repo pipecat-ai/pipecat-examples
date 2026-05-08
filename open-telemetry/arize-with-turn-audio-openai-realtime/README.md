@@ -28,9 +28,7 @@ For bot-speaks-first conversations: turn 1 is a "half turn" with only bot audio 
 
 The observer is wired in via a `__class__` swap on the auto-injected observer instance (`oi_observer.__class__ = AudioTurnObserver`) right after `PipelineTask` is constructed and before the runner starts. State is preserved; only method resolution changes.
 
-A sibling `BotFirstTurnObserver` is also defined in the same file. It pairs turns as `(bot audio + user response to that bot)` — a less-conventional alternative for trace narratives anchored on bot utterances rather than user questions.
-
-These observers are tuned for OpenAI Realtime's specific frame patterns. Other speech-to-speech services (e.g. Gemini Live) emit different signals and may need their own observer tuning, though `AudioTurnObserver` is the same code shared with the Gemini Live example as a starting point.
+`AudioTurnObserver` is tuned for OpenAI Realtime's specific frame patterns. Other speech-to-speech services (e.g. Gemini Live) emit different signals and may need their own observer tuning, though the same code is shared with the Gemini Live example as a starting point.
 
 ## Prerequisites
 

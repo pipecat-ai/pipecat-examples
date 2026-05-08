@@ -28,7 +28,9 @@ from loguru import logger
 class AudioTurnUploader:
     """Uploads per-turn audio segments to S3 and returns presigned URLs synchronously."""
 
-    def __init__(self, conversation_id: str, s3_key_prefix: str, url_expiry_seconds: int = 7 * 24 * 3600):
+    def __init__(
+        self, conversation_id: str, s3_key_prefix: str, url_expiry_seconds: int = 7 * 24 * 3600
+    ):
         """Initialize the turn audio uploader.
 
         Args:
