@@ -91,7 +91,7 @@ audio handler reads `_turn_count` while the turn is still active.
 
 ```python
 oi_observer.__class__ = AudioTurnObserver
-oi_observer.audio_uploader = TurnAudioUploader(...)
+oi_observer.audio_uploader = AudioTurnUploader(...)
 ```
 
 These observers are tuned for OpenAI Realtime's specific frame patterns.
@@ -111,7 +111,7 @@ from pipecat.frames.frames import (
 from pipecat.observers.base_observer import FramePushed
 
 
-class _OpenAIRealtimeTurnObserverBase(OpenInferenceObserver):
+class _AudioTurnObserverBase(OpenInferenceObserver):
     """Shared base class for the two turn-pairing strategies.
 
     Subclasses parameterize via two class attributes:
@@ -122,7 +122,7 @@ class _OpenAIRealtimeTurnObserverBase(OpenInferenceObserver):
     """
 
     # Set externally after the __class__ swap, e.g.
-    #   oi_observer.audio_uploader = TurnAudioUploader(...)
+    #   oi_observer.audio_uploader = AudioTurnUploader(...)
     audio_uploader = None
 
     # Strategy parameters (override in subclasses).
@@ -328,7 +328,7 @@ class _OpenAIRealtimeTurnObserverBase(OpenInferenceObserver):
         self._is_bot_speaking = False
 
 
-class AudioTurnObserver(_OpenAIRealtimeTurnObserverBase):
+class AudioTurnObserver(_AudioTurnObserverBase):
     """User-then-bot turn pairing (matches Pipecat convention).
 
     Each turn span carries ``(user audio + bot audio)``, with user audio
@@ -349,7 +349,7 @@ class AudioTurnObserver(_OpenAIRealtimeTurnObserverBase):
     _flush_before_end_start = False
 
 
-class BotFirstTurnObserver(_OpenAIRealtimeTurnObserverBase):
+class BotFirstTurnObserver(_AudioTurnObserverBase):
     """Bot-then-user turn pairing (alternate strategy).
 
     Each turn span carries ``(bot audio + user response to that bot)``.
@@ -363,6 +363,3 @@ class BotFirstTurnObserver(_OpenAIRealtimeTurnObserverBase):
     _flush_before_end_start = True
 
 
-# Backward-compatibility aliases.
-UserFirstTurnObserver = AudioTurnObserver
-OpenAIRealtimeTurnObserver = BotFirstTurnObserver

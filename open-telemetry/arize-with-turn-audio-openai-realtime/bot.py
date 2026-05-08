@@ -45,8 +45,8 @@ from pipecat.turns.user_stop.external_user_turn_stop_strategy import (
 )
 from pipecat.turns.user_turn_strategies import UserTurnStrategies
 
-from bot_utils.openai_realtime_turn_observer import AudioTurnObserver
-from bot_utils.turn_audio_uploader import TurnAudioUploader
+from bot_utils.audio_turn_observer import AudioTurnObserver
+from bot_utils.audio_turn_uploader import AudioTurnUploader
 
 load_dotenv(override=True)
 
@@ -174,7 +174,7 @@ async def run_bot(transport: BaseTransport):
     # between BotStoppedSpeakingFrame and the next BotStartedSpeakingFrame.
     bot_audio_buffer = AudioBufferProcessor(buffer_size=0, enable_turn_audio=True)
 
-    audio_uploader = TurnAudioUploader(
+    audio_uploader = AudioTurnUploader(
         conversation_id=conversation_id,
         s3_key_prefix=os.getenv("AWS_S3_PREFIX", "pipecat-turn-audio"),
     )

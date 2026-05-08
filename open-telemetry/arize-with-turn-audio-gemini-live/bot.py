@@ -14,7 +14,7 @@ from openinference.instrumentation.pipecat._observer import OpenInferenceObserve
 from pipecat.adapters.schemas.function_schema import FunctionSchema
 from pipecat.adapters.schemas.tools_schema import ToolsSchema
 from pipecat.audio.vad.silero import SileroVADAnalyzer
-from pipecat.frames.frames import LLMRunFrame, TTSSpeakFrame
+from pipecat.frames.frames import LLMRunFrame
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineParams, PipelineTask
@@ -26,14 +26,18 @@ from pipecat.processors.aggregators.llm_response_universal import (
 from pipecat.processors.audio.audio_buffer_processor import AudioBufferProcessor
 from pipecat.runner.types import RunnerArguments
 from pipecat.runner.utils import create_transport
-from pipecat.services.cartesia.tts import CartesiaTTSService
-from pipecat.services.deepgram.stt import DeepgramSTTService
-from pipecat.services.google.llm import GoogleLLMService
+from pipecat.services.google.gemini_live.llm import GeminiLiveLLMService
 from pipecat.services.llm_service import FunctionCallParams
 from pipecat.transports.base_transport import BaseTransport, TransportParams
 from pipecat.transports.daily.transport import DailyParams
 from pipecat.transports.websocket.fastapi import FastAPIWebsocketParams
+from pipecat.turns.user_start.vad_user_turn_start_strategy import VADUserTurnStartStrategy
+from pipecat.turns.user_stop.external_user_turn_stop_strategy import (
+    ExternalUserTurnStopStrategy,
+)
+from pipecat.turns.user_turn_strategies import UserTurnStrategies
 
+from bot_utils.audio_turn_observer import AudioTurnObserver
 from bot_utils.audio_turn_uploader import AudioTurnUploader
 
 load_dotenv(override=True)
@@ -83,47 +87,25 @@ transport_params = {
     "daily": lambda: DailyParams(
         audio_in_enabled=True,
         audio_out_enabled=True,
+        vad_analyzer=SileroVADAnalyzer(),
     ),
     "twilio": lambda: FastAPIWebsocketParams(
         audio_in_enabled=True,
         audio_out_enabled=True,
+        vad_analyzer=SileroVADAnalyzer(),
     ),
     "webrtc": lambda: TransportParams(
         audio_in_enabled=True,
         audio_out_enabled=True,
+        vad_analyzer=SileroVADAnalyzer(),
     ),
 }
 
 
 async def run_bot(transport: BaseTransport):
-    # Generate a fresh conversation_id per client connection so each call
-    # produces its own group of trace spans (no leakage across runs of a
-    # long-lived server).
+    # Generate a fresh conversation_id per client connection
     conversation_id = f"pipecat-test-conversation-001_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
     logger.info(f"Starting bot, conversation_id={conversation_id}")
-
-    stt = DeepgramSTTService(api_key=os.getenv("DEEPGRAM_API_KEY"))
-
-    llm = GoogleLLMService(
-        api_key=os.getenv("GOOGLE_API_KEY"),
-        settings=GoogleLLMService.Settings(
-            model="gemini-2.5-flash",
-            system_instruction="You are a helpful LLM in a WebRTC call. Your goal is to demonstrate your capabilities in a succinct way. Your output will be converted to audio so don't include special characters in your answers. Respond to what the user said in a creative and helpful way.",
-        ),
-    )
-
-    tts = CartesiaTTSService(
-        api_key=os.getenv("CARTESIA_API_KEY"),
-        settings=CartesiaTTSService.Settings(
-            voice="71a7ad14-091c-4e8e-a314-022ece01c121",  # British Reading Lady
-        ),
-    )
-
-    llm.register_function("get_current_weather", fetch_weather_from_api)
-
-    @llm.event_handler("on_function_calls_started")
-    async def on_function_calls_started(service, function_calls):
-        await tts.queue_frame(TTSSpeakFrame("Let me check on that."))
 
     weather_function = FunctionSchema(
         name="get_current_weather",
@@ -143,18 +125,40 @@ async def run_bot(transport: BaseTransport):
     )
     tools = ToolsSchema(standard_tools=[weather_function])
 
+    # Gemini Live replaces STT + LLM + TTS in one service. Note: on pipecat
+    # 0.0.100 the constructor takes top-level kwargs (system_instruction, voice_id,
+    # tools, etc.); the `settings=Settings(...)` pattern only landed in 0.0.105.
+    llm = GeminiLiveLLMService(
+        api_key=os.getenv("GOOGLE_API_KEY"),
+        voice_id="Aoede",  # Puck, Charon (default), Kore, Fenrir, Aoede
+        system_instruction="You are a helpful LLM in a WebRTC call. Your goal is to demonstrate your capabilities in a succinct way. Your output will be converted to audio so don't include special characters in your answers. Respond to what the user said in a creative and helpful way.",
+        tools=tools,
+    )
+
+    llm.register_function("get_current_weather", fetch_weather_from_api)
+
     context = LLMContext(tools=tools)
+    # Explicit user-turn strategies driven only by the transport's VAD:
+    # - VADUserTurnStartStrategy triggers on transport's VADUserStartedSpeakingFrame
+    # - ExternalUserTurnStopStrategy triggers on the transport-emitted
+    #   UserStoppedSpeakingFrame (which Silero on TransportParams produces)
+    # Both have enable_user_speaking_frames=False so the aggregator does NOT
+    # re-broadcast UserStarted/StoppedSpeakingFrame upstream — that broadcast
+    # was re-triggering user_audio_buffer's on_user_turn_audio_data twice.
     user_aggregator, assistant_aggregator = LLMContextAggregatorPair(
         context,
         user_params=LLMUserAggregatorParams(
-            vad_analyzer=SileroVADAnalyzer(),
+            user_turn_strategies=UserTurnStrategies(
+                start=[VADUserTurnStartStrategy(enable_user_speaking_frames=False)],
+                stop=[ExternalUserTurnStopStrategy()],
+            ),
         ),
     )
 
-    # enable_turn_audio=True is required for on_user_turn_audio_data /
-    # on_bot_turn_audio_data events. buffer_size=0 disables the merged-audio
-    # event since we only want per-turn segments.
-    audio_buffer = AudioBufferProcessor(buffer_size=0, enable_turn_audio=True)
+    # bot_audio_buffer captures bot output audio per turn via VAD-driven
+    # BotStoppedSpeakingFrame. User audio is captured by AudioTurnObserver
+    # internally (see bot_utils/audio_turn_observer.py).
+    bot_audio_buffer = AudioBufferProcessor(buffer_size=0, enable_turn_audio=True)
 
     audio_uploader = AudioTurnUploader(
         conversation_id=conversation_id,
@@ -164,12 +168,10 @@ async def run_bot(transport: BaseTransport):
     pipeline = Pipeline(
         [
             transport.input(),
-            stt,
             user_aggregator,
             llm,
-            tts,
             transport.output(),
-            audio_buffer,
+            bot_audio_buffer,
             assistant_aggregator,
         ]
     )
@@ -182,11 +184,12 @@ async def run_bot(transport: BaseTransport):
         ),
         conversation_id=conversation_id,
     )
+    
+    # this is kind of ugly - just for POC.
 
     # PipecatInstrumentor.instrument() wraps PipelineTask.__init__ to auto-inject
     # an OpenInferenceObserver. Look it up so we can set attributes on its
     # _turn_span from the audio_buffer event handlers.
-    # this is kind of ugly - just for POC.
     oi_observer = next(
         (o for o in task._observer._observers if isinstance(o, OpenInferenceObserver)),
         None,
@@ -194,19 +197,17 @@ async def run_bot(transport: BaseTransport):
     if oi_observer is None:
         raise RuntimeError("OpenInferenceObserver not found on PipelineTask")
 
-    @audio_buffer.event_handler("on_user_turn_audio_data")
-    async def on_user_turn_audio_data(buffer, audio, sample_rate, num_channels):
-        if oi_observer._turn_span is None:
-            logger.warning("No active turn span; skipping user audio attribute")
-            return
-        turn_number = oi_observer._turn_count
-        url = audio_uploader.get_presigned_url_and_upload(
-            audio, sample_rate, num_channels, turn_number, role="user"
-        )
-        oi_observer._turn_span.set_attribute("audio.user.url", url)
-        logger.info(f"Turn {turn_number} user audio URL set on span")
+    # and then this is _really_ ugly - just for POC.
 
-    @audio_buffer.event_handler("on_bot_turn_audio_data")
+    # Swap the auto-injected observer's class to AudioTurnObserver. Each
+    # turn span then represents (user audio + bot audio) chronologically —
+    # matching Pipecat's user-then-bot turn convention. AudioTurnObserver
+    # was originally written for OpenAI Realtime; we're trying it on Gemini
+    # Live to see if its frame patterns are similar enough.
+    oi_observer.__class__ = AudioTurnObserver
+    oi_observer.audio_uploader = audio_uploader
+
+    @bot_audio_buffer.event_handler("on_bot_turn_audio_data")
     async def on_bot_turn_audio_data(buffer, audio, sample_rate, num_channels):
         if oi_observer._turn_span is None:
             logger.warning("No active turn span; skipping bot audio attribute")
@@ -221,7 +222,7 @@ async def run_bot(transport: BaseTransport):
     @transport.event_handler("on_client_connected")
     async def on_client_connected(transport, client):
         logger.info(f"Client connected")
-        await audio_buffer.start_recording()
+        await bot_audio_buffer.start_recording()
         context.add_message({"role": "user", "content": "Please introduce yourself to the user."})
         await task.queue_frames([LLMRunFrame()])
 

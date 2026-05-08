@@ -10,22 +10,27 @@ The end-to-end flow:
 2. For each event we generate a presigned S3 GET URL **synchronously** (no S3 round-trip) using a deterministic key, set it as an attribute on the active `OpenInferenceObserver._turn_span`, and kick off the actual `put_object` upload as a background task.
 3. The Arize/Phoenix span carries the URL immediately — the link starts working as soon as the upload lands.
 
-### Custom turn observer (`OpenAIRealtimeTurnObserver`)
+### Custom turn observer (`AudioTurnObserver`)
 
 Default `OpenInferenceObserver` (via `TurnTrackingObserver`) defines a turn as `(user-utterance, bot-reply)` with VAD-driven boundaries. That model breaks against OpenAI's Realtime API:
 
 - `OpenAIRealtimeLLMService.broadcast_interruption` fires at end of every bot reply and propagates a `UserStartedSpeakingFrame` even when no user has spoken — the default observer reads this as an interruption and ends the turn early, shifting every audio attribute one turn off.
 - The default observer also auto-starts turn 1 on `StartFrame`, before the bot has produced any audio.
 
-`bot_utils/openai_realtime_turn_observer.py` defines `OpenAIRealtimeTurnObserver`, a subclass of `OpenInferenceObserver` that redefines a turn as **"bot utterance + everything until the next bot starts speaking"**. Boundaries:
+`bot_utils/audio_turn_observer.py` defines `AudioTurnObserver`, a subclass of `OpenInferenceObserver` that pairs each turn span as `(user audio + bot audio)` in chronological order — matching Pipecat's user-then-bot turn convention. Boundaries:
 
 - Turn STARTS on the first `BotStartedSpeakingFrame` (or adopts a turn that was auto-started by a service frame).
 - Turn ENDS on the *next* `BotStartedSpeakingFrame` after the bot has already spoken in the current turn.
-- `UserStartedSpeakingFrame` and `UserStoppedSpeakingFrame` are mid-turn events — completely ignored. This is what makes the interruption-broadcast a no-op.
+- `UserStartedSpeakingFrame` and `UserStoppedSpeakingFrame` are mid-turn events — completely ignored. This is what makes the broadcast_interruption phantom frames a no-op.
+- User audio is buffered inside the observer and flushed onto the new turn span just after the turn boundary advances. Pre-padding kicks in only on interrupted bot-stops (detected via `InterruptionFrame`), so polite "wait for bot to finish" turns don't get pre-roll bot tail.
 
-The observer is wired in via a `__class__` swap on the auto-injected observer instance (`oi_observer.__class__ = OpenAIRealtimeTurnObserver`) right after `PipelineTask` is constructed and before the runner starts. State is preserved; only method resolution changes.
+For bot-speaks-first conversations: turn 1 is a "half turn" with only bot audio (the bot intro); subsequent turns pair the user response to the previous bot utterance with the current bot utterance. For user-speaks-first conversations: turn 1 = (user 1 + bot 1), turn 2 = (user 2 + bot 2), and so on. Trailing user audio after the last bot reply (user keeps talking then disconnects) opens a final half-turn rather than overwriting the previous turn's user URL.
 
-This is **OpenAI-Realtime-specific**. Gemini Live and other speech-to-speech services emit different frame patterns and need their own observer.
+The observer is wired in via a `__class__` swap on the auto-injected observer instance (`oi_observer.__class__ = AudioTurnObserver`) right after `PipelineTask` is constructed and before the runner starts. State is preserved; only method resolution changes.
+
+A sibling `BotFirstTurnObserver` is also defined in the same file. It pairs turns as `(bot audio + user response to that bot)` — a less-conventional alternative for trace narratives anchored on bot utterances rather than user questions.
+
+These observers are tuned for OpenAI Realtime's specific frame patterns. Other speech-to-speech services (e.g. Gemini Live) emit different signals and may need their own observer tuning, though `AudioTurnObserver` is the same code shared with the Gemini Live example as a starting point.
 
 ## Prerequisites
 
@@ -137,7 +142,7 @@ uv run bot.py --help        # See all flags
 
 In the Arize (or Phoenix) trace UI, open a `pipecat.conversation.turn` span and look at its attributes. `audio.user.url` and `audio.bot.url` are clickable HTTPS links — paste in a browser to play, or feed to an `<audio>` tag.
 
-URLs are signed for **7 days** by default (`url_expiry_seconds` in `TurnAudioUploader`).
+URLs are signed for **7 days** by default (`url_expiry_seconds` in `AudioTurnUploader`).
 
 S3 layout per conversation:
 
@@ -159,7 +164,7 @@ s3://<bucket>/<prefix>/<conversation_id>/turn-0002/user.wav
 - **`OpenInferenceObserver not found on PipelineTask`** — `PipecatInstrumentor.instrument()` failed to wrap `PipelineTask.__init__`. Confirm the import path of `PipecatInstrumentor` and that `instrument()` is called *before* `PipelineTask(...)` is constructed.
 - **`audio.user.url` / `audio.bot.url` missing on a span** — turn ended faster than the audio handler fired. Check the debug log file (`pipecat-test-conversation-001_*.log`) for `No active turn span; skipping ... audio attribute`.
 - **Link 404s in the trace** — the background `put_object` hasn't finished or failed. Check logs for `Uploaded turn audio to s3://...` or `Failed to upload turn audio`.
-- **Link expires too soon** — bump `url_expiry_seconds` in `bot_utils/turn_audio_uploader.py` (max 7 days for SigV4).
+- **Link expires too soon** — bump `url_expiry_seconds` in `bot_utils/audio_turn_uploader.py` (max 7 days for SigV4).
 
 ## References
 

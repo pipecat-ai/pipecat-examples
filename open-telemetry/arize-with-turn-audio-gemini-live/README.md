@@ -1,4 +1,6 @@
-# Arize Tracing with Per-Turn Audio Links
+# Arize Tracing with Per-Turn Audio Links — Gemini Live
+
+Same shape as [`open-telemetry/arize-with-turn-audio`](../arize-with-turn-audio), but the cascade pipeline (Deepgram + Google Gemini + Cartesia) is replaced with a single `GeminiLiveLLMService` doing STT + LLM + TTS via Google's Multimodal Live API.
 
 Combines OpenInference/Arize tracing with per-turn audio recording. Each conversation turn gets its own root trace, and that turn span carries two attributes — `audio.user.url` and `audio.bot.url` — pointing to S3-hosted WAVs of just that turn's user utterance and bot reply.
 
@@ -12,7 +14,7 @@ The end-to-end flow:
 
 - Python 3.11+
 - [`uv`](https://docs.astral.sh/uv/) installed
-- Service accounts: Deepgram, Cartesia, Google (Gemini), AWS S3
+- Service accounts: Google AI Studio (Gemini Live API), AWS S3
 - Either an Arize account *or* a local Phoenix server for trace viewing
 
 ## Setup
@@ -67,9 +69,7 @@ cp env.example .env
 
 | Variable | Required? | Notes |
 | --- | --- | --- |
-| `DEEPGRAM_API_KEY` | yes | STT |
-| `CARTESIA_API_KEY` | yes | TTS |
-| `GOOGLE_API_KEY` | yes | Gemini LLM |
+| `GOOGLE_API_KEY` | yes | Gemini Live (STT + LLM + TTS) |
 | `AWS_ACCESS_KEY_ID` | yes | Long-lived IAM user key |
 | `AWS_SECRET_ACCESS_KEY` | yes | Long-lived IAM user secret |
 | `AWS_DEFAULT_REGION` | yes | e.g. `us-east-1` |
@@ -148,4 +148,4 @@ s3://<bucket>/<prefix>/<conversation_id>/turn-0002/user.wav
 
 - [openinference-instrumentation-pipecat](https://github.com/Arize-ai/openinference/tree/main/python/instrumentation/openinference-instrumentation-pipecat)
 - [AudioBufferProcessor turn events](https://github.com/pipecat-ai/pipecat/blob/main/src/pipecat/processors/audio/audio_buffer_processor.py)
-- Sister examples: [`open-telemetry/arize`](../arize), [`audio-recording-s3-multipart-upload`](../../audio-recording-s3-multipart-upload)
+- Sister examples: [`open-telemetry/arize`](../arize), [`open-telemetry/arize-with-turn-audio`](../arize-with-turn-audio) (cascade pipeline variant), [`open-telemetry/arize-with-turn-audio-openai-realtime`](../arize-with-turn-audio-openai-realtime) (OpenAI Realtime variant), [`audio-recording-s3-multipart-upload`](../../audio-recording-s3-multipart-upload)
