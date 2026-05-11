@@ -14,8 +14,10 @@ from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineParams, PipelineTask
 from pipecat.processors.aggregators.llm_context import LLMContext
-from pipecat.processors.aggregators.llm_response_universal import LLMContextAggregatorPair
-from pipecat.processors.frameworks.rtvi import RTVIConfig, RTVIObserver, RTVIProcessor
+from pipecat.processors.aggregators.llm_response_universal import (
+    LLMContextAggregatorPair,
+    LLMUserAggregatorParams,
+)
 from pipecat.runner.types import RunnerArguments
 from pipecat.serializers.protobuf import ProtobufFrameSerializer
 from pipecat.services.google.gemini_live.llm import GeminiLiveLLMService
@@ -113,20 +115,12 @@ async def bot(runner_args: RunnerArguments):
     logger.info(f"Starting the bot, received body: {runner_args.body}")
     websocket_client: WebSocket = runner_args.websocket
     try:
-        if os.environ.get("ENV") != "local":
-            from pipecat.audio.filters.krisp_filter import KrispFilter
-
-            krisp_filter = KrispFilter()
-        else:
-            krisp_filter = None
-
         transport = FastAPIWebsocketTransport(
             websocket=websocket_client,
             params=FastAPIWebsocketParams(
                 audio_in_enabled=True,
                 audio_out_enabled=True,
                 add_wav_header=False,
-                vad_analyzer=SileroVADAnalyzer(),
                 serializer=ProtobufFrameSerializer(),
             ),
         )
