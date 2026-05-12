@@ -21,10 +21,10 @@ from pipecat.processors.aggregators.llm_response_universal import (
 )
 from pipecat.runner.types import RunnerArguments
 from pipecat.runner.utils import create_transport
+from pipecat.services.nvidia.sagemaker.stt import NvidiaSageMakerWebsocketSTTService
+from pipecat.services.nvidia.sagemaker.tts import NvidiaSageMakerHTTPTTSService
 from pipecat.services.openai.llm import OpenAILLMService
 from pipecat.transports.base_transport import BaseTransport, TransportParams
-from pipecat.services.nvidia.sagemaker.tts import NvidiaSageMakerHTTPTTSService
-from pipecat.services.nvidia.sagemaker.stt import NvidiaSageMakerWebsocketSTTService
 
 load_dotenv(override=True)
 
