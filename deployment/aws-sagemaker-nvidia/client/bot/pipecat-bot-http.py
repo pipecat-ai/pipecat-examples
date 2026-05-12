@@ -21,7 +21,7 @@ from pipecat.processors.aggregators.llm_response_universal import (
 )
 from pipecat.runner.types import RunnerArguments
 from pipecat.runner.utils import create_transport
-from pipecat.services.nvidia.sagemaker.stt import NvidiaSageMakerWebsocketSTTService
+from pipecat.services.nvidia.sagemaker.stt import NvidiaSageMakerSTTService
 from pipecat.services.nvidia.sagemaker.tts import NvidiaSageMakerHTTPTTSService
 from pipecat.services.openai.llm import OpenAILLMService
 from pipecat.transports.base_transport import BaseTransport, TransportParams
@@ -41,7 +41,7 @@ transport_params = {
 async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     logger.info(f"Starting bot")
 
-    stt = NvidiaSageMakerWebsocketSTTService(
+    stt = NvidiaSageMakerSTTService(
         endpoint_name=os.getenv("SAGEMAKER_ASR_ENDPOINT_NAME"),
         region=os.getenv("AWS_REGION", "us-west-2"),
     )
