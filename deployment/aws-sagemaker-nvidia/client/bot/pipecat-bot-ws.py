@@ -104,7 +104,9 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     async def on_client_connected(transport, client):
         logger.info(f"Client connected")
         # Kick off the conversation.
-        context.add_message({"role": "developer", "content": "Please introduce yourself to the user."})
+        context.add_message(
+            {"role": "developer", "content": "Please introduce yourself to the user."}
+        )
         await task.queue_frames([LLMRunFrame()])
 
     @transport.event_handler("on_client_disconnected")
@@ -124,7 +126,7 @@ async def bot(runner_args: RunnerArguments):
 
 
 if __name__ == "__main__":
-    logger.info(f"Starting bot {os.getenv("AWS_REGION", "us-west-2")}")
+    logger.info(f"Starting bot {os.getenv('AWS_REGION', 'us-west-2')}")
     from pipecat.runner.run import main
 
     main()

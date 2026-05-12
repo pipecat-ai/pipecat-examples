@@ -155,9 +155,7 @@ async def _nim_ws_proxy(client_ws: WebSocket, log_tag: str) -> None:
                         msg = await client_ws.receive()
                         logger.info(f"msg received {msg}")
                         if msg.get("type") == "websocket.disconnect":
-                            logger.info(
-                                f"{log_tag} — client disconnected (code {msg.get('code')})"
-                            )
+                            logger.info(f"{log_tag} — client disconnected (code {msg.get('code')})")
                             await nim_ws.close()
                             return
                         if "text" in msg:
@@ -189,9 +187,7 @@ async def _nim_ws_proxy(client_ws: WebSocket, log_tag: str) -> None:
                 except websockets.exceptions.ConnectionClosedOK:
                     logger.info(f"{log_tag} — NIM WebSocket closed normally")
                 except websockets.exceptions.ConnectionClosedError as exc:
-                    logger.warning(
-                        f"{log_tag} — NIM WebSocket closed with error: {exc}"
-                    )
+                    logger.warning(f"{log_tag} — NIM WebSocket closed with error: {exc}")
 
             await asyncio.gather(client_to_nim(), nim_to_client())
 
