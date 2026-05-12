@@ -1,27 +1,46 @@
-# JavaScript Implementation
+# WebSocket Client
 
-Basic implementation using the [Pipecat JavaScript SDK](https://docs.pipecat.ai/client/js/introduction).
+Browser client for the WebSocket voice agent. Built with TypeScript and the [Pipecat JS SDK](https://docs.pipecat.ai/client/js/introduction).
 
 ## Setup
 
-1. Run the bot server. See the [server README](../README).
-
-2. Navigate to the `client` directory:
+### 1. Install dependencies
 
 ```bash
 cd client
-```
-
-3. Install dependencies:
-
-```bash
 npm install
 ```
 
-4. Run the client app:
+### 2. Configure environment
 
+```bash
+cp env.example .env
 ```
+
+Edit `.env` based on where your bot is running.
+
+#### Connecting to a local bot
+
+```env
+VITE_PIPECAT_BASE_URL=http://localhost:7860
+VITE_PIPECAT_PUBLIC_API=
+```
+
+Start the bot server first — see the [server README](../README.md).
+
+#### Connecting to Pipecat Cloud
+
+```env
+VITE_PIPECAT_BASE_URL=https://api.pipecat.daily.co/v1/public/<your-agent-name>
+VITE_PIPECAT_PUBLIC_API=<your-public-api-key>
+```
+
+Your agent name and public API key are available in the [Pipecat Cloud dashboard](https://pipecat.daily.co).
+
+### 3. Run the client
+
+```bash
 npm run dev
 ```
 
-5. Visit http://localhost:5173 in your browser.
+Open http://localhost:5173 in your browser and click **Connect**.
