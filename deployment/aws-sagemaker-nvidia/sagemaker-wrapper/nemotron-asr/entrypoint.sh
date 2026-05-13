@@ -37,6 +37,9 @@ start_nim() {
   elif [ -f /opt/nim/start-server.sh ]; then
     echo "→ Starting NIM via /opt/nim/start-server.sh ..."
     /opt/nim/start-server.sh
+  elif [ -f /opt/nim/start_server.sh ]; then
+    echo "→ Starting NIM via /opt/nim/start_server.sh ..."
+    /opt/nim/start_server.sh
   elif [ -f /opt/nvidia/nvidia_entrypoint.sh ]; then
     echo "→ Starting NIM via /opt/nvidia/nvidia_entrypoint.sh ..."
     /opt/nvidia/nvidia_entrypoint.sh

@@ -92,6 +92,10 @@ fi
 # ── Auto-detect NIM entrypoint ────────────────────────────────────────────────
 # Inspect the local NIM image to find its original ENTRYPOINT + CMD.
 # Baked in as NIM_START_CMD so entrypoint.sh knows how to start NIM.
+#
+# Note: docker inspect returns empty Config for manifest-list images (multi-arch
+# images stored with the containerd backend). In that case we fall back to
+# running the image and probing well-known start-script paths.
 NIM_ENTRYPOINT=$(docker inspect "$NIM_IMAGE" \
   --format='{{range .Config.Entrypoint}}{{.}} {{end}}' 2>/dev/null | xargs || true)
 NIM_CMD=$(docker inspect "$NIM_IMAGE" \
@@ -105,6 +109,17 @@ else
   NIM_START_CMD=""
 fi
 NIM_START_CMD=$(echo "$NIM_START_CMD" | xargs)
+
+# Fallback: probe well-known paths inside the container when docker inspect
+# returned nothing (happens with manifest-list images on containerd backends).
+if [ -z "$NIM_START_CMD" ]; then
+  echo "  docker inspect returned empty config (manifest-list image). Probing container..."
+  NIM_START_CMD=$(docker run --rm --platform linux/amd64 \
+    --entrypoint /bin/sh "$NIM_IMAGE" \
+    -c 'for f in /opt/nim/start_server.sh /opt/nim/start-server.sh; do
+          [ -f "$f" ] && echo "$f" && exit 0
+        done' 2>/dev/null | tr -d '[:space:]' || true)
+fi
 
 if [ -n "$NIM_START_CMD" ]; then
   echo "  Detected NIM start command: $NIM_START_CMD"
