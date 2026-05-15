@@ -21,9 +21,9 @@ from pipecat.processors.aggregators.llm_response_universal import (
 )
 from pipecat.runner.types import RunnerArguments
 from pipecat.runner.utils import create_transport
+from pipecat.services.aws.llm import AWSBedrockLLMService, AWSBedrockLLMSettings
 from pipecat.services.nvidia.sagemaker.stt import NvidiaSageMakerSTTService
 from pipecat.services.nvidia.sagemaker.tts import NvidiaSageMakerTTSService
-from pipecat.services.openai.llm import OpenAILLMService
 from pipecat.transports.base_transport import BaseTransport, TransportParams
 from pipecat.transports.daily.transport import DailyParams
 
@@ -51,20 +51,11 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
         region=os.getenv("AWS_REGION", "us-west-2"),
     )
 
-    llm = OpenAILLMService(
-        api_key="not_needed",
-        base_url=os.getenv("NEMOTRON_LLM_BASE_URL"),
-        model="nemotron-3-super-120b",
-        system_instruction="You are a real-time AI voice assistant. Keep responses short and sharp. Use plain speech and quick sentences. Avoid any symbols, emojis or formatting. Show usefulness in as few words as possible. Keep you response simple, maximum of 40 words each.",
-        params=OpenAILLMService.InputParams(
-            temperature=0.0,
-            extra={
-                "extra_body": {
-                    "chat_template_kwargs": {
-                        "enable_thinking": False,
-                    }
-                }
-            },
+    llm = AWSBedrockLLMService(
+        aws_region=os.getenv("AWS_REGION"),
+        settings=AWSBedrockLLMSettings(
+            model="nvidia.nemotron-super-3-120b",
+            system_instruction="You are a real-time AI voice assistant. Keep responses short and sharp. Use plain speech and quick sentences. Avoid any symbols, emojis or formatting. Show usefulness in as few words as possible. Keep you response simple, maximum of 40 words each.",
         ),
     )
 
