@@ -1,0 +1,20 @@
+[project]
+name = "nvidia-sgmaker-example"
+version = "0.1.0"
+description = "Quickstart example for using NVIDIA models with AWS Sagemaker"
+requires-python = ">=3.12"
+dependencies = [
+    "pipecat-ai[nvidia,runner,silero,webrtc,daily,sagemaker,aws]>=0.0.105",
+    "pipecat-ai-small-webrtc-prebuilt>=2.3.0",
+    "pipecat-ai-cli",
+]
+
+[dependency-groups]
+dev = [
+    "ruff~=0.12.1",
+]
+
+[tool.ruff]
+line-length = 100
+[tool.ruff.lint]
+select = ["I"]

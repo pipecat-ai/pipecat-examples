@@ -1,0 +1,7 @@
+.venv
+.env
+/tmp/
+.claude/settings.local.json
+/client/tmp
+/client/.venv
+/client/uv.lock

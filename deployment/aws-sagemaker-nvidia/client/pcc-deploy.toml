@@ -1,0 +1,6 @@
+agent_name = "nvidia-nim-bot"
+secret_set = "nvidia-nim-secrets"
+agent_profile = "agent-1x"
+
+[scaling]
+    min_agents = 1
