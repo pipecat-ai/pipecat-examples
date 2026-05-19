@@ -42,7 +42,7 @@ All scripts that operate on a specific NIM accept it as the first argument (`mag
 |---|---|
 | Docker Desktop | Running locally |
 | AWS CLI v2 | [Install guide](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html) |
-| Python 3.10+ | For Pipecat integration |
+| Python 3.11+ | For Pipecat integration |
 | AWS admin account | Needed to run the IAM setup script once |
 | NVIDIA NGC API key | See Step 2 below |
 

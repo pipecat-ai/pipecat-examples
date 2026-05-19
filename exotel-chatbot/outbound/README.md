@@ -37,7 +37,7 @@ App Bazaar triggers → WebSocket connects → Customer called → Audio bridged
 
 ### System
 
-- Python 3.10+
+- Python 3.11+
 - `uv` package manager
 - ngrok (for local development)
 - Docker (for production deployment)

@@ -11,7 +11,7 @@ This example demonstrates how to deploy a Pipecat voice agent to **Amazon Bedroc
   - Daily
   - Deepgram
   - Cartesia
-- Python 3.10 or higher
+- Python 3.11+
 - `uv` package manager
 
 ## Set Up the Environment

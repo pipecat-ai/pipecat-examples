@@ -24,7 +24,7 @@ This repository demonstrates how to wire up Google Gemini with Pipecat and the P
 ### Prerequisites
 
 - Node.js 18+ and npm
-- Python 3.10+ and [`uv`](https://github.com/astral-sh/uv)
+- Python 3.11+ and [`uv`](https://github.com/astral-sh/uv)
 - A Daily room URL
 - Required API keys for the server bot (see `server/env.example`)
 

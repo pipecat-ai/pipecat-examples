@@ -39,7 +39,7 @@ This organization helps you track conversation-to-conversation and turn-to-turn 
 
 ## Common Requirements
 
-- Python 3.10+
+- Python 3.11+
 - Pipecat and its dependencies
 - API keys for the services used (Deepgram, Cartesia, OpenAI)
 - The appropriate OpenTelemetry exporters

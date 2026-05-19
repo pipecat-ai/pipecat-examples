@@ -49,7 +49,7 @@ For detailed setup instructions on purchasing phone numbers and enabling dial-ou
 
 ### System
 
-- Python 3.10+
+- Python 3.11+
 - `uv` package manager (recommended) or pip
 - Docker (for production deployment)
 

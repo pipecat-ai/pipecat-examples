@@ -61,7 +61,7 @@ This example is organized to be production-ready and easy to customize:
 
 ### System
 
-- Python 3.10+
+- Python 3.11+
 - `uv` package manager (recommended) or pip
 - Docker (for production deployment)
 

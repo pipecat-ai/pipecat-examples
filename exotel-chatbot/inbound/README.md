@@ -39,7 +39,7 @@ The bot automatically receives the caller's and called phone numbers for persona
 
 ### System
 
-- Python 3.10+
+- Python 3.11+
 - `uv` package manager
 - ngrok (for local development)
 - Docker (for production deployment)

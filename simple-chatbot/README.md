@@ -67,7 +67,7 @@ The bot server must be running for any of the client implementations to work. St
 
 ## Requirements
 
-- Python 3.10+
+- Python 3.11+
 - Node.js 16+ (for JavaScript and React implementations)
 - Daily API key
 - OpenAI API key (for OpenAI bot)

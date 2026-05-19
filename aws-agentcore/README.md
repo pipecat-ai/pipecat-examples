@@ -13,7 +13,7 @@ Note that unlike an LLM service found in a traditional Pipecat bot pipeline, the
   - Deepgram
   - Cartesia
   - Daily (optional)
-- Python 3.10 or higher
+- Python 3.11+
 - `uv` package manager
 
 ## Setup
