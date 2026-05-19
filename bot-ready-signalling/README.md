@@ -43,7 +43,7 @@ Ensure the bot server is running before using any client implementations.
 
 ## Requirements
 
-- Python 3.10+
+- Python 3.11+
 - Node.js 16+ (for JavaScript)
 - Daily API key
 - Cartesia API key

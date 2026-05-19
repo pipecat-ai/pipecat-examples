@@ -57,7 +57,7 @@ For client-side setup, refer to the [JavaScript Guide](client/javascript/README.
 
 ## Requirements
 
-- **Python 3.10+**
+- **Python 3.11+**
 - **Node.js 16+** (for JavaScript/React client)
 - **Daily API key**
 - **Google API key**

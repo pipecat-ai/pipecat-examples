@@ -127,7 +127,7 @@ To receive incoming phone calls, you need:
 - `OPENAI_API_KEY` (used for STT, LLM inference and TTS in this example)
 
 ### System
-- Python 3.10+
+- Python 3.11+
 - `uv` package manager
 - ngrok (for local development)
 

@@ -84,7 +84,7 @@ Only the TTS service is deployed to SageMaker by this project.
 - An **NVIDIA NGC API key** — get one free at [build.nvidia.com](https://build.nvidia.com).
 - **Docker** installed locally.
 - **AWS CLI** configured (`aws configure`).
-- Python 3.10+ and `uv` (or `pip`) for the Pipecat integration.
+- Python 3.11+ and `uv` (or `pip`) for the Pipecat integration.
 
 ---
 

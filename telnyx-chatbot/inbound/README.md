@@ -31,7 +31,7 @@ This project is a Pipecat-based chatbot that integrates with Telnyx to handle We
 
 ### System
 
-- Python 3.10+
+- Python 3.11+
 - `uv` package manager
 - ngrok (for local development)
 - Docker (for production deployment)

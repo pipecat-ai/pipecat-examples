@@ -36,7 +36,7 @@ TwiML fetched → WebSocket connection → Bot conversation
 
 ### System
 
-- Python 3.10+
+- Python 3.11+
 - `uv` package manager
 - ngrok (for local development)
 - Docker (for production deployment)

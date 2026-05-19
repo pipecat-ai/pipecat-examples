@@ -77,4 +77,4 @@ If you see SSL certificate errors, install certificates:
 
 ### Dependencies
 
-This bot requires Python 3.10+ and uses `uv` for dependency management.
+This bot requires Python 3.11+ and uses `uv` for dependency management.
