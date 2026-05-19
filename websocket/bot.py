@@ -6,7 +6,6 @@
 import os
 
 from dotenv import load_dotenv
-from fastapi import WebSocket
 from loguru import logger
 from pipecat.audio.vad.silero import SileroVADAnalyzer
 from pipecat.frames.frames import LLMRunFrame
@@ -19,12 +18,12 @@ from pipecat.processors.aggregators.llm_response_universal import (
     LLMUserAggregatorParams,
 )
 from pipecat.runner.types import RunnerArguments
+from pipecat.runner.utils import create_transport
 from pipecat.serializers.protobuf import ProtobufFrameSerializer
 from pipecat.services.google.gemini_live.llm import GeminiLiveLLMService
 from pipecat.transports.base_transport import BaseTransport
 from pipecat.transports.websocket.fastapi import (
     FastAPIWebsocketParams,
-    FastAPIWebsocketTransport,
 )
 
 load_dotenv(override=True)
@@ -39,6 +38,16 @@ Your output will be converted to audio so don't include special characters in yo
 
 Respond to what the user said in a creative and helpful way. Keep your responses brief. One or two sentences at most.
 """
+
+
+transport_params = {
+    "websocket": lambda: FastAPIWebsocketParams(
+        audio_in_enabled=True,
+        audio_out_enabled=True,
+        add_wav_header=False,
+        serializer=ProtobufFrameSerializer(),
+    ),
+}
 
 
 async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
@@ -74,11 +83,10 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     pipeline = Pipeline(
         [
             transport.input(),
-            context_aggregator.user(),
-            rtvi,
+            user_aggregator,
             llm,  # LLM
             transport.output(),
-            context_aggregator.assistant(),
+            assistant_aggregator,
         ]
     )
 
@@ -113,22 +121,8 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
 async def bot(runner_args: RunnerArguments):
     """Main bot entry point compatible with Pipecat Cloud."""
     logger.info(f"Starting the bot, received body: {runner_args.body}")
-    websocket_client: WebSocket = runner_args.websocket
     try:
-        transport = FastAPIWebsocketTransport(
-            websocket=websocket_client,
-            params=FastAPIWebsocketParams(
-                audio_in_enabled=True,
-                audio_out_enabled=True,
-                add_wav_header=False,
-                serializer=ProtobufFrameSerializer(),
-            ),
-        )
-
-        if transport is None:
-            logger.error("Failed to create transport")
-            return
-
+        transport = await create_transport(runner_args, transport_params)
         await run_bot(transport, runner_args)
         logger.info("Bot process completed")
     except Exception as e:
