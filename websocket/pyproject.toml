@@ -2,7 +2,7 @@
 name = "websocket-example"
 version = "0.1.0"
 description = "Example for building voice AI bots with Pipecat built using Websocket"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dependencies = [
     "python-dotenv",
     "uvicorn",
