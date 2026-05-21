@@ -1,0 +1,18 @@
+{
+  "name": "test-js",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@pipecat-ai/client-js": "^1.9.0",
+    "@pipecat-ai/daily-transport": "^1.6.4"
+  },
+  "devDependencies": {
+    "vite": "^7.1.7"
+  }
+}
