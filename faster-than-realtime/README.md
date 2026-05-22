@@ -67,6 +67,43 @@ the Python pre-buffer logic.
 rotates an internal track ID so `WavStreamPlayer`'s interrupted-track blacklist
 does not block the next utterance.
 
+## Known Limitations
+
+> **Note:** The browser client is a proof of concept. The approach is not stable
+> enough for production use today due to the browser limitations described below.
+
+### Echo Cancellation
+
+WebRTC's acoustic echo cancellation (AEC) works by correlating the speaker output
+with the microphone input at the OS/browser level. `BotAudioPlayer` intercepts the
+Daily track and re-routes it through a synthetic `WavStreamPlayer` output track,
+breaking the AEC reference signal. A silent `<audio volume=0>` element is also
+attached to the original track to activate Chrome's pipeline, which compounds the
+problem. The result is degraded echo cancellation on all browsers, and it is
+especially noticeable on Safari.
+
+### iOS / Safari
+
+The dual-`AudioContext` approach is largely broken on iOS Safari. `sinkId: { type: "none" }` — 
+used to prevent the capture context from reaching the speakers — is not supported, and iOS 
+enforces strict autoplay and audio context resume policies that conflict with how `BotAudioPlayer`
+is initialised.
+
+> You can hear both tracks playing at the same time on iOS.
+
+### Comfort Noise Accumulation
+
+The silence detection threshold (`maxAbs < 5`) catches all-zero WebRTC padding. 
+It may not catch WebRTC comfort noise (CN) frames, which are low-amplitude but not silent. 
+If CN frames pass through as speech they accumulate in the playback buffer at delivery speed, 
+potentially causing a growing delay over long conversations.
+
+### CPU Overhead
+
+Running two `AudioContext` instances simultaneously with an `AudioWorklet` is more
+expensive than a single context. On mid-range mobile devices this can cause audio
+glitches if the CPU is also busy with network or LLM activity.
+
 ## Quick Start
 
 ### 1. Start the Bot Server
