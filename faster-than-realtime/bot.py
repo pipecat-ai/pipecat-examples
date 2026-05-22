@@ -8,7 +8,6 @@ import os
 
 from dotenv import load_dotenv
 from loguru import logger
-
 from pipecat.audio.vad.silero import SileroVADAnalyzer
 from pipecat.frames.frames import LLMRunFrame
 from pipecat.pipeline.pipeline import Pipeline
@@ -36,7 +35,7 @@ transport_params = {
         audio_in_enabled=True,
         audio_out_enabled=True,
         audio_out_declared_sample_rate=48000,
-        audio_out_prebuffer_secs=0.5
+        audio_out_prebuffer_secs=0.5,
     ),
 }
 
