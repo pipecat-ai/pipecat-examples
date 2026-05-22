@@ -1,0 +1,5 @@
+agent_name = "studypal"
+secret_set = "studypal-secrets"
+
+[scaling]
+	min_agents = 1
