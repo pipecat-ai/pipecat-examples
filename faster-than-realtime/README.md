@@ -104,6 +104,15 @@ Running two `AudioContext` instances simultaneously with an `AudioWorklet` is mo
 expensive than a single context. On mid-range mobile devices this can cause audio
 glitches if the CPU is also busy with network or LLM activity.
 
+### Sample Rate Mismatch and WebRTC Internals
+
+The declared/true rate mismatch interacts with several layers of the WebRTC stack in ways that can degrade audio quality.
+
+**Packet Loss Concealment (PLC)**: When a packet is lost, WebRTC's jitter buffer generates synthetic concealment audio at 
+the *declared* rate (e.g. 48 kHz). That synthetic audio flows through the `CaptureProcessor` (running at the declared rate) 
+and into the `WavStreamPlayer` playing at the true rate. Because each sample is played at the true rate, PLC artifacts play 
+at half the expected pitch and double the expected duration — packet loss sounds noticeably worse than in a normal stream. 
+
 ## Quick Start
 
 ### 1. Start the Bot Server
