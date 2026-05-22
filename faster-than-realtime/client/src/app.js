@@ -1,8 +1,16 @@
 /* jshint esversion: 11, browser: true */
 
 import { PipecatClient, RTVIEvent } from '@pipecat-ai/client-js';
-import { connectParams } from './config';
 import { DailyTransport } from '@pipecat-ai/daily-transport';
+
+const connectParams = {
+  endpoint: '/start',
+  requestData: {
+    createDailyRoom: false,
+    dailyRoomProperties: { start_video_off: true },
+    transport: 'daily',
+  },
+};
 
 class FasterThanRealtimeExample {
   constructor() {
