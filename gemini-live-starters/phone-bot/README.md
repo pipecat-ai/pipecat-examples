@@ -12,7 +12,7 @@ Call **1-970-LIVE-API** (1-970-548-3274) to talk to a Gemini Live Pipecat bot ov
 
 ### Environment
 
-- Python 3.10 or later
+- Python 3.11 or later
 - [uv](https://docs.astral.sh/uv/getting-started/installation/) package manager installed
 
 ### Service API keys
