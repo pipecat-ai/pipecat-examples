@@ -44,7 +44,7 @@ from pipecat.processors.aggregators.llm_response_universal import (
     UserTurnStoppedMessage,
 )
 from pipecat.processors.aggregators.llm_text_processor import LLMTextProcessor
-from pipecat.processors.frameworks.rtvi import RTVIObserverParams
+from pipecat.processors.frameworks.rtvi import BotOutputTransformResult, RTVIObserverParams
 from pipecat.runner.types import RunnerArguments
 from pipecat.runner.utils import create_transport
 from pipecat.services.cartesia.tts import CartesiaTTSService
@@ -144,8 +144,23 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     llm.register_function("get_credit_card_info", fetch_credit_card_info)
 
     # RTVI text transformer to obfuscate credit card numbers in the bot's output.
-    async def obfuscate_credit_card(text: str, type: str) -> str:
-        return "XXXX-XXXX-XXXX-" + text[-4:]
+    async def obfuscate_credit_card(
+        text: str,
+        agg_type: str,
+        accumulated_text: str | None = None,
+        remaining_text: str | None = None,
+    ) -> BotOutputTransformResult:
+        logger.debug(f"Obfuscating credit card number: {text}, acc: {accumulated_text}, rem: {remaining_text}")
+        transformed = "XXXX-XXXX-XXXX-" + text[-4:]
+        if accumulated_text is not None and remaining_text is not None:
+            ratio = len(accumulated_text) / max(len(text), 1)
+            split = int(ratio * len(transformed))
+            return BotOutputTransformResult(
+                text=transformed,
+                accumulated_text=transformed[:split],
+                remaining_text=transformed[split:],
+            )
+        return BotOutputTransformResult(text=transformed)
 
     credit_card_function = FunctionSchema(
         name="get_credit_card_info",
