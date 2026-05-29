@@ -56,5 +56,15 @@ Run the following command:
 npm run ios
 ```
 
-#### Connect to the server
-Use the http://localhost:5173 in your app.
+The app calls `POST $EXPO_PUBLIC_BASE_URL/start` (the Pipecat-provided
+runner), which spins up a fresh Daily room + meeting token and starts the
+bot. To pin a fixed room instead, set `DAILY_ROOM_URL` in `server/.env`
+before starting the server.
+
+#### How the bot-ready handshake works
+
+The Pipecat React Native client signals `client-ready` automatically once the
+transport reaches the `ready` state. The bot's `on_client_ready` handler then
+calls `set_bot_ready()` and pushes the first `TTSSpeakFrame`, so the greeting
+is never clipped. The previous `sendAppMessage("playable")` workaround is no
+longer needed.

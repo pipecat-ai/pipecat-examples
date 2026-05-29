@@ -2,6 +2,7 @@
   "expo": {
     "name": "bot-ready-rn",
     "slug": "bot-ready-rn",
+    "newArchEnabled": true,
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -54,16 +55,12 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "@config-plugins/react-native-webrtc",
       "@daily-co/config-plugin-rn-daily-js",
       [
         "expo-build-properties",
         {
           "android": {
-            "minSdkVersion": 24,
-            "compileSdkVersion": 35,
-            "targetSdkVersion": 34,
-            "buildToolsVersion": "35.0.0"
+            "minSdkVersion": 24
           },
           "ios": {
             "deploymentTarget": "15.1"
