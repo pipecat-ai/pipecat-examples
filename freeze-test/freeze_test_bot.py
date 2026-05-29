@@ -39,8 +39,7 @@ from pipecat.frames.frames import (
 from pipecat.observers.loggers.debug_log_observer import DebugLogObserver
 from pipecat.pipeline.parallel_pipeline import ParallelPipeline
 from pipecat.pipeline.pipeline import Pipeline
-from pipecat.pipeline.runner import PipelineRunner
-from pipecat.pipeline.task import PipelineParams, PipelineTask
+from pipecat.pipeline.worker import PipelineParams, PipelineWorker
 from pipecat.processors.aggregators.llm_context import LLMContext
 from pipecat.processors.aggregators.llm_response_universal import (
     LLMContextAggregatorPair,
@@ -57,6 +56,7 @@ from pipecat.transports.websocket.fastapi import (
     FastAPIWebsocketTransport,
 )
 from pipecat.utils.time import time_now_iso8601
+from pipecat.workers.runner import WorkerRunner
 
 load_dotenv(override=True)
 
@@ -273,7 +273,7 @@ async def run_example(websocket_client):
         ]
     )
 
-    task = PipelineTask(
+    worker = PipelineWorker(
         pipeline,
         params=PipelineParams(
             enable_metrics=True,
@@ -324,7 +324,7 @@ async def run_example(websocket_client):
     async def on_client_connected(transport, client):
         logger.info(f"Client connected")
 
-    @task.rtvi.event_handler("on_client_ready")
+    @worker.rtvi.event_handler("on_client_ready")
     async def on_client_ready(rtvi):
         logger.info(f"Client ready")
         # Kick off the conversation.
@@ -334,11 +334,12 @@ async def run_example(websocket_client):
     @transport.event_handler("on_client_disconnected")
     async def on_client_disconnected(transport, client):
         logger.info(f"Client disconnected")
-        await task.cancel()
+        await worker.cancel()
 
-    runner = PipelineRunner(handle_sigint=False)
+    runner = WorkerRunner(handle_sigint=False)
 
-    await runner.run(task)
+    await runner.add_workers(worker)
+    await runner.run()
 
 
 @app.websocket("/ws")

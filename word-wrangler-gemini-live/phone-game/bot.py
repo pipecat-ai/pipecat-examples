@@ -37,8 +37,7 @@ from pipecat.frames.frames import (
 )
 from pipecat.pipeline.parallel_pipeline import ParallelPipeline
 from pipecat.pipeline.pipeline import Pipeline
-from pipecat.pipeline.runner import PipelineRunner
-from pipecat.pipeline.task import PipelineParams, PipelineTask
+from pipecat.pipeline.worker import PipelineParams, PipelineWorker
 from pipecat.processors.aggregators.llm_context import LLMContext
 from pipecat.processors.aggregators.llm_response_universal import (
     LLMContextAggregatorPair,
@@ -64,6 +63,7 @@ from pipecat.turns.user_mute import (
 from pipecat.utils.sync.base_notifier import BaseNotifier
 from pipecat.utils.sync.event_notifier import EventNotifier
 from pipecat.utils.text.base_text_filter import BaseTextFilter
+from pipecat.workers.runner import WorkerRunner
 
 from word_list import generate_game_words
 
@@ -365,11 +365,11 @@ class GameTimer:
 
     def __init__(
         self,
-        task: PipelineTask,
+        worker: PipelineWorker,
         game_state_tracker: GameStateTracker,
         game_duration_seconds: int = 120,
     ):
-        self._task = task
+        self._worker = worker
         self._game_state_tracker = game_state_tracker
         self._game_duration = game_duration_seconds
         self._timer_task = None
@@ -415,10 +415,10 @@ class GameTimer:
 
             # Send end game message as TTSSpeakFrame
             logger.info(f"Game over! Final score: {final_score}")
-            await self._task.queue_frames([TTSSpeakFrame(text=end_message)])
+            await self._worker.queue_frames([TTSSpeakFrame(text=end_message)])
 
             # End the game
-            await self._task.queue_frames([EndFrame()])
+            await self._worker.queue_frames([EndFrame()])
 
         except asyncio.CancelledError:
             logger.debug("Game timer task cancelled")
@@ -646,7 +646,7 @@ Important guidelines:
     ]
 
     # While there are no context aggregators in the Pipeline, we need to create
-    # one here to be able to push the context frame to the PipelineTask. This is
+    # one here to be able to push the context frame to the PipelineWorker. This is
     # what initiates the conversation.
     context = LLMContext(messages)
     user_aggregator, assistant_aggregator = LLMContextAggregatorPair(
@@ -682,7 +682,7 @@ Important guidelines:
         ]
     )
 
-    task = PipelineTask(
+    worker = PipelineWorker(
         pipeline,
         params=PipelineParams(
             audio_out_sample_rate=8000,
@@ -692,15 +692,15 @@ Important guidelines:
     )
 
     # Create the game timer
-    game_timer = GameTimer(task, game_state_tracker, game_duration_seconds=GAME_DURATION_SECONDS)
+    game_timer = GameTimer(worker, game_state_tracker, game_duration_seconds=GAME_DURATION_SECONDS)
 
     @transport.event_handler("on_client_connected")
     async def on_client_connected(transport, client):
         logger.info(f"Client connected: {client}")
         # Kick off the conversation by getting the context frame and pushing it.
         # There is no aggegrator in the Pipeline, so we need to rely on the
-        # PipelineTask to push the frame.
-        await task.queue_frames([LLMRunFrame()])
+        # PipelineWorker to push the frame.
+        await worker.queue_frames([LLMRunFrame()])
         # Start the game timer
         game_timer.start()
 
@@ -710,11 +710,12 @@ Important guidelines:
         # Stop the timer
         game_timer.stop()
         # Cancel the pipeline task
-        await task.cancel()
+        await worker.cancel()
 
-    runner = PipelineRunner(handle_sigint=runner_args.handle_sigint)
+    runner = WorkerRunner(handle_sigint=runner_args.handle_sigint)
 
-    await runner.run(task)
+    await runner.add_workers(worker)
+    await runner.run()
 
 
 async def bot(runner_args: RunnerArguments):

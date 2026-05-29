@@ -14,8 +14,7 @@ from loguru import logger
 from pipecat.audio.vad.silero import SileroVADAnalyzer
 from pipecat.frames.frames import EndFrame, LLMRunFrame
 from pipecat.pipeline.pipeline import Pipeline
-from pipecat.pipeline.runner import PipelineRunner
-from pipecat.pipeline.task import PipelineParams, PipelineTask
+from pipecat.pipeline.worker import PipelineParams, PipelineWorker
 from pipecat.processors.aggregators.llm_context import LLMContext
 from pipecat.processors.aggregators.llm_response_universal import (
     LLMContextAggregatorPair,
@@ -24,6 +23,7 @@ from pipecat.processors.aggregators.llm_response_universal import (
 from pipecat.services.elevenlabs.tts import ElevenLabsTTSService
 from pipecat.services.openai.llm import OpenAILLMService
 from pipecat.transports.daily.transport import DailyParams, DailyTransport
+from pipecat.workers.runner import WorkerRunner
 
 load_dotenv(override=True)
 
@@ -82,7 +82,7 @@ async def main(room_url: str, token: str):
         ]
     )
 
-    task = PipelineTask(
+    worker = PipelineWorker(
         pipeline,
         params=PipelineParams(
             enable_metrics=True,
@@ -96,22 +96,23 @@ async def main(room_url: str, token: str):
         context.add_message(
             {"role": "user", "content": "Say hello and briefly introduce yourself."}
         )
-        await task.queue_frames([LLMRunFrame()])
+        await worker.queue_frames([LLMRunFrame()])
 
     @transport.event_handler("on_participant_left")
     async def on_participant_left(transport, participant, reason):
-        await task.cancel()
+        await worker.cancel()
 
     @transport.event_handler("on_call_state_updated")
     async def on_call_state_updated(transport, state):
         if state == "left":
             # Here we don't want to cancel, we just want to finish sending
             # whatever is queued, so we use an EndFrame().
-            await task.queue_frame(EndFrame())
+            await worker.queue_frame(EndFrame())
 
-    runner = PipelineRunner()
+    runner = WorkerRunner()
 
-    await runner.run(task)
+    await runner.add_workers(worker)
+    await runner.run()
 
 
 if __name__ == "__main__":

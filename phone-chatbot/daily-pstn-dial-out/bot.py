@@ -17,8 +17,7 @@ from dotenv import load_dotenv
 from loguru import logger
 from pipecat.audio.vad.silero import SileroVADAnalyzer
 from pipecat.pipeline.pipeline import Pipeline
-from pipecat.pipeline.runner import PipelineRunner
-from pipecat.pipeline.task import PipelineParams, PipelineTask
+from pipecat.pipeline.worker import PipelineParams, PipelineWorker
 from pipecat.processors.aggregators.llm_context import LLMContext
 from pipecat.processors.aggregators.llm_response_universal import (
     LLMContextAggregatorPair,
@@ -30,6 +29,7 @@ from pipecat.services.deepgram.stt import DeepgramSTTService
 from pipecat.services.openai.llm import OpenAILLMService
 from pipecat.transports.base_transport import BaseTransport
 from pipecat.transports.daily.transport import DailyParams, DailyTransport
+from pipecat.workers.runner import WorkerRunner
 
 from server_utils import AgentRequest, DialoutSettings
 
@@ -163,7 +163,7 @@ async def run_bot(
         ]
     )
 
-    task = PipelineTask(
+    worker = PipelineWorker(
         pipeline,
         params=PipelineParams(
             enable_metrics=True,
@@ -192,7 +192,7 @@ async def run_bot(
     @transport.event_handler("on_dialout_stopped")
     async def on_dialout_stopped(transport, data):
         logger.debug(f"Dial-out stopped: {data}")
-        await task.cancel()
+        await worker.cancel()
 
     @transport.event_handler("on_dialout_warning")
     async def on_dialout_warning(transport, data):
@@ -210,16 +210,17 @@ async def run_bot(
             await dialout_manager.attempt_dialout()
         else:
             logger.error(f"No more retries allowed, stopping bot.")
-            await task.cancel()
+            await worker.cancel()
 
     @transport.event_handler("on_client_disconnected")
     async def on_client_disconnected(transport, client):
         logger.info(f"Client disconnected")
-        await task.cancel()
+        await worker.cancel()
 
-    runner = PipelineRunner(handle_sigint=handle_sigint)
+    runner = WorkerRunner(handle_sigint=handle_sigint)
 
-    await runner.run(task)
+    await runner.add_workers(worker)
+    await runner.run()
 
 
 async def bot(runner_args: RunnerArguments):

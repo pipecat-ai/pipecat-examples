@@ -17,8 +17,7 @@ from loguru import logger
 from pipecat.audio.vad.silero import SileroVADAnalyzer
 from pipecat.frames.frames import LLMRunFrame
 from pipecat.pipeline.pipeline import Pipeline
-from pipecat.pipeline.runner import PipelineRunner
-from pipecat.pipeline.task import PipelineParams, PipelineTask
+from pipecat.pipeline.worker import PipelineParams, PipelineWorker
 from pipecat.processors.aggregators.llm_context import LLMContext
 from pipecat.processors.aggregators.llm_response_universal import (
     LLMContextAggregatorPair,
@@ -36,6 +35,7 @@ from pipecat.transports.websocket.fastapi import (
     FastAPIWebsocketParams,
     FastAPIWebsocketTransport,
 )
+from pipecat.workers.runner import WorkerRunner
 
 load_dotenv(override=True)
 
@@ -142,7 +142,7 @@ async def run_bot(transport: BaseTransport, handle_sigint: bool, testing: bool):
         ]
     )
 
-    task = PipelineTask(
+    worker = PipelineWorker(
         pipeline,
         params=PipelineParams(
             audio_in_sample_rate=8000,
@@ -158,11 +158,11 @@ async def run_bot(transport: BaseTransport, handle_sigint: bool, testing: bool):
         await audiobuffer.start_recording()
         # Kick off the conversation.
         context.add_message({"role": "user", "content": "Please introduce yourself to the user."})
-        await task.queue_frames([LLMRunFrame()])
+        await worker.queue_frames([LLMRunFrame()])
 
     @transport.event_handler("on_client_disconnected")
     async def on_client_disconnected(transport, client):
-        await task.cancel()
+        await worker.cancel()
 
     @audiobuffer.event_handler("on_audio_data")
     async def on_audio_data(buffer, audio, sample_rate, num_channels):
@@ -172,9 +172,10 @@ async def run_bot(transport: BaseTransport, handle_sigint: bool, testing: bool):
     # interruptions. We use `force_gc=True` to force garbage collection after
     # the runner finishes running a task which could be useful for long running
     # applications with multiple clients connecting.
-    runner = PipelineRunner(handle_sigint=handle_sigint, force_gc=True)
+    runner = WorkerRunner(handle_sigint=handle_sigint, force_gc=True)
 
-    await runner.run(task)
+    await runner.add_workers(worker)
+    await runner.run()
 
 
 async def bot(runner_args: RunnerArguments, testing: Optional[bool] = False):

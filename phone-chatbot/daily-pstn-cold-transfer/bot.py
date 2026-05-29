@@ -19,8 +19,7 @@ from pipecat.frames.frames import (
     LLMRunFrame,
 )
 from pipecat.pipeline.pipeline import Pipeline
-from pipecat.pipeline.runner import PipelineRunner
-from pipecat.pipeline.task import PipelineParams, PipelineTask
+from pipecat.pipeline.worker import PipelineParams, PipelineWorker
 from pipecat.processors.aggregators.llm_context import LLMContext
 from pipecat.processors.aggregators.llm_response_universal import (
     LLMContextAggregatorPair,
@@ -34,6 +33,7 @@ from pipecat.services.llm_service import FunctionCallParams
 from pipecat.services.openai.llm import OpenAILLMService
 from pipecat.transports.base_transport import BaseTransport
 from pipecat.transports.daily.transport import DailyDialinSettings, DailyParams, DailyTransport
+from pipecat.workers.runner import WorkerRunner
 
 load_dotenv(override=True)
 
@@ -167,7 +167,7 @@ Available functions:
     )
 
     # Create pipeline task
-    task = PipelineTask(
+    worker = PipelineWorker(
         pipeline,
         params=PipelineParams(
             enable_metrics=True,
@@ -182,7 +182,7 @@ Available functions:
     @transport.event_handler("on_first_participant_joined")
     async def on_first_participant_joined(transport, participant):
         # Bot answers the phone and greets the user
-        await task.queue_frames([LLMRunFrame()])
+        await worker.queue_frames([LLMRunFrame()])
 
     @transport.event_handler("on_dialin_ready")
     async def on_dialin_ready(transport, sip_endpoint):
@@ -203,14 +203,14 @@ Available functions:
     @transport.event_handler("on_dialin_error")
     async def on_dialin_error(transport, data):
         logger.error(f"Dial-in error: {data}")
-        await task.cancel()
+        await worker.cancel()
 
     @transport.event_handler("on_dialout_answered")
     async def on_dialout_answered(transport, data):
         logger.info(f"Operator answered, transferring call: {data}")
         # Cold transfer: bot leaves the call, customer and operator continue
         # await task.cancel()
-        await task.queue_frames([EndFrame()])
+        await worker.queue_frames([EndFrame()])
 
     @transport.event_handler("on_dialout_connected")
     async def on_dialout_connected(transport, data):
@@ -222,7 +222,7 @@ Available functions:
         # Inform the customer that transfer stopped
         content = "I'm sorry, but I'm unable to connect you with a supervisor at this time. Is there anything else I can help you with?"
         message = {"role": "user", "content": content}
-        await task.queue_frames([LLMMessagesAppendFrame([message], run_llm=True)])
+        await worker.queue_frames([LLMMessagesAppendFrame([message], run_llm=True)])
 
     @transport.event_handler("on_dialout_warning")
     async def on_dialout_warning(transport, data):
@@ -234,7 +234,7 @@ Available functions:
         # Inform the customer that transfer failed
         content = "I'm sorry, but I'm unable to connect you with a supervisor at this time. Is there anything else I can help you with?"
         message = {"role": "user", "content": content}
-        await task.queue_frames([LLMMessagesAppendFrame([message], run_llm=True)])
+        await worker.queue_frames([LLMMessagesAppendFrame([message], run_llm=True)])
 
     @transport.event_handler("on_dtmf_event")
     async def on_dtmf_event(transport, data):
@@ -244,12 +244,13 @@ Available functions:
     async def on_participant_left(transport, participant, reason):
         logger.debug(f"Participant left: {participant}, reason: {reason}")
         # If customer leaves, end the call
-        await task.cancel()
+        await worker.cancel()
 
     # ------------ RUN PIPELINE ------------
 
-    runner = PipelineRunner(handle_sigint=handle_sigint)
-    await runner.run(task)
+    runner = WorkerRunner(handle_sigint=handle_sigint)
+    await runner.add_workers(worker)
+    await runner.run()
 
 
 async def bot(runner_args: RunnerArguments):

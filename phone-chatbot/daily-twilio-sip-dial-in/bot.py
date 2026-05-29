@@ -13,8 +13,7 @@ from loguru import logger
 from pipecat.audio.vad.silero import SileroVADAnalyzer
 from pipecat.frames.frames import LLMRunFrame
 from pipecat.pipeline.pipeline import Pipeline
-from pipecat.pipeline.runner import PipelineRunner
-from pipecat.pipeline.task import PipelineParams, PipelineTask
+from pipecat.pipeline.worker import PipelineParams, PipelineWorker
 from pipecat.processors.aggregators.llm_context import LLMContext
 from pipecat.processors.aggregators.llm_response_universal import (
     LLMContextAggregatorPair,
@@ -26,6 +25,7 @@ from pipecat.services.deepgram.stt import DeepgramSTTService
 from pipecat.services.openai.llm import OpenAILLMService
 from pipecat.transports.base_transport import BaseTransport
 from pipecat.transports.daily.transport import DailyParams, DailyTransport
+from pipecat.workers.runner import WorkerRunner
 from twilio.rest import Client
 
 from server_utils import AgentRequest
@@ -82,7 +82,7 @@ async def run_bot(transport: BaseTransport, request: AgentRequest, handle_sigint
     )
 
     # Create the pipeline task
-    task = PipelineTask(
+    worker = PipelineWorker(
         pipeline,
         params=PipelineParams(
             enable_metrics=True,
@@ -116,7 +116,7 @@ async def run_bot(transport: BaseTransport, request: AgentRequest, handle_sigint
             logger.info("Call forwarded successfully")
         except Exception as e:
             logger.error(f"Failed to forward call: {str(e)}")
-            await task.cancel()
+            await worker.cancel()
 
     @transport.event_handler("on_dialin_connected")
     async def on_dialin_connected(transport, data):
@@ -125,7 +125,7 @@ async def run_bot(transport: BaseTransport, request: AgentRequest, handle_sigint
     @transport.event_handler("on_dialin_stopped")
     async def on_dialin_stopped(transport, data):
         logger.info(f"Dial-in stopped: {data}")
-        await task.cancel()
+        await worker.cancel()
 
     @transport.event_handler("on_dialin_warning")
     async def on_dialin_warning(transport, data):
@@ -134,7 +134,7 @@ async def run_bot(transport: BaseTransport, request: AgentRequest, handle_sigint
     @transport.event_handler("on_dialin_error")
     async def on_dialin_error(transport, data):
         logger.error(f"Dial-in error: {data}")
-        await task.cancel()
+        await worker.cancel()
 
     @transport.event_handler("on_dtmf_event")
     async def on_dtmf_event(transport, data):
@@ -147,16 +147,17 @@ async def run_bot(transport: BaseTransport, request: AgentRequest, handle_sigint
     @transport.event_handler("on_client_connected")
     async def on_client_connected(transport, client):
         logger.info("Client connected")
-        await task.queue_frame(LLMRunFrame())
+        await worker.queue_frame(LLMRunFrame())
 
     @transport.event_handler("on_client_disconnected")
     async def on_client_disconnected(transport, client):
         logger.info("Client disconnected")
-        await task.cancel()
+        await worker.cancel()
 
-    runner = PipelineRunner(handle_sigint=handle_sigint)
+    runner = WorkerRunner(handle_sigint=handle_sigint)
 
-    await runner.run(task)
+    await runner.add_workers(worker)
+    await runner.run()
 
 
 async def bot(runner_args: RunnerArguments):
