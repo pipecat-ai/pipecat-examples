@@ -154,7 +154,7 @@ uv run pcc deploy
 After deploying, get your agent's start URL and public API key from the Pipecat Cloud dashboard, then update `client/.env.local`:
 
 ```ini
-VITE_BOT_START_URL=https://api.pipecat.daily.co/v1/public/agents/YOUR_AGENT_NAME/start
+VITE_BOT_START_URL=https://api.pipecat.daily.co/v1/public/YOUR_AGENT_NAME/start
 VITE_BOT_START_PUBLIC_API_KEY=your_pipecat_cloud_public_api_key
 ```
 

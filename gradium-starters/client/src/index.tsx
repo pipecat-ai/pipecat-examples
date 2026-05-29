@@ -59,13 +59,16 @@ function VoiceSelect({ value, onValueChange }: VoiceSelectProps) {
 function Home() {
   const [voice, setVoice] = useState(VOICES[0].value);
 
+  const headers = new Headers();
+  if (botStartApiKey) {
+    headers.set("Authorization", `Bearer ${botStartApiKey}`);
+  }
+
   const startBotParams = isPipecatCloud
     ? {
         endpoint: botStartUrl,
         requestData: { createDailyRoom: true, voice },
-        headers: botStartApiKey
-          ? { Authorization: `Bearer ${botStartApiKey}` }
-          : {},
+        headers,
       }
     : {
         endpoint: "/start",
