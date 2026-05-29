@@ -7,7 +7,7 @@ dependencies = [
     "python-dotenv",
     "fastapi[all]",
     "uvicorn",
-    "pipecat-ai[silero,websocket,openai,deepgram,cartesia,sentry,soundfile]>=1.0.0",
+    "pipecat-ai[silero,websocket,openai,deepgram,cartesia,sentry,soundfile]>=1.3.0",
 ]
 
 [dependency-groups]
