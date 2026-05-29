@@ -22,6 +22,9 @@ const isPipecatCloud = Boolean(import.meta.env.VITE_BOT_START_URL);
 
 const VOICES: { value: string; label: string }[] = [
   { value: "_6Aslh2DxfmnRLmP", label: "Default" },
+  { value: "m86j6D7UZpGzHsNu", label: "Jackie" },
+  { value: "YTpq7expH9539ERJ", label: "Emma" },
+  { value: "ubuXFxVQwVYnZQhy", label: "Eva" },
   // Add more Gradium voice IDs here
 ];
 
@@ -70,7 +73,7 @@ function Home() {
           createDailyRoom: false,
           enableDefaultIceServers: true,
           transport: "webrtc",
-          voice,
+          body: { voice },
         },
       };
 
