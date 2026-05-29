@@ -17,8 +17,7 @@ from loguru import logger
 from pipecat.audio.vad.silero import SileroVADAnalyzer
 from pipecat.frames.frames import LLMRunFrame
 from pipecat.pipeline.pipeline import Pipeline
-from pipecat.pipeline.runner import PipelineRunner
-from pipecat.pipeline.task import PipelineParams, PipelineTask
+from pipecat.pipeline.worker import PipelineParams, PipelineWorker
 from pipecat.processors.aggregators.llm_context import LLMContext
 from pipecat.processors.aggregators.llm_response_universal import (
     LLMContextAggregatorPair,
@@ -30,6 +29,7 @@ from pipecat.services.deepgram.stt import DeepgramSTTService
 from pipecat.services.openai.llm import OpenAILLMService
 from pipecat.transports.base_transport import BaseTransport
 from pipecat.transports.daily.transport import DailyDialinSettings, DailyParams, DailyTransport
+from pipecat.workers.runner import WorkerRunner
 
 load_dotenv(override=True)
 
@@ -86,7 +86,7 @@ async def run_bot(transport: BaseTransport, handle_sigint: bool) -> None:
         ]
     )
 
-    task = PipelineTask(
+    worker = PipelineWorker(
         pipeline,
         params=PipelineParams(
             enable_metrics=True,
@@ -99,12 +99,12 @@ async def run_bot(transport: BaseTransport, handle_sigint: bool) -> None:
     @transport.event_handler("on_first_participant_joined")
     async def on_first_participant_joined(transport, participant):
         logger.debug(f"First participant joined: {participant['id']}")
-        await task.queue_frames([LLMRunFrame()])
+        await worker.queue_frames([LLMRunFrame()])
 
     @transport.event_handler("on_client_disconnected")
     async def on_client_disconnected(transport, client):
         logger.info(f"Client disconnected")
-        await task.cancel()
+        await worker.cancel()
 
     @transport.event_handler("on_dialin_ready")
     async def on_dialin_ready(transport, sip_endpoint):
@@ -117,7 +117,7 @@ async def run_bot(transport: BaseTransport, handle_sigint: bool) -> None:
     @transport.event_handler("on_dialin_stopped")
     async def on_dialin_stopped(transport, data):
         logger.info(f"Dial-in stopped: {data}")
-        await task.cancel()
+        await worker.cancel()
 
     @transport.event_handler("on_dialin_warning")
     async def on_dialin_warning(transport, data):
@@ -126,14 +126,15 @@ async def run_bot(transport: BaseTransport, handle_sigint: bool) -> None:
     @transport.event_handler("on_dialin_error")
     async def on_dialin_error(transport, data):
         logger.error(f"Dial-in error: {data}")
-        await task.cancel()
+        await worker.cancel()
 
     @transport.event_handler("on_dtmf_event")
     async def on_dtmf_event(transport, data):
         logger.info(f"DTMF event: {data}")
 
-    runner = PipelineRunner(handle_sigint=handle_sigint)
-    await runner.run(task)
+    runner = WorkerRunner(handle_sigint=handle_sigint)
+    await runner.add_workers(worker)
+    await runner.run()
 
 
 async def bot(runner_args: RunnerArguments):

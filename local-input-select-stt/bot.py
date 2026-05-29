@@ -12,10 +12,10 @@ from dotenv import load_dotenv
 from loguru import logger
 from pipecat.observers.loggers.transcription_log_observer import TranscriptionLogObserver
 from pipecat.pipeline.pipeline import Pipeline
-from pipecat.pipeline.runner import PipelineRunner
-from pipecat.pipeline.task import PipelineTask
+from pipecat.pipeline.worker import PipelineWorker
 from pipecat.services.whisper.stt import Model, WhisperSTTService
 from pipecat.transports.local.audio import LocalAudioTransport, LocalAudioTransportParams
+from pipecat.workers.runner import WorkerRunner
 
 from select_audio_device import AudioDevice, run_device_selector
 
@@ -45,11 +45,13 @@ async def main(input_device: int, output_device: int):
 
     pipeline = Pipeline([transport.input(), stt])
 
-    task = PipelineTask(pipeline, observers=[TranscriptionLogObserver()])
+    worker = PipelineWorker(pipeline, observers=[TranscriptionLogObserver()])
 
-    runner = PipelineRunner(handle_sigint=False if sys.platform == "win32" else True)
+    runner = WorkerRunner(handle_sigint=False if sys.platform == "win32" else True)
 
-    await asyncio.gather(runner.run(task))
+    await runner.add_workers(worker)
+
+    await asyncio.gather(runner.run())
 
 
 if __name__ == "__main__":

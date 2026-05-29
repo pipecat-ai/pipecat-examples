@@ -33,8 +33,7 @@ from pipecat.frames.frames import (
     SpriteFrame,
 )
 from pipecat.pipeline.pipeline import Pipeline
-from pipecat.pipeline.runner import PipelineRunner
-from pipecat.pipeline.task import PipelineParams, PipelineTask
+from pipecat.pipeline.worker import PipelineParams, PipelineWorker
 from pipecat.processors.aggregators.llm_context import LLMContext
 from pipecat.processors.aggregators.llm_response_universal import (
     LLMContextAggregatorPair,
@@ -44,6 +43,7 @@ from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
 from pipecat.services.elevenlabs.tts import ElevenLabsTTSService
 from pipecat.services.openai.llm import OpenAILLMService
 from pipecat.transports.daily.transport import DailyParams, DailyTransport
+from pipecat.workers.runner import WorkerRunner
 
 load_dotenv(override=True)
 
@@ -185,19 +185,19 @@ async def run_bot(room_url: str, token: str):
         ]
     )
 
-    task = PipelineTask(
+    worker = PipelineWorker(
         pipeline,
         params=PipelineParams(
             enable_metrics=True,
             enable_usage_metrics=True,
         ),
     )
-    await task.queue_frame(quiet_frame)
+    await worker.queue_frame(quiet_frame)
 
-    @task.rtvi.event_handler("on_client_ready")
-    async def on_client_ready(task):
+    @worker.rtvi.event_handler("on_client_ready")
+    async def on_client_ready(worker):
         # Kick off the conversation
-        await task.queue_frames([LLMRunFrame()])
+        await worker.queue_frames([LLMRunFrame()])
 
     @transport.event_handler("on_first_participant_joined")
     async def on_first_participant_joined(transport, participant):
@@ -206,8 +206,9 @@ async def run_bot(room_url: str, token: str):
     @transport.event_handler("on_participant_left")
     async def on_participant_left(transport, participant, reason):
         print(f"Participant left: {participant}")
-        await task.cancel()
+        await worker.cancel()
 
-    runner = PipelineRunner()
+    runner = WorkerRunner()
 
-    await runner.run(task)
+    await runner.add_workers(worker)
+    await runner.run()

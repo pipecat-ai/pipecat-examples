@@ -14,10 +14,10 @@ from dotenv import load_dotenv
 from loguru import logger
 from pipecat.frames.frames import AudioRawFrame, EndFrame, OutputAudioRawFrame, TTSSpeakFrame
 from pipecat.pipeline.pipeline import Pipeline
-from pipecat.pipeline.runner import PipelineRunner
-from pipecat.pipeline.task import PipelineTask
+from pipecat.pipeline.worker import PipelineWorker
 from pipecat.services.cartesia.tts import CartesiaTTSService
 from pipecat.transports.daily.transport import DailyParams, DailyTransport
+from pipecat.workers.runner import WorkerRunner
 
 from runner import configure
 
@@ -69,9 +69,9 @@ async def main():
             ),
         )
 
-        runner = PipelineRunner()
+        runner = WorkerRunner()
 
-        task = PipelineTask(Pipeline([tts, transport.output()]))
+        worker = PipelineWorker(Pipeline([tts, transport.output()]))
 
         # Register an event handler so we can play the audio when we receive a specific message
         @transport.event_handler("on_app_message")
@@ -79,10 +79,10 @@ async def main():
             logger.debug(f"Received app message: {message} - {sender}")
             if "playable" not in message:
                 return
-            await task.queue_frames(
+            await worker.queue_frames(
                 [
                     SilenceFrame(
-                        sample_rate=task.params.audio_out_sample_rate,
+                        sample_rate=worker.params.audio_out_sample_rate,
                         duration=0.5,
                     ),
                     TTSSpeakFrame(f"Hello there, how are you doing today ?"),
@@ -90,7 +90,8 @@ async def main():
                 ]
             )
 
-        await runner.run(task)
+        await runner.add_workers(worker)
+        await runner.run()
 
 
 if __name__ == "__main__":

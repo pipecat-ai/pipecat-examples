@@ -10,13 +10,13 @@ from dotenv import load_dotenv
 from loguru import logger
 from pipecat.frames.frames import Frame, InputAudioRawFrame, OutputAudioRawFrame
 from pipecat.pipeline.pipeline import Pipeline
-from pipecat.pipeline.runner import PipelineRunner
-from pipecat.pipeline.task import PipelineParams, PipelineTask
+from pipecat.pipeline.worker import PipelineParams, PipelineWorker
 from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
 from pipecat.runner.types import RunnerArguments
 from pipecat.runner.utils import create_transport
 from pipecat.transports.base_transport import BaseTransport
 from pipecat.transports.daily.transport import DailyParams
+from pipecat.workers.runner import WorkerRunner
 
 logger.remove(0)
 logger.add(sys.stderr, level="DEBUG")
@@ -64,7 +64,7 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
         ]
     )
 
-    task = PipelineTask(
+    worker = PipelineWorker(
         pipeline,
         params=PipelineParams(
             audio_in_sample_rate=16000,
@@ -79,9 +79,10 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     async def on_participant_joined(transport, participant):
         await transport.capture_participant_audio(participant["id"], audio_source="pipecat")
 
-    runner = PipelineRunner(handle_sigint=runner_args.handle_sigint)
+    runner = WorkerRunner(handle_sigint=runner_args.handle_sigint)
 
-    await runner.run(task)
+    await runner.add_workers(worker)
+    await runner.run()
 
 
 async def bot(runner_args: RunnerArguments):
