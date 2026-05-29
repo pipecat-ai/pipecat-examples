@@ -67,7 +67,10 @@ function Home() {
   const startBotParams = isPipecatCloud
     ? {
         endpoint: botStartUrl,
-        requestData: { createDailyRoom: true, voice },
+        requestData: {
+            createDailyRoom: true,
+            body: { voice },
+        },
         headers,
       }
     : {
