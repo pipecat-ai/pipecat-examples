@@ -1,0 +1,9 @@
+agent_name = "gradium-web-bot"
+secret_set = "gradium-web-bot-secrets"
+agent_profile = "agent-1x"
+
+[krisp_viva]
+	audio_filter = "tel"
+
+[scaling]
+	min_agents = 1

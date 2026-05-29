@@ -1,0 +1,35 @@
+@import "@pipecat-ai/voice-ui-kit/styles.css";
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+}
+
+.voice-select-trigger {
+  width: 160px;
+  max-width: calc(100vw - 1rem);
+}
+
+.grid:has(> .voice-select-trigger) {
+  padding-top: 12px;
+  padding-bottom: 4px;
+}
+
+@media (min-width: 640px) {
+  .grid:has(> .voice-select-trigger) > strong {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.625rem;
+  }
+
+  .grid:has(> .voice-select-trigger) > strong::before {
+    content: "";
+    width: 42px;
+    height: 24px;
+    flex: none;
+    background-color: currentColor;
+    mask: url("/pipecat-logo.svg") center / contain no-repeat;
+  }
+}
