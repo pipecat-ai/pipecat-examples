@@ -4,7 +4,6 @@
 # SPDX-License-Identifier: BSD 2-Clause License
 #
 import os
-import sys
 
 from dotenv import load_dotenv
 from loguru import logger
@@ -18,17 +17,16 @@ from pipecat.processors.aggregators.llm_response_universal import (
     LLMContextAggregatorPair,
     LLMUserAggregatorParams,
 )
+from pipecat.runner.types import RunnerArguments
+from pipecat.runner.utils import create_transport
 from pipecat.serializers.protobuf import ProtobufFrameSerializer
 from pipecat.services.google.gemini_live.llm import GeminiLiveLLMService
+from pipecat.transports.base_transport import BaseTransport
 from pipecat.transports.websocket.fastapi import (
     FastAPIWebsocketParams,
-    FastAPIWebsocketTransport,
 )
 
 load_dotenv(override=True)
-
-logger.remove(0)
-logger.add(sys.stderr, level="DEBUG")
 
 
 SYSTEM_INSTRUCTION = f"""
@@ -42,17 +40,23 @@ Respond to what the user said in a creative and helpful way. Keep your responses
 """
 
 
-async def run_bot(websocket_client):
-    ws_transport = FastAPIWebsocketTransport(
-        websocket=websocket_client,
-        params=FastAPIWebsocketParams(
-            audio_in_enabled=True,
-            audio_out_enabled=True,
-            add_wav_header=False,
-            serializer=ProtobufFrameSerializer(),
-        ),
-    )
+transport_params = {
+    "websocket": lambda: FastAPIWebsocketParams(
+        audio_in_enabled=True,
+        audio_out_enabled=True,
+        add_wav_header=False,
+        serializer=ProtobufFrameSerializer(),
+    ),
+}
 
+
+async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
+    """Run your bot with the provided transport.
+
+    Args:
+        transport (BaseTransport): The transport to use for communication.
+        runner_args: runner session arguments
+    """
     llm = GeminiLiveLLMService(
         api_key=os.getenv("GOOGLE_API_KEY"),
         settings=GeminiLiveLLMService.Settings(
@@ -78,10 +82,10 @@ async def run_bot(websocket_client):
 
     pipeline = Pipeline(
         [
-            ws_transport.input(),
+            transport.input(),
             user_aggregator,
             llm,  # LLM
-            ws_transport.output(),
+            transport.output(),
             assistant_aggregator,
         ]
     )
@@ -100,15 +104,33 @@ async def run_bot(websocket_client):
         # Kick off the conversation.
         await task.queue_frames([LLMRunFrame()])
 
-    @ws_transport.event_handler("on_client_connected")
+    @transport.event_handler("on_client_connected")
     async def on_client_connected(transport, client):
         logger.info("Pipecat Client connected")
 
-    @ws_transport.event_handler("on_client_disconnected")
+    @transport.event_handler("on_client_disconnected")
     async def on_client_disconnected(transport, client):
         logger.info("Pipecat Client disconnected")
         await task.cancel()
 
-    runner = PipelineRunner(handle_sigint=False)
+    runner = PipelineRunner(handle_sigint=runner_args.handle_sigint)
 
     await runner.run(task)
+
+
+async def bot(runner_args: RunnerArguments):
+    """Main bot entry point compatible with Pipecat Cloud."""
+    logger.info(f"Starting the bot, received body: {runner_args.body}")
+    try:
+        transport = await create_transport(runner_args, transport_params)
+        await run_bot(transport, runner_args)
+        logger.info("Bot process completed")
+    except Exception as e:
+        logger.exception(f"Error in bot process: {str(e)}")
+        raise
+
+
+if __name__ == "__main__":
+    from pipecat.runner.run import main
+
+    main()

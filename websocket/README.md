@@ -1,59 +1,79 @@
-# Voice Agent
+# WebSocket Voice Agent
 
-A Pipecat example demonstrating the simplest way to create a voice agent using `WebsocketTransport`.
+A Pipecat example demonstrating a voice agent using WebSocket transport. The same `bot.py` runs locally for development and deploys directly to Pipecat Cloud.
 
-## 🚀 Quick Start
+## Prerequisites
 
-### 1️⃣ Start the Bot Server
-
-#### 🔧 Set Up the Environment
-
-1. Navigate to the server directory:
-
-   ```bash
-   cd server
-   ```
-
-2. Install dependencies:
-
-   ```bash
-   uv sync
-   ```
-
-3. Configure environment variables:
-   ```bash
-   cp env.example .env
-   ```
-   - Add your API keys
-   - Choose what you wish to use: 'fast_api' or 'websocket_server'
-
-#### ▶️ Run the Server
-
-```bash
-uv run server.py
-```
-
-### 3️⃣ Connect Using a Custom Client App
-
-For client-side setup, refer to the:
-
-- [Typescript Guide](client/README.md).
-
-## ⚠️ Important Note
-
-Ensure the bot server is running before using any client implementations.
-
-## 📌 Requirements
-
-- Python **3.10+**
-- Node.js **16+** (for JavaScript components)
-- Google API Key
+- Python 3.11+
+- [uv](https://docs.astral.sh/uv/)
+- Google API key (Gemini)
 
 ---
 
-### 💡 Notes
+## Running Locally
 
-- Ensure all dependencies are installed before running the server.
-- Check the `.env` file for missing configurations.
+### 1. Install dependencies
 
-Happy coding! 🎉
+```bash
+uv sync
+```
+
+### 2. Configure environment
+
+```bash
+cp env.example .env
+```
+
+Edit `.env` and set your `GOOGLE_API_KEY`.
+
+### 3. Start the bot
+
+```bash
+uv run bot.py
+```
+
+This starts a local server at `http://localhost:7860`. When the client connects, it calls `POST /start` to allocate a session, then establishes the WebSocket.
+
+### 4. Run the client
+
+See the [client README](client/README.md).
+
+---
+
+## Deploying to Pipecat Cloud
+
+`bot.py` is ready to deploy to [Pipecat Cloud](https://pipecat.cloud). The `pcc-deploy.toml` configures the agent name, secret set, and scaling.
+
+### 1. Install the Pipecat CLI
+
+```bash
+uv tool install pipecat-ai-cli
+```
+
+### 2. Authenticate
+
+```bash
+pipecat cloud auth login
+```
+
+### 3. Upload secrets
+
+Upload your `.env` as a named secret set. Pipecat Cloud injects these as environment variables at runtime:
+
+```bash
+pipecat cloud secrets set websocket-secrets --file .env
+```
+
+The secret set name `websocket-secrets` matches what is configured in `pcc-deploy.toml`.
+
+### 4. Deploy
+
+```bash
+pipecat cloud deploy
+```
+
+This builds the Docker image, pushes it to Pipecat Cloud, and starts the agent.
+
+### 5. Connect the client
+
+Once deployed, point the client at your agent's public URL. See the [client README](client/README.md).

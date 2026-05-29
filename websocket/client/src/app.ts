@@ -1,47 +1,101 @@
-/**
- * Copyright (c) 2024–2025, Daily
- *
- * SPDX-License-Identifier: BSD 2-Clause License
- */
-
-/**
- * Pipecat Client Implementation
- *
- * This client connects to an RTVI-compatible bot server using WebSocket.
- *
- * Requirements:
- * - A running RTVI bot server (defaults to http://localhost:7860)
- */
-
+import {WebSocketTransport} from '@pipecat-ai/websocket-transport';
 import {
+  AggregationType,
+  BotOutputData,
+  Participant,
   PipecatClient,
   PipecatClientOptions,
-  RTVIEvent,
+  TranscriptData,
+  TransportState,
 } from '@pipecat-ai/client-js';
-import { WebSocketTransport } from '@pipecat-ai/websocket-transport';
 
-class WebsocketClientApp {
-  private pcClient: PipecatClient | null = null;
-  private connectBtn: HTMLButtonElement | null = null;
-  private disconnectBtn: HTMLButtonElement | null = null;
-  private statusSpan: HTMLElement | null = null;
+class WebSocketApp {
+  private declare connectBtn: HTMLButtonElement;
+  private declare disconnectBtn: HTMLButtonElement;
+  private declare botAudioElement: HTMLAudioElement;
+
   private debugLog: HTMLElement | null = null;
-  private botAudio: HTMLAudioElement;
+  private statusSpan: HTMLElement | null = null;
+
+  private declare pcClient: PipecatClient;
+
+  private declare baseUrl: string;
+  private declare startUrl: string;
+  private declare apiKey: string;
 
   constructor() {
-    console.log('WebsocketClientApp');
-    this.botAudio = document.createElement('audio');
-    this.botAudio.autoplay = true;
-    //this.botAudio.playsInline = true;
-    document.body.appendChild(this.botAudio);
-
+    this.setupEnvironmentVariables();
     this.setupDOMElements();
-    this.setupEventListeners();
+    this.setupDOMEventListeners();
+    this.initializePipecatClient();
   }
 
-  /**
-   * Set up references to DOM elements and create necessary media elements
-   */
+  private setupEnvironmentVariables() {
+    this.baseUrl = import.meta.env.VITE_PIPECAT_BASE_URL || 'http://localhost:7860'
+    this.startUrl = `${this.baseUrl}/start`
+    this.apiKey = import.meta.env.VITE_PIPECAT_PUBLIC_API;
+  }
+
+  private initializePipecatClient(): void {
+    const opts: PipecatClientOptions = {
+      transport: new WebSocketTransport(),
+      enableMic: true,
+      enableCam: false,
+      callbacks: {
+        onTransportStateChanged: (state: TransportState) => {
+          this.log(`Transport state: ${state}`);
+        },
+        onConnected: () => {
+          this.onConnectedHandler();
+        },
+        onBotReady: () => {
+          this.log('Bot is ready.');
+        },
+        onDisconnected: () => {
+          this.onDisconnectedHandler();
+        },
+        onUserStartedSpeaking: () => {
+          this.log('User started speaking.');
+        },
+        onUserStoppedSpeaking: () => {
+          this.log('User stopped speaking.');
+        },
+        onBotStartedSpeaking: () => {
+          this.log('Bot started speaking.');
+        },
+        onBotStoppedSpeaking: () => {
+          this.log('Bot stopped speaking.');
+        },
+        onUserTranscript: (transcript: TranscriptData) => {
+          if (transcript.final) {
+            this.log(`User transcript: ${transcript.text}`);
+          }
+        },
+        onBotOutput: (data: BotOutputData) => {
+          if(data.aggregated_by === AggregationType.SENTENCE) {
+            this.log(`Bot output: ${data.text}`);
+          }
+        },
+        onTrackStarted: (
+          track: MediaStreamTrack,
+          participant?: Participant
+        ) => {
+          if (!participant?.local) {
+            this.onBotTrackStarted(track);
+          }
+        },
+        onServerMessage: (msg: unknown) => {
+          this.log(`Server message: ${msg}`);
+        },
+      },
+    };
+    this.pcClient = new PipecatClient(opts);
+    // @ts-ignore
+    window.webapp = this;
+    // @ts-ignore
+    window.client = this.pcClient;
+  }
+
   private setupDOMElements(): void {
     this.connectBtn = document.getElementById(
       'connect-btn'
@@ -49,38 +103,33 @@ class WebsocketClientApp {
     this.disconnectBtn = document.getElementById(
       'disconnect-btn'
     ) as HTMLButtonElement;
-    this.statusSpan = document.getElementById('connection-status');
     this.debugLog = document.getElementById('debug-log');
+    this.statusSpan = document.getElementById('connection-status');
+    this.botAudioElement = document.getElementById('bot-audio') as HTMLAudioElement;
   }
 
-  /**
-   * Set up event listeners for connect/disconnect buttons
-   */
-  private setupEventListeners(): void {
-    this.connectBtn?.addEventListener('click', () => this.connect());
-    this.disconnectBtn?.addEventListener('click', () => this.disconnect());
+  private setupDOMEventListeners(): void {
+    this.connectBtn.addEventListener('click', () => this.start());
+    this.disconnectBtn.addEventListener('click', () => this.stop());
   }
 
-  /**
-   * Add a timestamped message to the debug log
-   */
   private log(message: string): void {
     if (!this.debugLog) return;
     const entry = document.createElement('div');
     entry.textContent = `${new Date().toISOString()} - ${message}`;
-    if (message.startsWith('User: ')) {
+    if (message.startsWith('User transcript: ')) {
       entry.style.color = '#2196F3';
-    } else if (message.startsWith('Bot: ')) {
+    } else if (message.startsWith('Bot transcript: ')) {
       entry.style.color = '#4CAF50';
     }
     this.debugLog.appendChild(entry);
     this.debugLog.scrollTop = this.debugLog.scrollHeight;
-    console.log(message);
   }
 
-  /**
-   * Update the connection status display
-   */
+  private clearAllLogs() {
+    this.debugLog!.innerText = '';
+  }
+
   private updateStatus(status: string): void {
     if (this.statusSpan) {
       this.statusSpan.textContent = status;
@@ -88,157 +137,62 @@ class WebsocketClientApp {
     this.log(`Status: ${status}`);
   }
 
-  /**
-   * Check for available media tracks and set them up if present
-   * This is called when the bot is ready or when the transport state changes to ready
-   */
-  setupMediaTracks() {
-    if (!this.pcClient) return;
-    const tracks = this.pcClient.tracks();
-    if (tracks.bot?.audio) {
-      this.setupAudioTrack(tracks.bot.audio);
+  private onConnectedHandler() {
+    this.updateStatus('Connected');
+    if (this.connectBtn) this.connectBtn.disabled = true;
+    if (this.disconnectBtn) this.disconnectBtn.disabled = false;
+  }
+
+  private onDisconnectedHandler() {
+    this.updateStatus('Disconnected');
+    if (this.connectBtn) this.connectBtn.disabled = false;
+    if (this.disconnectBtn) this.disconnectBtn.disabled = true;
+  }
+
+  private onBotTrackStarted(track: MediaStreamTrack) {
+    if (track.kind === 'audio') {
+      this.botAudioElement.srcObject = new MediaStream([track]);
     }
   }
 
-  /**
-   * Set up listeners for track events (start/stop)
-   * This handles new tracks being added during the session
-   */
-  setupTrackListeners() {
-    if (!this.pcClient) return;
-
-    // Listen for new tracks starting
-    this.pcClient.on(RTVIEvent.TrackStarted, (track, participant) => {
-      // Only handle non-local (bot) tracks
-      if (!participant?.local && track.kind === 'audio') {
-        this.setupAudioTrack(track);
-      }
-    });
-
-    // Listen for tracks stopping
-    this.pcClient.on(RTVIEvent.TrackStopped, (track, participant) => {
-      this.log(
-        `Track stopped: ${track.kind} from ${participant?.name || 'unknown'}`
-      );
-    });
-  }
-
-  /**
-   * Set up an audio track for playback
-   * Handles both initial setup and track updates
-   */
-  private setupAudioTrack(track: MediaStreamTrack): void {
-    this.log('Setting up audio track');
-    if (
-      this.botAudio.srcObject &&
-      'getAudioTracks' in this.botAudio.srcObject
-    ) {
-      const oldTrack = this.botAudio.srcObject.getAudioTracks()[0];
-      if (oldTrack?.id === track.id) return;
-    }
-    this.botAudio.srcObject = new MediaStream([track]);
-  }
-
-  /**
-   * Initialize and connect to the bot
-   * This sets up the Pipecat client, initializes devices, and establishes the connection
-   */
-  public async connect(): Promise<void> {
+  private async start(): Promise<void> {
+    this.clearAllLogs();
+    await this.pcClient.initDevices();
+    this.connectBtn.disabled = true;
     try {
-      const startTime = Date.now();
+      this.updateStatus('Starting the bot');
+      const headers = new Headers();
+      headers.append("Authorization", `Bearer ${this.apiKey}`);
 
-      //const transport = new DailyTransport();
-      const PipecatConfig: PipecatClientOptions = {
-        transport: new WebSocketTransport(),
-        enableMic: true,
-        enableCam: false,
-        callbacks: {
-          onConnected: () => {
-            this.updateStatus('Connected');
-            if (this.connectBtn) this.connectBtn.disabled = true;
-            if (this.disconnectBtn) this.disconnectBtn.disabled = false;
-          },
-          onDisconnected: () => {
-            this.updateStatus('Disconnected');
-            if (this.connectBtn) this.connectBtn.disabled = false;
-            if (this.disconnectBtn) this.disconnectBtn.disabled = true;
-            this.log('Client disconnected');
-          },
-          onBotReady: (data) => {
-            this.log(`Bot ready: ${JSON.stringify(data)}`);
-            this.setupMediaTracks();
-          },
-          onUserTranscript: (data) => {
-            if (data.final) {
-              this.log(`User: ${data.text}`);
-            }
-          },
-          onBotTranscript: (data) => this.log(`Bot: ${data.text}`),
-          onMessageError: (error) => console.error('Message error:', error),
-          onError: (error) => console.error('Error:', error),
-        },
+      // TODO: this should not be needed in the future
+      // When we release a version of websocket transport which knows how to handle it automatically
+      const startBotResponseTransformerWebsocket = ({ token, wsUrl}: {
+        wsUrl: string;
+        token?: string;
+      }) => {
+        return {
+          wsUrl: token ? `${wsUrl}?token=${encodeURIComponent(token)}` : wsUrl,
+        };
       };
-      this.pcClient = new PipecatClient(PipecatConfig);
-      // @ts-ignore
-      window.pcClient = this.pcClient; // Expose for debugging
-      this.setupTrackListeners();
-
-      this.log('Initializing devices...');
-      await this.pcClient.initDevices();
-
-      this.log('Connecting to bot...');
-      await this.pcClient.startBotAndConnect({
-        // The baseURL and endpoint of your bot server that the client will connect to
-        endpoint: 'http://localhost:7860/connect',
+      const startBotResult = await this.pcClient.startBot({
+          endpoint: this.startUrl,
+          headers: headers,
+          requestData: {
+            transport: "websocket"
+          }
       });
-
-      const timeTaken = Date.now() - startTime;
-      this.log(`Connection complete, timeTaken: ${timeTaken}`);
-    } catch (error) {
-      this.log(`Error connecting: ${(error as Error).message}`);
-      this.updateStatus('Error');
-      // Clean up if there's an error
-      if (this.pcClient) {
-        try {
-          await this.pcClient.disconnect();
-        } catch (disconnectError) {
-          this.log(`Error during disconnect: ${disconnectError}`);
-        }
-      }
+      // @ts-ignore
+      const wsConnectionParams = startBotResponseTransformerWebsocket(startBotResult)
+      await this.pcClient.connect(wsConnectionParams)
+    } catch (e) {
+      console.log(`Failed to connect ${e}`);
+      this.stop();
     }
   }
 
-  /**
-   * Disconnect from the bot and clean up media resources
-   */
-  public async disconnect(): Promise<void> {
-    if (this.pcClient) {
-      try {
-        await this.pcClient.disconnect();
-        this.pcClient = null;
-        if (
-          this.botAudio.srcObject &&
-          'getAudioTracks' in this.botAudio.srcObject
-        ) {
-          this.botAudio.srcObject
-            .getAudioTracks()
-            .forEach((track) => track.stop());
-          this.botAudio.srcObject = null;
-        }
-      } catch (error) {
-        this.log(`Error disconnecting: ${(error as Error).message}`);
-      }
-    }
+  private stop(): void {
+    void this.pcClient.disconnect();
   }
 }
 
-declare global {
-  interface Window {
-    WebsocketClientApp: typeof WebsocketClientApp;
-  }
-}
-
-window.addEventListener('DOMContentLoaded', () => {
-  window.WebsocketClientApp = WebsocketClientApp;
-  new WebsocketClientApp();
-});
+const websocketApp = new WebSocketApp();
