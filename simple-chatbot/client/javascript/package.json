@@ -9,9 +9,9 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@pipecat-ai/client-js": "^1.5.0",
-    "@pipecat-ai/daily-transport": "^1.5.0",
-    "@pipecat-ai/small-webrtc-transport": "^1.8.0"
+    "@pipecat-ai/client-js": "^1.10.0",
+    "@pipecat-ai/daily-transport": "^1.6.5",
+    "@pipecat-ai/small-webrtc-transport": "^1.10.3"
   },
   "devDependencies": {
     "vite": "^7.1.7"
