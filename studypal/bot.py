@@ -303,7 +303,9 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments) -> Non
             api_key=os.getenv("OPENAI_API_KEY"),
             settings=OpenAILLMService.Settings(
                 model=llm_model,
-                system_instruction=create_system_instructions_for_model(model=llm_model, article_content=article_content),
+                system_instruction=create_system_instructions_for_model(
+                    model=llm_model, article_content=article_content
+                ),
             ),
         )
 
