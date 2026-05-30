@@ -8,14 +8,11 @@ import os
 
 from dotenv import load_dotenv
 from loguru import logger
-from pipecat.audio.vad.silero import SileroVADAnalyzer
 from pipecat.frames.frames import (
     Frame,
-    InputAudioRawFrame,
-    InterruptionFrame,
     LLMRunFrame,
-    StartFrame,
     UserStartedSpeakingFrame,
+    UserStoppedSpeakingFrame,
 )
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.worker import PipelineParams, PipelineWorker
@@ -24,7 +21,6 @@ from pipecat.processors.aggregators.llm_response_universal import (
     LLMContextAggregatorPair,
     LLMUserAggregatorParams,
 )
-from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
 from pipecat.processors.frameworks.rtvi import RTVIClientMessageFrame
 from pipecat.runner.types import RunnerArguments
 from pipecat.runner.utils import create_transport
@@ -33,13 +29,17 @@ from pipecat.services.deepgram.stt import DeepgramSTTService
 from pipecat.services.openai.llm import OpenAILLMService
 from pipecat.transports.base_transport import BaseTransport, TransportParams
 from pipecat.transports.daily.transport import DailyParams
+from pipecat.turns.types import ProcessFrameResult
+from pipecat.turns.user_start.base_user_turn_start_strategy import BaseUserTurnStartStrategy
+from pipecat.turns.user_stop.external_user_turn_stop_strategy import ExternalUserTurnStopStrategy
+from pipecat.turns.user_turn_strategies import UserTurnStrategies
 from pipecat.workers.runner import WorkerRunner
 
 load_dotenv(override=True)
 
-# We store functions so objects (e.g. SileroVADAnalyzer) don't get
-# instantiated. The function will be called when the desired transport gets
-# selected.
+# We store functions so transport params don't get instantiated until the
+# desired transport is selected. The function will be called when the desired
+# transport gets selected.
 transport_params = {
     "daily": lambda: DailyParams(
         audio_in_enabled=True,
@@ -52,45 +52,60 @@ transport_params = {
 }
 
 
-class PushToTalkGate(FrameProcessor):
-    def __init__(self):
-        super().__init__()
-        self._gate_opened = False
+class PushToTalkUserTurnStartStrategy(BaseUserTurnStartStrategy):
+    """Start a user turn when the client presses the push-to-talk button.
 
-    async def process_frame(self, frame: Frame, direction: FrameDirection):
-        await super().process_frame(frame, direction)
+    Reacts directly to the `push_to_talk` RTVI client message (state == "start").
+    Interruptions are enabled, so pressing the button while the bot is talking
+    barges in and stops its speech.
+    """
 
-        if isinstance(frame, StartFrame):
-            await self.push_frame(frame, direction)
+    def __init__(self, **kwargs):
+        super().__init__(enable_interruptions=True, enable_user_speaking_frames=False, **kwargs)
 
-        elif isinstance(frame, RTVIClientMessageFrame):
-            self._handle_rtvi_frame(frame)
-            await self.push_frame(frame, direction)
+    async def process_frame(self, frame: Frame) -> ProcessFrameResult:
+        await super().process_frame(frame)
 
-        # If the gate is closed, suppress all audio frames until the user releases the button
-        # We don't include the UserStoppedSpeakingFrame because it's an important signal to tell
-        # the UserContextAggregator that the user is done speaking and to push the aggregation.
-        if not self._gate_opened and isinstance(
-            frame,
-            (
-                InputAudioRawFrame,
-                UserStartedSpeakingFrame,
-                InterruptionFrame,
-            ),
+        if (
+            isinstance(frame, RTVIClientMessageFrame)
+            and frame.type == "push_to_talk"
+            and (frame.data or {}).get("state") == "start"
         ):
-            logger.trace(f"{frame.__class__.__name__} suppressed - Button not pressed")
-        else:
-            await self.push_frame(frame, direction)
+            logger.info("User turn started")
+            await self.trigger_user_turn_started()
+            return ProcessFrameResult.STOP
 
-    def _handle_rtvi_frame(self, frame: RTVIClientMessageFrame):
-        if frame.type == "push_to_talk" and frame.data:
-            data = frame.data
-            if data.get("state") == "start":
-                self._gate_opened = True
-                logger.info("Input gate opened - user started talking")
-            elif data.get("state") == "stop":
-                self._gate_opened = False
-                logger.info("Input gate closed - user stopped talking")
+        return ProcessFrameResult.CONTINUE
+
+
+class PushToTalkUserTurnStopStrategy(ExternalUserTurnStopStrategy):
+    """Stop a user turn when the client releases the push-to-talk button.
+
+    Reacts directly to the `push_to_talk` RTVI client message and drives the
+    parent `ExternalUserTurnStopStrategy`'s transcript-aware finalization:
+    "start" primes the turn and "stop" ends it (after the trailing transcript
+    arrives). All other frames (e.g. transcriptions) are delegated to the parent.
+    """
+
+    async def process_frame(self, frame: Frame) -> ProcessFrameResult:
+        if isinstance(frame, RTVIClientMessageFrame) and frame.type == "push_to_talk":
+            state = (frame.data or {}).get("state")
+            if state == "start":
+                await self._handle_user_started_speaking(UserStartedSpeakingFrame())
+            elif state == "stop":
+                logger.info("User turn stopped")
+                await self._handle_user_stopped_speaking(UserStoppedSpeakingFrame())
+            return ProcessFrameResult.CONTINUE
+
+        return await super().process_frame(frame)
+
+
+class PushToTalkUserTurnStrategies(UserTurnStrategies):
+    """User turn strategies driven entirely by the push-to-talk button."""
+
+    def __init__(self):
+        self.start = [PushToTalkUserTurnStartStrategy()]
+        self.stop = [PushToTalkUserTurnStopStrategy()]
 
 
 async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
@@ -112,20 +127,21 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
         ),
     )
 
-    push_to_talk_gate = PushToTalkGate()
-
     context = LLMContext()
+    # The push-to-talk button is the sole authority over user turns. The custom
+    # strategies react to the client's `push_to_talk` message: the aggregator
+    # only collects transcription between a button press and release, then pushes
+    # the aggregation to the LLM (waiting briefly for the trailing transcript).
     user_aggregator, assistant_aggregator = LLMContextAggregatorPair(
         context,
         user_params=LLMUserAggregatorParams(
-            vad_analyzer=SileroVADAnalyzer(),
+            user_turn_strategies=PushToTalkUserTurnStrategies(),
         ),
     )
 
     pipeline = Pipeline(
         [
             transport.input(),  # Transport user input
-            push_to_talk_gate,
             stt,
             user_aggregator,  # User responses
             llm,  # LLM

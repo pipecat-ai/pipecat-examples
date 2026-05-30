@@ -5,7 +5,7 @@ A voice AI agent with push-to-talk functionality. Users hold a button to speak, 
 ## How it Works
 
 - **Client**: Hold the "Hold to Talk" button to speak, release to send
-- **Server**: Audio input is gated, only flowing to the STT processor when the button is pressed
+- **Server**: The user aggregator uses `ExternalUserTurnStrategies`, so it only collects transcription between the button press and release. Audio still flows to STT the whole time; transcripts that arrive outside a held turn are simply ignored.
 - **Real-time**: Uses WebRTC for low-latency audio communication
 
 ## Quick Start
@@ -71,12 +71,14 @@ npm run dev
 
 ## Architecture
 
-The push-to-talk functionality uses client-server message passing:
+The push-to-talk functionality is encapsulated in custom [user turn strategies](https://docs.pipecat.ai/api-reference/server/utilities/turn-management/user-turn-strategies) (see `PushToTalkUserTurnStrategies` in `server/bot.py`). The user aggregator is configured with these strategies, making the client button the sole authority over when a user turn starts and stops:
 
-- Client sends `{type: "push_to_talk", data: {state: "start"}}` when button is pressed
-- Server opens audio input gate, allowing frames to flow to STT
-- Client sends `{type: "push_to_talk", data: {state: "stop"}}` when button is released
-- Server closes audio input gate, triggering transcript processing
+- Client sends `{type: "push_to_talk", data: {state: "start"}}` when the button is pressed.
+- `PushToTalkUserTurnStartStrategy` sees the message and starts the user turn. Because interruptions are enabled, this also barges in on the bot if it's speaking. The aggregator begins collecting transcription.
+- Client sends `{type: "push_to_talk", data: {state: "stop"}}` when the button is released.
+- `PushToTalkUserTurnStopStrategy` ends the turn. It extends `ExternalUserTurnStopStrategy`, so it waits briefly for the trailing transcript, then pushes the aggregated message to the LLM.
+
+The strategies react to the `push_to_talk` message directly, so no separate frame-handling processor is needed. (For an app that mixes push-to-talk with live VAD-driven turns, you'd instead translate the message into custom frames in an `on_client_message` handler — see [pipecat-ai/ptt-and-conversation](https://github.com/kwindla/ptt-and-conversation).)
 
 ## Deploy your Bot to Pipecat Cloud
 
