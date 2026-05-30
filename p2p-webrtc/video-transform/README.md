@@ -12,36 +12,32 @@ cd server
 ```
 
 #### 🔧 Set Up the Environment
-1. Create and activate a virtual environment:
+1. Install dependencies (uses [uv](https://docs.astral.sh/uv/)):
    ```bash
-   python3 -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   uv sync
    ```
 
-2. Install dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-3. Configure environment variables:
+2. Configure environment variables:
    - Copy `env.example` to `.env`
    ```bash
    cp env.example .env
    ```
    - Add your API keys
 
-#### ▶️ Run the Server
+#### ▶️ Run the Bot
 ```bash
-python server.py
+uv run bot.py
 ```
 
-### 2️⃣ Test with SmallWebRTC Prebuilt UI
+> The first startup can take a little longer as Pipecat downloads the required models and dependencies.
 
-You can quickly test your bot using the `SmallWebRTCPrebuiltUI`:
+### 2️⃣ Test with the Prebuilt UI
+
+The development runner serves a prebuilt web UI for quick local testing:
 
 - Open your browser and navigate to:
 👉 http://localhost:7860
-  - (Or use your custom port, if configured)
+  - (Or use your custom host/port, e.g. `uv run bot.py --host 0.0.0.0 --port 8080`)
 
 ### 3️⃣ Connect Using a Custom Client App
 
