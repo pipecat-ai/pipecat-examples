@@ -72,6 +72,10 @@ class PushToTalkUserTurnStartStrategy(BaseUserTurnStartStrategy):
             and (frame.data or {}).get("state") == "start"
         ):
             logger.info("User turn started")
+            # STT runs continuously, so transcripts can accumulate in the
+            # aggregator while the button is up. Discard them on press so only
+            # speech captured after the press is aggregated into the user message.
+            await self.trigger_reset_aggregation()
             await self.trigger_user_turn_started()
             return ProcessFrameResult.STOP
 
