@@ -145,7 +145,7 @@
   },
   {
     "path": "p2p-webrtc/video-transform/server",
-    "runCommand": "uv run server.py",
+    "runCommand": "uv run bot.py",
     "skip": false
   },
   {
@@ -265,7 +265,7 @@
   },
   {
     "path": "websocket/server",
-    "runCommand": "uv run server.py",
+    "runCommand": "uv run bot.py",
     "skip": false
   },
   {
