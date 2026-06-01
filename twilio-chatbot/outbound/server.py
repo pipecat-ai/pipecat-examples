@@ -17,6 +17,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, Request, WebSocket
 from fastapi.responses import HTMLResponse, JSONResponse
 from loguru import logger
+
 from server_utils import (
     DialoutResponse,
     dialout_request_from_request,
@@ -91,8 +92,9 @@ async def websocket_endpoint(websocket: WebSocket):
     Args:
         websocket (WebSocket): FastAPI WebSocket connection from Twilio.
     """
-    from bot import bot
     from pipecat.runner.types import WebSocketRunnerArguments
+
+    from bot import bot
 
     await websocket.accept()
     logger.info("WebSocket connection accepted for outbound call")

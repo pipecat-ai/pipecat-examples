@@ -200,7 +200,9 @@ async def bot(runner_args: RunnerArguments, testing: bool | None = False):
     call_data = runner_args.call_data
     call_info = await get_call_info(call_data.call_id) if call_data else None
     if call_info:
-        logger.info(f"Call from: {call_info.from_number} to: {call_info.to_number}") if call_info else None
+        logger.info(
+            f"Call from: {call_info.from_number} to: {call_info.to_number}"
+        ) if call_info else None
 
     await run_bot(transport, runner_args.handle_sigint, testing)
 
