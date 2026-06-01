@@ -4,19 +4,22 @@
 # SPDX-License-Identifier: BSD 2-Clause License
 #
 
-"""Pipecat Cloud-compatible bot example.
+"""Verbose transport construction for Daily and SmallWebRTC (manual control).
 
-Transports are Daily or SmallWebRTC.
+Most bots should use create_transport (see 01-create-transport-bot.py), which
+selects and builds the transport for you. This example shows the manual
+equivalent — branching on the runner-args type and constructing each transport
+by hand — for when you need full control over transport setup.
 
-Run it with:
+Telephony (Twilio/Telnyx/Plivo/Exotel) is intentionally omitted: those need
+provider serializers that create_transport builds automatically, and you should
+not hand-roll them. Manual construction is shown only for the serializer-free
+WebRTC and Daily transports.
 
-- WebRTC transport::
+Run it with::
 
-    python 02-two-transport-bot.py
-
-- Daily transport::
-
-    python 02-two-transport-bot.py --transport daily
+    python 02-verbose-transport-bot.py                  # SmallWebRTC (open /client)
+    python 02-verbose-transport-bot.py --transport daily
 """
 
 import os
