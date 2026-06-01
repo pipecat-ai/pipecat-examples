@@ -17,16 +17,12 @@ from pipecat.processors.aggregators.llm_response_universal import (
     LLMUserAggregatorParams,
 )
 from pipecat.runner.types import RunnerArguments
-from pipecat.runner.utils import parse_telephony_websocket
-from pipecat.serializers.telnyx import TelnyxFrameSerializer
+from pipecat.runner.utils import create_transport
 from pipecat.services.cartesia.tts import CartesiaTTSService
 from pipecat.services.deepgram.stt import DeepgramSTTService
 from pipecat.services.openai.llm import OpenAILLMService
 from pipecat.transports.base_transport import BaseTransport
-from pipecat.transports.websocket.fastapi import (
-    FastAPIWebsocketParams,
-    FastAPIWebsocketTransport,
-)
+from pipecat.transports.websocket.fastapi import FastAPIWebsocketParams
 from pipecat.workers.runner import WorkerRunner
 
 load_dotenv(override=True)
@@ -98,29 +94,25 @@ async def run_bot(transport: BaseTransport, handle_sigint: bool):
 async def bot(runner_args: RunnerArguments):
     """Main bot entry point compatible with Pipecat Cloud."""
 
-    transport_type, call_data = await parse_telephony_websocket(runner_args.websocket)
-    logger.info(f"Auto-detected transport: {transport_type}")
-    # Custom data from the body parameter can be accessed via the runner_args.body attribute
-    logger.info(f"Runner args body: {runner_args.body}")
-
-    serializer = TelnyxFrameSerializer(
-        stream_id=call_data["stream_id"],
-        outbound_encoding=call_data["outbound_encoding"],
-        inbound_encoding="PCMU",
-        call_control_id=call_data["call_control_id"],
-        api_key=os.getenv("TELNYX_API_KEY"),
-    )
-
-    transport = FastAPIWebsocketTransport(
-        websocket=runner_args.websocket,
-        params=FastAPIWebsocketParams(
+    transport_params = {
+        "telnyx": lambda: FastAPIWebsocketParams(
             audio_in_enabled=True,
             audio_out_enabled=True,
-            add_wav_header=False,
-            serializer=serializer,
         ),
-    )
+    }
 
-    handle_sigint = runner_args.handle_sigint
+    # create_transport auto-detects the telephony provider, builds the matching
+    # serializer (here the TelnyxFrameSerializer, using TELNYX_API_KEY) and sets
+    # add_wav_header=False, so the bot only supplies the params it cares about.
+    transport = await create_transport(runner_args, transport_params)
 
-    await run_bot(transport, handle_sigint)
+    # Custom data passed via the body parameter is on runner_args.body.
+    logger.info(f"Runner args body: {runner_args.body}")
+
+    await run_bot(transport, runner_args.handle_sigint)
+
+
+if __name__ == "__main__":
+    from pipecat.runner.run import main
+
+    main()

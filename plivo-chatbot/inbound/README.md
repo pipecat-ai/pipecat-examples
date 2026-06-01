@@ -88,17 +88,17 @@ The bot supports two deployment modes controlled by the `ENV` variable:
 
 2. Update the Plivo Application:
 
-   - Go to your Plivo console and navigate to Voice > Applications > XML
-   - Select "Add New Application" or edit an existing one
+   - Go to your Plivo console and navigate to Applications
+   - Select "Create Application" or edit an existing one
    - Set the Primary Answer URL to your ngrok URL: `https://your-subdomain.ngrok.io/`
    - Ensure the Answer Method is set to GET (not POST)
    - Save the application
    - Configure your number to use the newly created (or updated) application:
-     - Go to Phone Numbers > Your Numbers
+     - Go to Phone Numbers > Purchased Numbers
      - Edit your Plivo number
-     - Select Application Type: XML Application
-     - Plivo Application: Your application
-     - Click "Update" to save
+     - Select Application Type: Application
+     - In the Application form, select your application
+     - Click "Save changes" to save
 
 The bot automatically receives the caller's and called phone numbers for personalized responses via the body parameter.
 

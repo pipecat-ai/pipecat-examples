@@ -18,16 +18,12 @@ from pipecat.processors.aggregators.llm_response_universal import (
     LLMUserAggregatorParams,
 )
 from pipecat.runner.types import RunnerArguments
-from pipecat.runner.utils import parse_telephony_websocket
-from pipecat.serializers.twilio import TwilioFrameSerializer
+from pipecat.runner.utils import create_transport
 from pipecat.services.cartesia.tts import CartesiaTTSService
 from pipecat.services.deepgram.stt import DeepgramSTTService
 from pipecat.services.google.llm import GoogleLLMService
 from pipecat.transports.base_transport import BaseTransport
-from pipecat.transports.websocket.fastapi import (
-    FastAPIWebsocketParams,
-    FastAPIWebsocketTransport,
-)
+from pipecat.transports.websocket.fastapi import FastAPIWebsocketParams
 from pipecat.workers.runner import WorkerRunner
 
 load_dotenv(override=True)
@@ -101,35 +97,33 @@ async def run_bot(transport: BaseTransport, handle_sigint: bool):
 
 async def bot(runner_args: RunnerArguments):
     """Main bot entry point compatible with Pipecat Cloud."""
-    transport_type, call_data = await parse_telephony_websocket(runner_args.websocket)
-    logger.info(f"Auto-detected transport: {transport_type}")
 
-    # Access custom stream parameters passed from TwiML
-    # Use the body data to personalize the conversation
-    # by loading customer data based on the to_number or from_number
-    body_data = call_data.get("body", {})
-    to_number = body_data.get("to_number")
-    from_number = body_data.get("from_number")
-
-    logger.info(f"Call metadata - To: {to_number}, From: {from_number}")
-
-    serializer = TwilioFrameSerializer(
-        stream_sid=call_data["stream_id"],
-        call_sid=call_data["call_id"],
-        account_sid=os.getenv("TWILIO_ACCOUNT_SID", ""),
-        auth_token=os.getenv("TWILIO_AUTH_TOKEN", ""),
-    )
-
-    transport = FastAPIWebsocketTransport(
-        websocket=runner_args.websocket,
-        params=FastAPIWebsocketParams(
+    transport_params = {
+        "twilio": lambda: FastAPIWebsocketParams(
             audio_in_enabled=True,
             audio_out_enabled=True,
-            add_wav_header=False,
-            serializer=serializer,
         ),
-    )
+    }
 
-    handle_sigint = runner_args.handle_sigint
+    # create_transport auto-detects the telephony provider, builds the matching
+    # serializer (here the TwilioFrameSerializer, using TWILIO_ACCOUNT_SID /
+    # TWILIO_AUTH_TOKEN), and sets add_wav_header=False, so the bot only supplies
+    # the params it cares about.
+    transport = await create_transport(runner_args, transport_params)
 
-    await run_bot(transport, handle_sigint)
+    # Personalize the bot based on the caller's numbers.
+    # The call_data is available via runner_args.call_data as a typed CallData model.
+    call_data = runner_args.call_data
+    to_number = call_data.to_number if call_data else None
+    from_number = call_data.from_number if call_data else None
+    logger.info(f"Call metadata - To: {to_number}, From: {from_number}")
+
+    await run_bot(transport, runner_args.handle_sigint)
+
+
+if __name__ == "__main__":
+    # Normally this bot runs via server.py (which initiates the Twilio call and
+    # connects the Media Stream to bot()).
+    from pipecat.runner.run import main
+
+    main()
