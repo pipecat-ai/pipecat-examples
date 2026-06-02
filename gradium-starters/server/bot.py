@@ -25,6 +25,7 @@ from pipecat.services.openai.llm import OpenAILLMService
 from pipecat.transcriptions.language import Language
 from pipecat.transports.base_transport import BaseTransport, TransportParams
 from pipecat.transports.daily.transport import DailyParams
+from pipecat.transports.whatsapp.api import WhatsAppConnectCall
 from pipecat.workers.runner import WorkerRunner
 
 load_dotenv(override=True)
@@ -36,6 +37,11 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     voice = DEFAULT_VOICE
     if isinstance(runner_args.body, dict):
         voice = runner_args.body.get("voice", DEFAULT_VOICE)
+    elif isinstance(runner_args.body, WhatsAppConnectCall):
+        whatsapp_call = runner_args.body
+        logger.info(f"WhatsApp call received, from: {whatsapp_call.from_}, to: {whatsapp_call.to}")
+        # TODO: we can select a different voice based on the from number
+        voice = DEFAULT_VOICE
 
     logger.info(f"Starting bot with voice {voice}")
 
