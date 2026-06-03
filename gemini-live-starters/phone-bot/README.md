@@ -25,6 +25,8 @@ You'll need API keys for the following services:
 
 > 💡 **Tip**: Sign up these services. You'll need them for both local and cloud deployment.
 
+> **Regional note (Latin America and other regions):** The Gemini Live WebSocket API via AI Studio (`generativelanguage.googleapis.com`) is not reliably available in all regions, including Latin America. If you experience connection timeouts, use **Vertex AI** instead — see the [Regional Setup (Vertex AI)](#regional-setup-vertex-ai) section below.
+
 ## Setup
 
 1. Clone this repository
@@ -51,7 +53,7 @@ You'll need API keys for the following services:
    TWILIO_AUTH_TOKEN=
    ```
 
-   > If you're running bot-cascade.py, you'll need to add a `credentials.json` file containing your Google Service Account credentials.
+   > If you're running bot-cascade.py, or using the Vertex AI backend (recommended for Latin America and other regions), you'll need to add a `credentials.json` file containing your Google Service Account credentials. See [Regional Setup (Vertex AI)](#regional-setup-vertex-ai) below.
 
 3. Set up a virtual environment and install dependencies
 
@@ -175,6 +177,53 @@ uv run pcc deploy
 ### Call your bot
 
 Call the Twilio number you set up earlier to speak with your bot! 🚀
+
+## Regional Setup (Vertex AI)
+
+If you are located in **Latin America or another region where the Gemini Live AI Studio endpoint is unavailable**, you need to use **Google Vertex AI** instead of the default AI Studio backend. The standard `GeminiLiveLLMService` will time out because `generativelanguage.googleapis.com` does not serve all regions. Vertex AI lets you pin requests to a US region (`us-central1`) regardless of your location.
+
+### Why this is needed
+
+The Gemini Live WebSocket API via AI Studio is not available in all regions. Switching to Vertex AI routes your requests through a GCP region that supports the API (e.g., `us-central1`), bypassing the regional restriction entirely.
+
+### Steps
+
+1. **Use a GCP project with billing enabled.** Auto-created AI Studio projects work, but you must enable the Vertex AI API manually.
+
+2. **Enable the Vertex AI API** on your GCP project:
+
+   Go to [APIs & Services > Vertex AI API](https://console.cloud.google.com/apis/library/aiplatform.googleapis.com) in the GCP Console and click **Enable**. Without this step, the WebSocket connection will close with a `1008 policy violation` error.
+
+3. **Create a Service Account** with the **Vertex AI User** role and download a JSON key. Save it as `credentials.json` in the project root (it is gitignored — do not commit it).
+
+4. **Update your `.env`** to include:
+
+   ```ini
+   GOOGLE_CLOUD_PROJECT=your-gcp-project-id
+   GOOGLE_CREDENTIALS_PATH=./credentials.json
+   TWILIO_ACCOUNT_SID=
+   TWILIO_AUTH_TOKEN=
+   ```
+
+5. **Update `bot.py`** to use `GeminiLiveVertexLLMService`:
+
+   ```python
+   from pipecat.services.google.gemini_live.llm import InputParams
+   from pipecat.services.google.gemini_live.llm_vertex import GeminiLiveVertexLLMService
+
+   llm = GeminiLiveVertexLLMService(
+       project_id=os.getenv("GOOGLE_CLOUD_PROJECT"),
+       credentials_path=os.getenv("GOOGLE_CREDENTIALS_PATH"),
+       location="us-central1",
+       model="google/gemini-live-2.5-flash-native-audio",
+       voice_id="Charon",
+       system_instruction=instructions,
+       tools=tools,
+       params=InputParams(thinking=ThinkingConfig(thinking_budget=0)),
+   )
+   ```
+
+> **Network note:** Some ISPs and home networks block WebSocket upgrade requests entirely. If you experience timeouts even after switching to Vertex AI, try running the bot on a mobile hotspot or through a VPN to rule out a network-level block.
 
 ## What's Next?
 
