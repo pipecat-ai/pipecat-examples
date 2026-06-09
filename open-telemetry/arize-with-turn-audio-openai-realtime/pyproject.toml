@@ -8,8 +8,8 @@ dependencies = [
     "arize-otel>=0.11.0",
     "boto3>=1.34.0",
     "openinference-instrumentation>=0.1.42",
-    "openinference-instrumentation-pipecat>=0.1.0",
-    "pipecat-ai[daily,openai,runner,silero,webrtc,websocket]>=0.0.100",
+    "openinference-instrumentation-pipecat>=2.0.0",
+    "pipecat-ai[daily,openai,runner,silero,webrtc,websocket]>=1.3.0",
     "pipecatcloud>=0.4.4",
 ]
 

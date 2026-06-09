@@ -8,11 +8,13 @@ The end-to-end flow:
 2. For each event we generate a presigned S3 GET URL **synchronously** (no S3 round-trip) using a deterministic key, set it as an attribute on the active `OpenInferenceObserver._turn_span`, and kick off the actual `put_object` upload as a background task.
 3. The Arize/Phoenix span carries the URL immediately — the link starts working as soon as the upload lands.
 
+> **Note:** This example requires AWS credentials with S3 write access for the per-turn audio uploads.
+
 ## Prerequisites
 
 - Python 3.11+
 - [`uv`](https://docs.astral.sh/uv/) installed
-- Service accounts: Deepgram, Cartesia, Google (Gemini), AWS S3
+- Service accounts: Deepgram, Cartesia, OpenAI, AWS S3
 - Either an Arize account *or* a local Phoenix server for trace viewing
 
 ## Setup
@@ -42,7 +44,7 @@ AWS_PROFILE=your_aws_profile ./create_s3_user.sh <BUCKET_NAME>
 Requires `aws` CLI and `jq`. The script:
 
 - Creates `<BUCKET_NAME>` in your configured region (defaults to `us-east-1`) with a public-access block applied. If the bucket already exists, it's left as-is.
-- Creates IAM user `pipecat-turn-audio-uploader` with an inline policy granting `s3:PutObject` + `s3:GetObject` on the bucket.
+- Creates IAM user `pipecat-turn-audio-uploader` with an inline policy granting `s3:PutObject` + `s3:GetObject` on the bucket. If the user already exists, the new bucket's resource ARN is **merged** into the existing inline policy — re-running against a different bucket accumulates grants instead of revoking the previous one.
 - Prints `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_DEFAULT_REGION`, and `AWS_BUCKET_NAME` lines ready to paste into `.env`.
 
    To create the user manually instead, attach this inline policy (substitute `<BUCKET>`):
@@ -69,7 +71,7 @@ cp env.example .env
 | --- | --- | --- |
 | `DEEPGRAM_API_KEY` | yes | STT |
 | `CARTESIA_API_KEY` | yes | TTS |
-| `GOOGLE_API_KEY` | yes | Gemini LLM |
+| `OPENAI_API_KEY` | yes | OpenAI LLM |
 | `AWS_ACCESS_KEY_ID` | yes | Long-lived IAM user key |
 | `AWS_SECRET_ACCESS_KEY` | yes | Long-lived IAM user secret |
 | `AWS_DEFAULT_REGION` | yes | e.g. `us-east-1` |
@@ -96,7 +98,7 @@ Phoenix UI: <http://localhost:6006>
 ### 5. Run the bot
 
 ```bash
-uv run bot.py -t webrtc
+uv run bot.py
 ```
 
 You should see:

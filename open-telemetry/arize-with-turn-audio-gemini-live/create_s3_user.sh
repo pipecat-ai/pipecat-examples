@@ -70,21 +70,42 @@ fi
 
 echo "~ creating IAM user '${USER_NAME}' with PutObject + GetObject on '${YOUR_BUCKET_NAME}' ~"
 
-aws iam create-user --user-name "${USER_NAME}" >/dev/null
+aws iam create-user --user-name "${USER_NAME}" >/dev/null 2>&1 || true
 
-# Inline policy: just PutObject + GetObject on the bucket. GetObject is
-# included so the IAM user can presign GET URLs (the principal signing
-# the URL must itself be allowed to perform the action).
-cat > s3-policy.json <<EOF
+# Inline policy: PutObject + GetObject on the bucket. GetObject is included
+# so the IAM user can presign GET URLs (the principal signing the URL must
+# itself be allowed to perform the action).
+#
+# `put-user-policy` overwrites the document for a given policy name. So if
+# the policy already exists (re-run against a different bucket), we merge
+# the new bucket's resource ARN into the existing Resource list rather than
+# replacing it — otherwise a re-run for bucket B would revoke access to A.
+NEW_RESOURCE="arn:aws:s3:::${YOUR_BUCKET_NAME}/*"
+
+if EXISTING=$(aws iam get-user-policy \
+  --user-name "${USER_NAME}" \
+  --policy-name TurnAudioReadWritePolicy \
+  --query 'PolicyDocument' \
+  --output json 2>/dev/null); then
+  echo "$EXISTING" | jq --arg new "$NEW_RESOURCE" '
+    .Statement[0].Resource = (
+      (.Statement[0].Resource | if type == "array" then . else [.] end)
+      + [$new]
+      | unique
+    )
+  ' > s3-policy.json
+else
+  cat > s3-policy.json <<EOF
 {
   "Version": "2012-10-17",
   "Statement": [{
     "Effect": "Allow",
     "Action": ["s3:PutObject", "s3:GetObject"],
-    "Resource": "arn:aws:s3:::${YOUR_BUCKET_NAME}/*"
+    "Resource": ["arn:aws:s3:::${YOUR_BUCKET_NAME}/*"]
   }]
 }
 EOF
+fi
 
 aws iam put-user-policy \
   --user-name "${USER_NAME}" \
@@ -92,10 +113,31 @@ aws iam put-user-policy \
   --policy-document file://s3-policy.json
 
 echo "-------"
-echo "~ add these vars to your Pipecat Bot .env ~"
-echo ""
-aws iam create-access-key --user-name "${USER_NAME}" | \
-  jq -r '.AccessKey | "AWS_ACCESS_KEY_ID=" + .AccessKeyId, "AWS_SECRET_ACCESS_KEY=" + .SecretAccessKey'
+
+# AWS caps access keys at 2 per user. Only mint a new key if the user has
+# none — otherwise re-runs hit LimitExceeded once two keys exist. If keys
+# already exist we assume the secret is still in your .env and just print
+# the non-secret env vars.
+EXISTING_KEY_COUNT=$(aws iam list-access-keys \
+  --user-name "${USER_NAME}" \
+  --query 'length(AccessKeyMetadata)' \
+  --output text)
+
+if [ "${EXISTING_KEY_COUNT}" = "0" ]; then
+  echo "~ add these vars to your Pipecat Bot .env ~"
+  echo ""
+  aws iam create-access-key --user-name "${USER_NAME}" | \
+    jq -r '.AccessKey | "AWS_ACCESS_KEY_ID=" + .AccessKeyId, "AWS_SECRET_ACCESS_KEY=" + .SecretAccessKey'
+else
+  echo "~ IAM user '${USER_NAME}' already has ${EXISTING_KEY_COUNT} access key(s); keeping existing ~"
+  echo "~ if your .env doesn't have AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY,"
+  echo "  delete an old key with:"
+  echo "    aws iam delete-access-key --user-name ${USER_NAME} --access-key-id <OLD_KEY_ID>"
+  echo "  then re-run this script to mint a fresh pair."
+  echo ""
+  echo "~ add these vars to your Pipecat Bot .env ~"
+  echo ""
+fi
 echo "AWS_DEFAULT_REGION=${YOUR_REGION}"
 echo "AWS_BUCKET_NAME=${YOUR_BUCKET_NAME}"
 echo ""

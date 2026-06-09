@@ -16,8 +16,7 @@ from pipecat.adapters.schemas.tools_schema import ToolsSchema
 from pipecat.audio.vad.silero import SileroVADAnalyzer
 from pipecat.frames.frames import LLMRunFrame, TTSSpeakFrame
 from pipecat.pipeline.pipeline import Pipeline
-from pipecat.pipeline.runner import PipelineRunner
-from pipecat.pipeline.task import PipelineParams, PipelineTask
+from pipecat.pipeline.worker import PipelineParams, PipelineWorker
 from pipecat.processors.aggregators.llm_context import LLMContext
 from pipecat.processors.aggregators.llm_response_universal import (
     LLMContextAggregatorPair,
@@ -28,18 +27,19 @@ from pipecat.runner.types import RunnerArguments
 from pipecat.runner.utils import create_transport
 from pipecat.services.cartesia.tts import CartesiaTTSService
 from pipecat.services.deepgram.stt import DeepgramSTTService
-from pipecat.services.google.llm import GoogleLLMService
 from pipecat.services.llm_service import FunctionCallParams
+from pipecat.services.openai.llm import OpenAILLMService
 from pipecat.transports.base_transport import BaseTransport, TransportParams
 from pipecat.transports.daily.transport import DailyParams
 from pipecat.transports.websocket.fastapi import FastAPIWebsocketParams
+from pipecat.workers.runner import WorkerRunner
 
 from bot_utils.audio_turn_uploader import AudioTurnUploader
 
 load_dotenv(override=True)
 
 # One debug log file per process startup. The PipecatInstrumentor wraps
-# PipelineTask.__init__ globally and writes all conversation logs to this
+# PipelineWorker.__init__ globally and writes all conversation logs to this
 # file. Per-conversation `conversation_id` is generated inside run_bot()
 # (which fires once per client connection) so tracing spans aren't shared
 # across runs of a long-lived server.
@@ -104,10 +104,9 @@ async def run_bot(transport: BaseTransport):
 
     stt = DeepgramSTTService(api_key=os.getenv("DEEPGRAM_API_KEY"))
 
-    llm = GoogleLLMService(
-        api_key=os.getenv("GOOGLE_API_KEY"),
-        settings=GoogleLLMService.Settings(
-            model="gemini-2.5-flash",
+    llm = OpenAILLMService(
+        api_key=os.getenv("OPENAI_API_KEY"),
+        settings=OpenAILLMService.Settings(
             system_instruction="You are a helpful LLM in a WebRTC call. Your goal is to demonstrate your capabilities in a succinct way. Your output will be converted to audio so don't include special characters in your answers. Respond to what the user said in a creative and helpful way.",
         ),
     )
@@ -174,7 +173,7 @@ async def run_bot(transport: BaseTransport):
         ]
     )
 
-    task = PipelineTask(
+    worker = PipelineWorker(
         pipeline,
         params=PipelineParams(
             enable_metrics=True,
@@ -183,16 +182,16 @@ async def run_bot(transport: BaseTransport):
         conversation_id=conversation_id,
     )
 
-    # PipecatInstrumentor.instrument() wraps PipelineTask.__init__ to auto-inject
+    # PipecatInstrumentor.instrument() wraps PipelineWorker.__init__ to auto-inject
     # an OpenInferenceObserver. Look it up so we can set attributes on its
     # _turn_span from the audio_buffer event handlers.
     # this is kind of ugly - just for POC.
     oi_observer = next(
-        (o for o in task._observer._observers if isinstance(o, OpenInferenceObserver)),
+        (o for o in worker._observer._observers if isinstance(o, OpenInferenceObserver)),
         None,
     )
     if oi_observer is None:
-        raise RuntimeError("OpenInferenceObserver not found on PipelineTask")
+        raise RuntimeError("OpenInferenceObserver not found on PipelineWorker")
 
     @audio_buffer.event_handler("on_user_turn_audio_data")
     async def on_user_turn_audio_data(buffer, audio, sample_rate, num_channels):
@@ -223,16 +222,17 @@ async def run_bot(transport: BaseTransport):
         logger.info(f"Client connected")
         await audio_buffer.start_recording()
         context.add_message({"role": "user", "content": "Please introduce yourself to the user."})
-        await task.queue_frames([LLMRunFrame()])
+        await worker.queue_frames([LLMRunFrame()])
 
     @transport.event_handler("on_client_disconnected")
     async def on_client_disconnected(transport, client):
         logger.info(f"Client disconnected")
-        await task.cancel()
+        await worker.cancel()
 
-    runner = PipelineRunner(handle_sigint=False)
+    runner = WorkerRunner(handle_sigint=False)
 
-    await runner.run(task)
+    await runner.add_workers(worker)
+    await runner.run()
 
 
 async def bot(runner_args: RunnerArguments):

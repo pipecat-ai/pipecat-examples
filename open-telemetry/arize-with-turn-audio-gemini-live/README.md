@@ -1,6 +1,6 @@
 # Arize Tracing with Per-Turn Audio Links — Gemini Live
 
-Same shape as [`open-telemetry/arize-with-turn-audio`](../arize-with-turn-audio), but the cascade pipeline (Deepgram + Google Gemini + Cartesia) is replaced with a single `GeminiLiveLLMService` doing STT + LLM + TTS via Google's Multimodal Live API.
+Same shape as [`open-telemetry/arize-with-turn-audio`](../arize-with-turn-audio), but the cascade pipeline (Deepgram + OpenAI + Cartesia) is replaced with a single `GeminiLiveLLMService` doing STT + LLM + TTS via Google's Multimodal Live API.
 
 Combines OpenInference/Arize tracing with per-turn audio recording. Each conversation turn gets its own root trace, and that turn span carries two attributes — `audio.user.url` and `audio.bot.url` — pointing to S3-hosted WAVs of just that turn's user utterance and bot reply.
 
@@ -9,6 +9,8 @@ The end-to-end flow:
 1. `AudioBufferProcessor(enable_turn_audio=True)` fires `on_user_turn_audio_data` at `UserStoppedSpeakingFrame` and `on_bot_turn_audio_data` at `BotStoppedSpeakingFrame`.
 2. For each event we generate a presigned S3 GET URL **synchronously** (no S3 round-trip) using a deterministic key, set it as an attribute on the active `OpenInferenceObserver._turn_span`, and kick off the actual `put_object` upload as a background task.
 3. The Arize/Phoenix span carries the URL immediately — the link starts working as soon as the upload lands.
+
+> **Note:** This example requires AWS credentials with S3 write access for the per-turn audio uploads.
 
 ## Prerequisites
 
@@ -44,7 +46,7 @@ AWS_PROFILE=your_aws_profile ./create_s3_user.sh <BUCKET_NAME>
 Requires `aws` CLI and `jq`. The script:
 
 - Creates `<BUCKET_NAME>` in your configured region (defaults to `us-east-1`) with a public-access block applied. If the bucket already exists, it's left as-is.
-- Creates IAM user `pipecat-turn-audio-uploader` with an inline policy granting `s3:PutObject` + `s3:GetObject` on the bucket.
+- Creates IAM user `pipecat-turn-audio-uploader` with an inline policy granting `s3:PutObject` + `s3:GetObject` on the bucket. If the user already exists, the new bucket's resource ARN is **merged** into the existing inline policy — re-running against a different bucket accumulates grants instead of revoking the previous one.
 - Prints `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_DEFAULT_REGION`, and `AWS_BUCKET_NAME` lines ready to paste into `.env`.
 
    To create the user manually instead, attach this inline policy (substitute `<BUCKET>`):
@@ -96,7 +98,7 @@ Phoenix UI: <http://localhost:6006>
 ### 5. Run the bot
 
 ```bash
-uv run bot.py -t webrtc
+uv run bot.py
 ```
 
 You should see:
