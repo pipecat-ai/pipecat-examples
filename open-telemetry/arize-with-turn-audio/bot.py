@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2024–2025, Daily
+# Copyright (c) 2024-2025, Daily
 #
 # SPDX-License-Identifier: BSD 2-Clause License
 #
@@ -10,6 +10,7 @@ from datetime import datetime
 from dotenv import load_dotenv
 from loguru import logger
 from openinference.instrumentation.pipecat import PipecatInstrumentor
+from openinference.instrumentation.pipecat._observer import OpenInferenceObserver
 from pipecat.adapters.schemas.function_schema import FunctionSchema
 from pipecat.adapters.schemas.tools_schema import ToolsSchema
 from pipecat.audio.vad.silero import SileroVADAnalyzer
@@ -21,28 +22,34 @@ from pipecat.processors.aggregators.llm_response_universal import (
     LLMContextAggregatorPair,
     LLMUserAggregatorParams,
 )
+from pipecat.processors.audio.audio_buffer_processor import AudioBufferProcessor
 from pipecat.runner.types import RunnerArguments
 from pipecat.runner.utils import create_transport
 from pipecat.services.cartesia.tts import CartesiaTTSService
 from pipecat.services.deepgram.stt import DeepgramSTTService
-from pipecat.services.google.llm import GoogleLLMService
 from pipecat.services.llm_service import FunctionCallParams
+from pipecat.services.openai.llm import OpenAILLMService
 from pipecat.transports.base_transport import BaseTransport, TransportParams
 from pipecat.transports.daily.transport import DailyParams
 from pipecat.transports.websocket.fastapi import FastAPIWebsocketParams
 from pipecat.workers.runner import WorkerRunner
 
+from bot_utils.audio_turn_uploader import AudioTurnUploader
+
 load_dotenv(override=True)
 
+# One debug log file per process startup. The PipecatInstrumentor wraps
+# PipelineWorker.__init__ globally and writes all conversation logs to this
+# file. Per-conversation `conversation_id` is generated inside run_bot()
+# (which fires once per client connection) so tracing spans aren't shared
+# across runs of a long-lived server.
 _process_started = datetime.now().strftime("%Y%m%d_%H%M%S")
 debug_log_filename = os.path.join(os.getcwd(), f"pipecat-debug_{_process_started}.log")
 print(f"debug_log_filename: {debug_log_filename}")
 
 
 def setup_tracer_provider():
-    """
-    Setup the tracer provider.
-    """
+    """Setup the tracer provider (Arize if configured, else local Phoenix)."""
     project_name = os.getenv("ARIZE_PROJECT_NAME", "default")
 
     ARIZE_SPACE_ID = os.getenv("ARIZE_SPACE_ID")
@@ -56,11 +63,8 @@ def setup_tracer_provider():
             project_name=project_name,
         )
     else:
-        # Register the Phoenix tracer provider
         from phoenix.otel import register as register_phoenix
 
-        # run `phoenix serve` in a separate shell window
-        # and open http://localhost:6006
         return register_phoenix(project_name="default")
 
 
@@ -75,9 +79,6 @@ async def fetch_weather_from_api(params: FunctionCallParams):
     await params.result_callback({"conditions": "nice", "temperature": "75"})
 
 
-# We store functions so objects (e.g. SileroVADAnalyzer) don't get
-# instantiated. The function will be called when the desired transport gets
-# selected.
 transport_params = {
     "daily": lambda: DailyParams(
         audio_in_enabled=True,
@@ -95,15 +96,17 @@ transport_params = {
 
 
 async def run_bot(transport: BaseTransport):
+    # Generate a fresh conversation_id per client connection so each call
+    # produces its own group of trace spans (no leakage across runs of a
+    # long-lived server).
     conversation_id = f"pipecat-test-conversation-001_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
     logger.info(f"Starting bot, conversation_id={conversation_id}")
 
     stt = DeepgramSTTService(api_key=os.getenv("DEEPGRAM_API_KEY"))
 
-    llm = GoogleLLMService(
-        api_key=os.getenv("GOOGLE_API_KEY"),
-        settings=GoogleLLMService.Settings(
-            model="gemini-2.5-flash",
+    llm = OpenAILLMService(
+        api_key=os.getenv("OPENAI_API_KEY"),
+        settings=OpenAILLMService.Settings(
             system_instruction="You are a helpful LLM in a WebRTC call. Your goal is to demonstrate your capabilities in a succinct way. Your output will be converted to audio so don't include special characters in your answers. Respond to what the user said in a creative and helpful way.",
         ),
     )
@@ -115,8 +118,6 @@ async def run_bot(transport: BaseTransport):
         ),
     )
 
-    # You can also register a function_name of None to get all functions
-    # sent to the same callback with an additional function_name parameter.
     llm.register_function("get_current_weather", fetch_weather_from_api)
 
     @llm.event_handler("on_function_calls_started")
@@ -149,6 +150,16 @@ async def run_bot(transport: BaseTransport):
         ),
     )
 
+    # enable_turn_audio=True is required for on_user_turn_audio_data /
+    # on_bot_turn_audio_data events. buffer_size=0 disables the merged-audio
+    # event since we only want per-turn segments.
+    audio_buffer = AudioBufferProcessor(buffer_size=0, enable_turn_audio=True)
+
+    audio_uploader = AudioTurnUploader(
+        conversation_id=conversation_id,
+        s3_key_prefix=os.getenv("AWS_S3_PREFIX", "pipecat-turn-audio"),
+    )
+
     pipeline = Pipeline(
         [
             transport.input(),
@@ -157,6 +168,7 @@ async def run_bot(transport: BaseTransport):
             llm,
             tts,
             transport.output(),
+            audio_buffer,
             assistant_aggregator,
         ]
     )
@@ -167,14 +179,48 @@ async def run_bot(transport: BaseTransport):
             enable_metrics=True,
             enable_usage_metrics=True,
         ),
-        # Optionally, add a conversation ID for session tracking
         conversation_id=conversation_id,
     )
+
+    # PipecatInstrumentor.instrument() wraps PipelineWorker.__init__ to auto-inject
+    # an OpenInferenceObserver. Look it up so we can set attributes on its
+    # _turn_span from the audio_buffer event handlers.
+    # this is kind of ugly - just for POC.
+    oi_observer = next(
+        (o for o in worker._observer._observers if isinstance(o, OpenInferenceObserver)),
+        None,
+    )
+    if oi_observer is None:
+        raise RuntimeError("OpenInferenceObserver not found on PipelineWorker")
+
+    @audio_buffer.event_handler("on_user_turn_audio_data")
+    async def on_user_turn_audio_data(buffer, audio, sample_rate, num_channels):
+        if oi_observer._turn_span is None:
+            logger.warning("No active turn span; skipping user audio attribute")
+            return
+        turn_number = oi_observer._turn_count
+        url = audio_uploader.get_presigned_url_and_upload(
+            audio, sample_rate, num_channels, turn_number, role="user"
+        )
+        oi_observer._turn_span.set_attribute("audio.user.url", url)
+        logger.info(f"Turn {turn_number} user audio URL set on span")
+
+    @audio_buffer.event_handler("on_bot_turn_audio_data")
+    async def on_bot_turn_audio_data(buffer, audio, sample_rate, num_channels):
+        if oi_observer._turn_span is None:
+            logger.warning("No active turn span; skipping bot audio attribute")
+            return
+        turn_number = oi_observer._turn_count
+        url = audio_uploader.get_presigned_url_and_upload(
+            audio, sample_rate, num_channels, turn_number, role="bot"
+        )
+        oi_observer._turn_span.set_attribute("audio.bot.url", url)
+        logger.info(f"Turn {turn_number} bot audio URL set on span")
 
     @transport.event_handler("on_client_connected")
     async def on_client_connected(transport, client):
         logger.info(f"Client connected")
-        # Kick off the conversation.
+        await audio_buffer.start_recording()
         context.add_message({"role": "user", "content": "Please introduce yourself to the user."})
         await worker.queue_frames([LLMRunFrame()])
 

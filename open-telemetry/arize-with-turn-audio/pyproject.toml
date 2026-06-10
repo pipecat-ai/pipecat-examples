@@ -1,14 +1,15 @@
 [project]
-name = "pipecat-open-inference-tracing"
+name = "pipecat-arize-with-turn-audio"
 version = "0.1.0"
-description = "A Pipecat example using OpenInference tracing"
+description = "Pipecat + OpenInference/Arize tracing with per-turn audio uploaded to S3, linked from each turn span."
 requires-python = ">=3.11"
 dependencies = [
     "arize-otel>=0.11.0",
+    "boto3>=1.34.0",
     "openinference-instrumentation>=0.1.42",
     "openinference-instrumentation-pipecat>=2.0.0",
-    "pipecat-ai[cartesia,daily,deepgram,google,runner,silero,webrtc,websocket]>=1.3.0",
-    "pipecatcloud>=0.7.1",
+    "pipecat-ai[cartesia,daily,deepgram,openai,runner,silero,webrtc,websocket]>=1.3.0",
+    "pipecatcloud>=0.4.4",
 ]
 
 [dependency-groups]
