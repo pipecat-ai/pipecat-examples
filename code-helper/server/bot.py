@@ -150,7 +150,9 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
         accumulated_text: str | None = None,
         remaining_text: str | None = None,
     ) -> BotOutputTransformResult:
-        logger.debug(f"Obfuscating credit card number: {text}, acc: {accumulated_text}, rem: {remaining_text}")
+        logger.debug(
+            f"Obfuscating credit card number: {text}, acc: {accumulated_text}, rem: {remaining_text}"
+        )
         transformed = "XXXX-XXXX-XXXX-" + text[-4:]
         if accumulated_text is not None and remaining_text is not None:
             ratio = len(accumulated_text) / max(len(text), 1)
