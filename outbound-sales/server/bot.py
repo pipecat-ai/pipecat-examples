@@ -31,6 +31,8 @@ from typing import Any
 
 from dotenv import load_dotenv
 from loguru import logger
+from pipecat.audio.turn.smart_turn.base_smart_turn import SmartTurnParams
+from pipecat.audio.turn.smart_turn.local_smart_turn_v3 import LocalSmartTurnAnalyzerV3
 from pipecat.audio.vad.silero import SileroVADAnalyzer
 from pipecat.frames.frames import (
     EndWorkerFrame,
@@ -41,6 +43,7 @@ from pipecat.frames.frames import (
     LLMFullResponseStartFrame,
     LLMTextFrame,
 )
+from pipecat.observers.user_bot_latency_observer import UserBotLatencyObserver
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.worker import PipelineParams, PipelineWorker
 from pipecat.processors.aggregators.llm_context import LLMContext
@@ -58,6 +61,8 @@ from pipecat.services.openai.llm import OpenAILLMService
 from pipecat.transports.base_transport import BaseTransport
 from pipecat.transports.daily.transport import DailyParams, DailyTransport
 from pipecat.transports.websocket.server import WebsocketServerParams
+from pipecat.turns.user_stop import TurnAnalyzerUserTurnStopStrategy
+from pipecat.turns.user_turn_strategies import UserTurnStrategies
 from pipecat.workers.runner import WorkerRunner
 
 from results import append_result
@@ -338,6 +343,20 @@ async def run_bot(
         context,
         user_params=LLMUserAggregatorParams(
             vad_analyzer=SileroVADAnalyzer(),
+            user_turn_strategies=UserTurnStrategies(
+                stop=[
+                    TurnAnalyzerUserTurnStopStrategy(
+                        # Smart Turn's default silence fallback is 3s. When it
+                        # judges an utterance "incomplete" (e.g. a bare
+                        # "Hello?"), the bot would sit silent that whole time.
+                        # 1s keeps its don't-interrupt judgement with a phone
+                        # friendly worst case.
+                        turn_analyzer=LocalSmartTurnAnalyzerV3(
+                            params=SmartTurnParams(stop_secs=1.0)
+                        )
+                    )
+                ]
+            ),
         ),
     )
 
@@ -364,6 +383,8 @@ async def run_bot(
             audio_in_sample_rate=8000,
             audio_out_sample_rate=8000,
         ),
+        # Logs exact user-stopped-speaking to bot-started-speaking latency
+        observers=[UserBotLatencyObserver()],
     )
 
     # Dial-out only applies to real calls; eval runs get minimal handlers below.
