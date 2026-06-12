@@ -1,5 +1,17 @@
 {
   "attribution": {
     "commit": ""
+  },
+  "permissions": {
+    "allow": [
+      "mcp__claude_ai_Daily_MCP_Gateway__get_api",
+      "mcp__claude_ai_Daily_MCP_Gateway__execute_code",
+      "Bash(uv run *)",
+      "Bash(rtk ls *)",
+      "Bash(python3 -)",
+      "Bash(rtk git *)",
+      "Bash(rtk read *)",
+      "Bash(rtk wc *)"
+    ]
   }
 }
