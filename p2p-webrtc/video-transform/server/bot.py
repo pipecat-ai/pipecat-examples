@@ -12,17 +12,19 @@ from loguru import logger
 from pipecat.audio.vad.silero import SileroVADAnalyzer
 from pipecat.frames.frames import Frame, InputImageRawFrame, LLMRunFrame, OutputImageRawFrame
 from pipecat.pipeline.pipeline import Pipeline
-from pipecat.pipeline.runner import PipelineRunner
-from pipecat.pipeline.task import PipelineParams, PipelineTask
+from pipecat.pipeline.worker import PipelineParams, PipelineWorker
 from pipecat.processors.aggregators.llm_context import LLMContext
 from pipecat.processors.aggregators.llm_response_universal import (
     LLMContextAggregatorPair,
     LLMUserAggregatorParams,
 )
 from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
+from pipecat.runner.types import RunnerArguments
 from pipecat.services.google.gemini_live.llm import GeminiLiveLLMService
-from pipecat.transports.base_transport import TransportParams
+from pipecat.transports.base_transport import BaseTransport, TransportParams
+from pipecat.transports.smallwebrtc.connection import SmallWebRTCConnection
 from pipecat.transports.smallwebrtc.transport import SmallWebRTCTransport
+from pipecat.workers.runner import WorkerRunner
 
 load_dotenv(override=True)
 
@@ -72,20 +74,16 @@ Respond to what the user said in a creative and helpful way. Keep your responses
 """
 
 
-async def run_bot(webrtc_connection):
-    transport_params = TransportParams(
-        audio_in_enabled=True,
-        audio_out_enabled=True,
-        audio_out_10ms_chunks=2,
-        video_in_enabled=True,
-        video_out_enabled=True,
-        video_out_is_live=True,
-    )
+async def run_bot(
+    transport: BaseTransport, transport_params: TransportParams, runner_args: RunnerArguments
+):
+    """Run the video transform bot with the provided transport.
 
-    pipecat_transport = SmallWebRTCTransport(
-        webrtc_connection=webrtc_connection, params=transport_params
-    )
-
+    Args:
+        transport (BaseTransport): The transport to use for communication.
+        transport_params (TransportParams): The params used to configure the transport.
+        runner_args: runner session arguments
+    """
     llm = GeminiLiveLLMService(
         api_key=os.getenv("GOOGLE_API_KEY"),
         settings=GeminiLiveLLMService.Settings(
@@ -111,18 +109,18 @@ async def run_bot(webrtc_connection):
 
     pipeline = Pipeline(
         [
-            pipecat_transport.input(),
+            transport.input(),
             user_aggregator,
             llm,  # LLM
             EdgeDetectionProcessor(
                 transport_params.video_out_width, transport_params.video_out_height
             ),  # Sending the video back to the user
-            pipecat_transport.output(),
+            transport.output(),
             assistant_aggregator,
         ]
     )
 
-    task = PipelineTask(
+    worker = PipelineWorker(
         pipeline,
         params=PipelineParams(
             enable_metrics=True,
@@ -130,23 +128,51 @@ async def run_bot(webrtc_connection):
         ),
     )
 
-    @task.rtvi.event_handler("on_client_ready")
+    @worker.rtvi.event_handler("on_client_ready")
     async def on_client_ready(rtvi):
         logger.info("Pipecat client ready.")
         # Kick off the conversation.
-        await task.queue_frames([LLMRunFrame()])
+        await worker.queue_frames([LLMRunFrame()])
 
-    @pipecat_transport.event_handler("on_client_connected")
+    @transport.event_handler("on_client_connected")
     async def on_client_connected(transport, client):
         logger.info("Pipecat Client connected")
-        await pipecat_transport.capture_participant_video("camera")
-        await pipecat_transport.capture_participant_video("screenVideo")
+        await transport.capture_participant_video("camera")
+        await transport.capture_participant_video("screenVideo")
 
-    @pipecat_transport.event_handler("on_client_disconnected")
+    @transport.event_handler("on_client_disconnected")
     async def on_client_disconnected(transport, client):
         logger.info("Pipecat Client disconnected")
-        await task.cancel()
+        await worker.cancel()
 
-    runner = PipelineRunner(handle_sigint=False)
+    runner = WorkerRunner(handle_sigint=runner_args.handle_sigint)
 
-    await runner.run(task)
+    await runner.add_workers(worker)
+    await runner.run()
+
+
+async def bot(runner_args: RunnerArguments):
+    """Main bot entry point compatible with the Pipecat development runner."""
+    webrtc_connection: SmallWebRTCConnection = runner_args.webrtc_connection
+
+    transport_params = TransportParams(
+        audio_in_enabled=True,
+        audio_out_enabled=True,
+        audio_out_10ms_chunks=2,
+        video_in_enabled=True,
+        video_out_enabled=True,
+        video_out_is_live=True,
+    )
+
+    transport = SmallWebRTCTransport(
+        webrtc_connection=webrtc_connection,
+        params=transport_params,
+    )
+
+    await run_bot(transport, transport_params, runner_args)
+
+
+if __name__ == "__main__":
+    from pipecat.runner.run import main
+
+    main()

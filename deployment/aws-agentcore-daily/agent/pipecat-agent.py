@@ -14,8 +14,7 @@ from loguru import logger
 from pipecat.audio.vad.silero import SileroVADAnalyzer
 from pipecat.frames.frames import EndFrame, LLMRunFrame
 from pipecat.pipeline.pipeline import Pipeline
-from pipecat.pipeline.runner import PipelineRunner
-from pipecat.pipeline.task import PipelineParams, PipelineTask
+from pipecat.pipeline.worker import PipelineParams, PipelineWorker
 from pipecat.processors.aggregators.llm_context import LLMContext
 from pipecat.processors.aggregators.llm_response_universal import (
     LLMContextAggregatorPair,
@@ -26,6 +25,7 @@ from pipecat.services.aws.llm import AWSBedrockLLMService
 from pipecat.services.cartesia.tts import CartesiaTTSService
 from pipecat.services.deepgram.stt import DeepgramSTTService
 from pipecat.transports.daily.transport import DailyParams, DailyTransport
+from pipecat.workers.runner import WorkerRunner
 
 app = BedrockAgentCoreApp()
 
@@ -81,7 +81,7 @@ async def run_bot(transport: DailyTransport):
         ]
     )
 
-    task = PipelineTask(
+    worker = PipelineWorker(
         pipeline,
         params=PipelineParams(
             enable_metrics=True,
@@ -96,24 +96,25 @@ async def run_bot(transport: DailyTransport):
         context.add_message(
             {"role": "user", "content": "Say hello and briefly introduce yourself."}
         )
-        await task.queue_frames([LLMRunFrame()])
+        await worker.queue_frames([LLMRunFrame()])
 
     @transport.event_handler("on_client_disconnected")
     async def on_client_disconnected(transport, client):
         logger.info(f"Client disconnected")
-        await task.cancel()
+        await worker.cancel()
 
     @transport.event_handler("on_call_state_updated")
     async def on_call_state_updated(transport, state):
         logger.info(f"Call state updated: {state}")
         if state == "left":
-            await task.queue_frames([EndFrame()])
+            await worker.queue_frames([EndFrame()])
 
-    runner = PipelineRunner(handle_sigint=True)
+    runner = WorkerRunner(handle_sigint=True)
 
     task_id = app.add_async_task("voice_agent")
 
-    await runner.run(task)
+    await runner.add_workers(worker)
+    await runner.run()
 
     app.complete_async_task(task_id)
 

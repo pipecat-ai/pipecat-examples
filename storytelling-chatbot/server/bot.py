@@ -15,8 +15,7 @@ from loguru import logger
 from pipecat.audio.vad.silero import SileroVADAnalyzer
 from pipecat.frames.frames import EndFrame, LLMRunFrame
 from pipecat.pipeline.pipeline import Pipeline
-from pipecat.pipeline.runner import PipelineRunner
-from pipecat.pipeline.task import PipelineParams, PipelineTask
+from pipecat.pipeline.worker import PipelineParams, PipelineWorker
 from pipecat.processors.aggregators.llm_context import LLMContext
 from pipecat.processors.aggregators.llm_response_universal import (
     LLMContextAggregatorPair,
@@ -30,6 +29,7 @@ from pipecat.transports.daily.transport import (
     DailyTransport,
     DailyTransportMessageFrame,
 )
+from pipecat.workers.runner import WorkerRunner
 
 from processors import StoryImageProcessor, StoryProcessor
 from prompts import CUE_USER_TURN, LLM_BASE_PROMPT
@@ -98,7 +98,7 @@ async def main(room_url, token=None):
 
         # -------------- Story Loop ------------- #
 
-        runner = PipelineRunner()
+        runner = WorkerRunner()
 
         logger.debug("Waiting for participant...")
         main_pipeline = Pipeline(
@@ -114,7 +114,7 @@ async def main(room_url, token=None):
             ]
         )
 
-        main_task = PipelineTask(
+        worker = PipelineWorker(
             main_pipeline,
             params=PipelineParams(
                 enable_metrics=True,
@@ -126,7 +126,7 @@ async def main(room_url, token=None):
         async def on_first_participant_joined(transport, participant):
             logger.debug("Participant joined, storytime commence!")
             await transport.capture_participant_transcription(participant["id"])
-            await main_task.queue_frames(
+            await worker.queue_frames(
                 [
                     images["book1"],
                     LLMRunFrame(),
@@ -138,16 +138,17 @@ async def main(room_url, token=None):
 
         @transport.event_handler("on_participant_left")
         async def on_participant_left(transport, participant, reason):
-            await main_task.cancel()
+            await worker.cancel()
 
         @transport.event_handler("on_call_state_updated")
         async def on_call_state_updated(transport, state):
             if state == "left":
                 # Here we don't want to cancel, we just want to finish sending
                 # whatever is queued, so we use an EndFrame().
-                await main_task.queue_frame(EndFrame())
+                await worker.queue_frame(EndFrame())
 
-        await runner.run(main_task)
+        await runner.add_workers(worker)
+        await runner.run()
 
 
 if __name__ == "__main__":

@@ -38,8 +38,7 @@ from pipecat.frames.frames import (
     MixerEnableFrame,
 )
 from pipecat.pipeline.pipeline import Pipeline
-from pipecat.pipeline.runner import PipelineRunner
-from pipecat.pipeline.task import PipelineParams, PipelineTask
+from pipecat.pipeline.worker import PipelineParams, PipelineWorker
 from pipecat.processors.aggregators.llm_context import LLMContext, LLMContextMessage
 from pipecat.processors.aggregators.llm_response_universal import (
     LLMContextAggregatorPair,
@@ -53,6 +52,7 @@ from pipecat.services.llm_service import FunctionCallParams
 from pipecat.services.openai.llm import OpenAILLMService
 from pipecat.transports.daily.transport import DailyDialinSettings, DailyParams, DailyTransport
 from pipecat.turns.user_mute.base_user_mute_strategy import BaseUserMuteStrategy
+from pipecat.workers.runner import WorkerRunner
 
 from server_utils import AgentRequest, TransferTarget, WarmTransferConfig
 
@@ -419,7 +419,7 @@ async def run_bot(
         ]
     )
 
-    task = PipelineTask(
+    worker = PipelineWorker(
         pipeline,
         params=PipelineParams(
             enable_metrics=True,
@@ -435,23 +435,23 @@ async def run_bot(
     async def on_first_participant_joined(transport, participant) -> None:
         # First participant after bot is always the customer
         logger.info(f"Customer joined: {participant.get('id')}")
-        await task.queue_frames([LLMRunFrame()])
+        await worker.queue_frames([LLMRunFrame()])
 
     @transport.event_handler("on_dialout_connected")
     async def on_dialout_connected(transport, data) -> None:
         logger.info(f"Supervisor dial-out connected (ringing): {data}")
         # Stop hold music so customer hears the ringing
-        await task.queue_frame(MixerEnableFrame(False))
+        await worker.queue_frame(MixerEnableFrame(False))
 
     @transport.event_handler("on_dialout_answered")
     async def on_dialout_answered(transport, data) -> None:
         logger.info(f"Supervisor dial-out answered: {data}")
-        await task.queue_frame(DialoutAnsweredFrame())
+        await worker.queue_frame(DialoutAnsweredFrame())
 
     @transport.event_handler("on_dialout_stopped")
     async def on_dialout_stopped(transport, data) -> None:
         logger.info(f"Supervisor dial-out stopped: {data}")
-        await task.queue_frame(DialoutStoppedFrame())
+        await worker.queue_frame(DialoutStoppedFrame())
 
     @transport.event_handler("on_dialout_warning")
     async def on_dialout_warning(transport, data) -> None:
@@ -461,7 +461,7 @@ async def run_bot(
     async def on_dialout_error(transport, data) -> None:
         logger.error(f"Supervisor dial-out error: {data}")
 
-        await task.queue_frame(DialoutErrorFrame())
+        await worker.queue_frame(DialoutErrorFrame())
 
     @transport.event_handler("on_dialin_ready")
     async def on_dialin_ready(transport, sip_endpoint) -> None:
@@ -494,10 +494,11 @@ async def run_bot(
     @transport.event_handler("on_participant_left")
     async def on_participant_left(transport, participant, reason) -> None:
         logger.info(f"Participant left: {participant.get('id')}, reason: {reason}")
-        await task.queue_frame(ParticipantLeftFrame())
+        await worker.queue_frame(ParticipantLeftFrame())
 
-    runner = PipelineRunner(handle_sigint=handle_sigint)
-    await runner.run(task)
+    runner = WorkerRunner(handle_sigint=handle_sigint)
+    await runner.add_workers(worker)
+    await runner.run()
 
 
 def _create_hold_music_mixer() -> SoundfileMixer | None:

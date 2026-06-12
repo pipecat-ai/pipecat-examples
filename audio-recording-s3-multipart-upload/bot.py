@@ -18,8 +18,7 @@ from pipecat.frames.frames import (
     TTSSpeakFrame,
 )
 from pipecat.pipeline.pipeline import Pipeline
-from pipecat.pipeline.runner import PipelineRunner
-from pipecat.pipeline.task import PipelineParams, PipelineTask
+from pipecat.pipeline.worker import PipelineParams, PipelineWorker
 from pipecat.processors.aggregators.llm_context import LLMContext
 from pipecat.processors.aggregators.llm_response_universal import (
     LLMContextAggregatorPair,
@@ -35,6 +34,7 @@ from pipecat.services.google.llm import GoogleLLMService
 from pipecat.services.llm_service import FunctionCallParams
 from pipecat.transports.base_transport import BaseTransport, TransportParams
 from pipecat.transports.daily.transport import DailyParams
+from pipecat.workers.runner import WorkerRunner
 
 from bot_utils.audio_upload_util import AudioUploader
 
@@ -112,7 +112,7 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
         ]
     )
 
-    task = PipelineTask(
+    worker = PipelineWorker(
         pipeline,
         params=PipelineParams(
             enable_metrics=True,
@@ -145,7 +145,7 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
 
     #############################
 
-    @task.rtvi.event_handler("on_client_ready")
+    @worker.rtvi.event_handler("on_client_ready")
     async def on_client_ready(rtvi):
         logger.info(f"Client ready")
 
@@ -155,20 +155,21 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
         # start recording audio
         await audio_buffer.start_recording()
         context.add_message({"role": "user", "content": "Please introduce yourself to the user."})
-        await task.queue_frames([LLMRunFrame()])
+        await worker.queue_frames([LLMRunFrame()])
 
     @transport.event_handler("on_left")
     async def on_left(transport):
         logger.info(f"Bot left the call")
 
-    @task.event_handler("on_pipeline_finished")
-    async def on_pipeline_finished(task, frame):
+    @worker.event_handler("on_pipeline_finished")
+    async def on_pipeline_finished(worker, frame):
         logger.info(f"Pipeline finished")
         await audio_uploader.finalize_upload_audio_wav_to_s3()
 
-    runner = PipelineRunner(handle_sigint=runner_args.handle_sigint)
+    runner = WorkerRunner(handle_sigint=runner_args.handle_sigint)
 
-    await runner.run(task)
+    await runner.add_workers(worker)
+    await runner.run()
 
 
 async def bot(runner_args: RunnerArguments):

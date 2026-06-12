@@ -32,7 +32,7 @@ class WebRTCApp {
   }
 
   private setupEnvironmentVariables() {
-    this.baseUrl = import.meta.env.VITE_PIPECAT_BASE_URL
+    this.baseUrl = import.meta.env.VITE_PIPECAT_BASE_URL || 'http://localhost:7860';
     this.startUrl = `${this.baseUrl}/start`
     this.apiKey = import.meta.env.VITE_PIPECAT_PUBLIC_API;
   }

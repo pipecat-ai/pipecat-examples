@@ -21,8 +21,7 @@ from loguru import logger
 from pipecat.audio.vad.silero import SileroVADAnalyzer
 from pipecat.frames.frames import EndFrame, TransportMessageUrgentFrame
 from pipecat.pipeline.pipeline import Pipeline
-from pipecat.pipeline.runner import PipelineRunner
-from pipecat.pipeline.task import PipelineParams, PipelineTask
+from pipecat.pipeline.worker import PipelineParams, PipelineWorker
 from pipecat.processors.aggregators.llm_context import LLMContext
 from pipecat.processors.aggregators.llm_response_universal import (
     LLMContextAggregatorPair,
@@ -37,6 +36,7 @@ from pipecat.transports.websocket.client import (
     WebsocketClientParams,
     WebsocketClientTransport,
 )
+from pipecat.workers.runner import WorkerRunner
 
 load_dotenv(override=True)
 
@@ -141,7 +141,7 @@ async def run_client(client_name: str, server_url: str, duration_secs: int):
         ]
     )
 
-    task = PipelineTask(
+    worker = PipelineWorker(
         pipeline,
         params=PipelineParams(
             audio_in_sample_rate=8000,
@@ -178,11 +178,13 @@ async def run_client(client_name: str, server_url: str, duration_secs: int):
     async def end_call():
         await asyncio.sleep(duration_secs)
         logger.info(f"Client {client_name} finished after {duration_secs} seconds.")
-        await task.queue_frame(EndFrame())
+        await worker.queue_frame(EndFrame())
 
-    runner = PipelineRunner()
+    runner = WorkerRunner()
 
-    await asyncio.gather(runner.run(task), end_call())
+    await runner.add_workers(worker)
+
+    await asyncio.gather(runner.run(), end_call())
 
 
 async def main():

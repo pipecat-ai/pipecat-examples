@@ -11,8 +11,7 @@ from loguru import logger
 from pipecat.audio.vad.silero import SileroVADAnalyzer
 from pipecat.frames.frames import LLMRunFrame
 from pipecat.pipeline.pipeline import Pipeline
-from pipecat.pipeline.runner import PipelineRunner
-from pipecat.pipeline.task import PipelineParams, PipelineTask
+from pipecat.pipeline.worker import PipelineParams, PipelineWorker
 from pipecat.processors.aggregators.llm_context import LLMContext
 from pipecat.processors.aggregators.llm_response_universal import (
     LLMContextAggregatorPair,
@@ -28,6 +27,7 @@ from pipecat.transports.websocket.fastapi import (
     FastAPIWebsocketParams,
     FastAPIWebsocketTransport,
 )
+from pipecat.workers.runner import WorkerRunner
 
 AUDIO_OUT_SAMPLE_RATE: int = 24_000
 
@@ -90,7 +90,7 @@ async def run_bot(transport: BaseTransport, handle_sigint: bool, sample_rate: in
         ]
     )
 
-    task = PipelineTask(
+    worker = PipelineWorker(
         pipeline,
         params=PipelineParams(
             audio_in_sample_rate=sample_rate,
@@ -103,15 +103,16 @@ async def run_bot(transport: BaseTransport, handle_sigint: bool, sample_rate: in
     @transport.event_handler("on_client_connected")
     async def on_client_connected(_transport, _client):
         logger.info("Vonage Audio Connector connected. Waiting for user audio...")
-        await task.queue_frames([LLMRunFrame()])
+        await worker.queue_frames([LLMRunFrame()])
 
     @transport.event_handler("on_client_disconnected")
     async def on_client_disconnected(_transport, _client):
         logger.info("Vonage Audio Connector disconnected. Ending call.")
-        await task.cancel()
+        await worker.cancel()
 
-    runner = PipelineRunner(handle_sigint=handle_sigint)
-    await runner.run(task)
+    runner = WorkerRunner(handle_sigint=handle_sigint)
+    await runner.add_workers(worker)
+    await runner.run()
 
 
 async def bot(runner_args: RunnerArguments):

@@ -1,0 +1,4 @@
+.venv
+.python-version
+client/node_modules
+client/.env

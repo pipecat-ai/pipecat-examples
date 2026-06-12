@@ -4,8 +4,8 @@ version = "0.1.0"
 description = "A Pipecat example using Jaeger tracing"
 requires-python = ">=3.11"
 dependencies = [
-    "pipecat-ai[daily,webrtc,websocket,silero,cartesia,deepgram,openai,tracing,runner]>=1.0.0",
-    "pipecatcloud>=0.4.4",
+    "pipecat-ai[daily,webrtc,websocket,silero,cartesia,deepgram,openai,tracing,runner]>=1.3.0",
+    "pipecatcloud>=0.7.1",
     "opentelemetry-exporter-otlp-proto-grpc",
 ]
 
