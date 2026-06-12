@@ -13,11 +13,13 @@ This module provides data models and functions for:
 """
 
 import os
+import time
 
 import aiohttp
 from fastapi import HTTPException, Request
 from loguru import logger
 from pipecat.runner.daily import DailyRoomConfig, configure
+from pipecat.transports.daily.utils import DailyRoomProperties, DailyRoomSipParams
 from pydantic import BaseModel
 
 
@@ -121,11 +123,23 @@ async def create_daily_room(
         HTTPException: If room creation fails
     """
     try:
-        return await configure(
-            session,
-            sip_caller_phone=dialout_request.dialout_settings.phone_number,
+        # Same properties configure() would build for a dial-out room, plus
+        # cloud recording. The bot starts the recording when the call is
+        # answered; recordings are listed and downloaded via Daily's REST API.
+        room_properties = DailyRoomProperties(
+            exp=time.time() + 2 * 60 * 60,
+            eject_at_room_exp=True,
             enable_dialout=True,
+            enable_recording="cloud",
+            sip=DailyRoomSipParams(
+                display_name=dialout_request.dialout_settings.phone_number,
+                video=False,
+                sip_mode="dial-in",
+                num_endpoints=1,
+            ),
+            start_video_off=True,
         )
+        return await configure(session, room_properties=room_properties)
     except Exception as e:
         logger.error(f"Error creating Daily room: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to create Daily room: {str(e)}")

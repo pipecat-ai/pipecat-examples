@@ -220,3 +220,6 @@ __marimo__/
 # Outbound sales example: call outcomes are data, not source
 results.csv
 test-runs/
+
+# Downloaded call recordings
+recordings/

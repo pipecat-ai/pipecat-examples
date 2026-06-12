@@ -409,6 +409,12 @@ async def run_bot(
         async def on_dialout_answered(transport, data):
             logger.debug(f"Dial-out answered: {data}")
             dialout_manager.mark_successful()
+            # Record the call. Daily cloud recording; server.py enables it on
+            # the room. Download recordings via Daily's REST API afterwards.
+            try:
+                await transport.start_recording()
+            except Exception as e:
+                logger.warning(f"Could not start recording: {e}")
 
         @transport.event_handler("on_dialout_stopped")
         async def on_dialout_stopped(transport, data):
