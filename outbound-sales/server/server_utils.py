@@ -19,7 +19,11 @@ import aiohttp
 from fastapi import HTTPException, Request
 from loguru import logger
 from pipecat.runner.daily import DailyRoomConfig, configure
-from pipecat.transports.daily.utils import DailyRoomProperties, DailyRoomSipParams
+from pipecat.transports.daily.utils import (
+    DailyMeetingTokenProperties,
+    DailyRoomProperties,
+    DailyRoomSipParams,
+)
 from pydantic import BaseModel
 
 
@@ -55,8 +59,8 @@ class DialoutRequest(BaseModel):
     Attributes:
         dialout_settings: Settings for the outbound call
         lead: Who we're calling (defaults to just the phone number)
-        call_id: Identifier for this call, used to track it in results.csv
-            (the server mints one if not provided)
+        call_id: Identifier for this call, used to track its outcome in the
+            server's results log (the server mints one if not provided)
     """
 
     dialout_settings: DialoutSettings
@@ -72,7 +76,8 @@ class AgentRequest(BaseModel):
         token: Authentication token for the Daily room
         dialout_settings: Settings for the outbound call
         lead: Who we're calling
-        call_id: Identifier for this call, used to track it in results.csv
+        call_id: Identifier for this call, used to track its outcome in the
+            server's results log
     """
 
     room_url: str
@@ -124,13 +129,16 @@ async def create_daily_room(
     """
     try:
         # Same properties configure() would build for a dial-out room, plus
-        # cloud recording. The bot starts the recording when the call is
-        # answered; recordings are listed and downloaded via Daily's REST API.
+        # audio-only cloud recording. start_cloud_recording on the bot's token
+        # starts the recording automatically when the bot joins, before the
+        # phone leg connects, so the callee never hears a recording
+        # announcement. Recordings are listed and downloaded via Daily's
+        # REST API.
         room_properties = DailyRoomProperties(
             exp=time.time() + 2 * 60 * 60,
             eject_at_room_exp=True,
             enable_dialout=True,
-            enable_recording="cloud",
+            enable_recording="cloud-audio-only",
             sip=DailyRoomSipParams(
                 display_name=dialout_request.dialout_settings.phone_number,
                 video=False,
@@ -139,10 +147,35 @@ async def create_daily_room(
             ),
             start_video_off=True,
         )
-        return await configure(session, room_properties=room_properties)
+        token_properties = DailyMeetingTokenProperties(
+            enable_recording="cloud-audio-only",
+            start_cloud_recording=True,
+        )
+        return await configure(
+            session, room_properties=room_properties, token_properties=token_properties
+        )
     except Exception as e:
         logger.error(f"Error creating Daily room: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to create Daily room: {str(e)}")
+
+
+async def report_result(row: dict[str, str]) -> None:
+    """Report one call outcome to server.py, which logs it and keeps it in memory.
+
+    This demo's stand-in for persistence; a real production app would write
+    the outcome to a database. Best effort: a failed report is logged, not
+    raised, so it never breaks call shutdown.
+
+    Args:
+        row: The outcome row, as built by CallResult.to_row() in bot.py
+    """
+    server_url = os.getenv("SERVER_URL", "http://localhost:8080")
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.post(f"{server_url}/call_result", json=row) as response:
+                response.raise_for_status()
+    except Exception as e:
+        logger.warning(f"Could not report call result to {server_url}: {e}")
 
 
 async def start_bot_production(agent_request: AgentRequest, session: aiohttp.ClientSession):

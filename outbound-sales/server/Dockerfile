@@ -21,5 +21,4 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 
 # Copy the application code
 COPY ./server_utils.py server_utils.py
-COPY ./results.py results.py
 COPY ./bot.py bot.py

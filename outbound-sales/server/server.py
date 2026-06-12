@@ -16,6 +16,7 @@ All call data (room_url, token, dialout_settings) flows through the body paramet
 to ensure consistency between local and cloud deployments.
 """
 
+import datetime
 import os
 import uuid
 from contextlib import asynccontextmanager
@@ -56,6 +57,11 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan)
+
+# Call results keyed by call_id. This is the demo stand-in for persistence:
+# each result is logged to the terminal and kept in memory while the server
+# runs. A real production app would save these to a database instead.
+CALL_RESULTS: dict[str, dict[str, str]] = {}
 
 
 @app.post("/dialout")
@@ -118,6 +124,36 @@ async def handle_dial_out_request(request: Request) -> JSONResponse:
             "call_id": call_id,
         }
     )
+
+
+@app.post("/call_result")
+async def handle_call_result(request: Request) -> JSONResponse:
+    """Record one call's outcome.
+
+    Bots report their outcome here when a call ends; the dialer reports
+    timeout and error rows. The first report for a call_id wins, so a timeout
+    verdict from the dialer stands even if a slow bot reports later.
+
+    This is where a real production app would write to a database. The demo
+    just logs the result to the terminal and keeps it in memory.
+    """
+    row = await request.json()
+    call_id = row.get("call_id")
+    if not call_id:
+        raise HTTPException(status_code=400, detail="Missing 'call_id'")
+    row = {"timestamp": datetime.datetime.now().isoformat(timespec="seconds"), **row}
+    if call_id in CALL_RESULTS:
+        logger.debug(f"Ignoring duplicate result for call {call_id}: {row}")
+    else:
+        CALL_RESULTS[call_id] = row
+        logger.info(f"Call {call_id} finished ({row.get('outcome')}): {row}")
+    return JSONResponse({"status": "ok"})
+
+
+@app.get("/results")
+async def get_results() -> dict[str, dict[str, str]]:
+    """Return all recorded call results keyed by call_id. Polled by dialer.py."""
+    return CALL_RESULTS
 
 
 @app.get("/health")

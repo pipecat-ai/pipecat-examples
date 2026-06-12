@@ -217,8 +217,7 @@ __marimo__/
 
 # Node.js (client/)
 
-# Outbound sales example: call outcomes are data, not source
-results.csv
+# Outbound sales example: eval run artifacts are data, not source
 test-runs/
 
 # Downloaded call recordings

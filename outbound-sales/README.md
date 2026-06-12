@@ -1,6 +1,6 @@
 # Outbound Sales Bot
 
-Meet Hailey, an outbound sales agent built with Pipecat. She calls a list of leads in batches of 5 over Daily PSTN, introduces herself ("Hi, this is Hailey from Pipecat Labs. Am I speaking with Beau?"), and tries to reach the person who handles IT decisions. She either gets transferred or collects the decision maker's contact info, saves it to `results.csv`, says thanks, and hangs up.
+Meet Hailey, an outbound sales agent built with Pipecat. She calls a list of leads in batches of 5 over Daily PSTN, introduces herself ("Hi, this is Hailey from Pipecat Labs. Am I speaking with Beau?"), and tries to reach the person who handles IT decisions. She either gets transferred or collects the decision maker's contact info, reports it to the server (which logs it to the terminal), says thanks, and hangs up.
 
 The example also shows the new **Pipecat evals** feature: the same bot runs in a text-only eval mode so you can test its behavior in seconds, with no phone calls and no audio.
 
@@ -17,14 +17,14 @@ pipecat init outbound-sales --bot-type telephony -t daily_pstn_dialout \
 ```
 leads.csv → dialer.py → server.py /dialout → Daily room + dial-out
                                               ↓
-results.csv ← bot.py (Hailey) ← call answered
+server.py /call_result ← bot.py (Hailey) ← call answered
 ```
 
 1. `dialer.py` reads `leads.csv` and starts calls in batches of 5
 2. For each lead, `server.py` creates a Daily room with dial-out enabled and starts a bot
 3. The bot dials the lead's number; when they answer, Hailey runs the conversation
 4. Hailey saves contact info with the `save_contact_info` tool and hangs up with the `end_call` tool
-5. Every finished call appends one row to `results.csv`; the dialer polls that file to know when a batch is done, then starts the next batch
+5. Every finished call reports one outcome row to `server.py`, which logs it to the terminal and keeps it in memory; the dialer polls `GET /results` to know when a batch is done, then starts the next batch. (This is a demo: a real production app would save outcomes to a database instead.)
 
 ## Configuration
 
@@ -132,7 +132,7 @@ You'll need two terminal windows open:
      }'
    ```
 
-   Answer the call and have a chat with Hailey. When the call ends, check `results.csv` for the outcome.
+   Answer the call and have a chat with Hailey. When the call ends, the outcome is logged in the webhook server's terminal (Terminal 1).
 
 ## Run a Batch Campaign
 
@@ -142,11 +142,11 @@ Edit `leads.csv` with real numbers (`phone,name,company`), then with both server
 uv run dialer.py
 ```
 
-The dialer calls in batches of 5, waits for every call in a batch to finish (or time out after 6 minutes), then starts the next batch. Leads that already have a row in `results.csv` are skipped, so you can stop and re-run it.
+The dialer calls in batches of 5, waits for every call in a batch to finish (or time out after 6 minutes), then starts the next batch. Leads that already have a result are skipped, so you can stop and re-run the dialer while the server stays up.
 
-`results.csv` columns: timestamp, call_id, lead phone/name/company, outcome, contact name/role/phone/email, notes. Outcomes are `contact_captured`, `refused`, `wrong_number`, `transferred_no_info`, `other`, `hung_up`, `no_answer`, `dialout_error`, `timeout`, or `error`.
+Each result row is logged to the server terminal and has: timestamp, call_id, lead phone/name/company, outcome, contact name/role/phone/email, notes. Outcomes are `contact_captured`, `refused`, `wrong_number`, `transferred_no_info`, `other`, `hung_up`, `no_answer`, `dialout_error`, `timeout`, or `error`.
 
-> **Production note**: the dialer learns a call finished by polling `results.csv`, which works locally because all bot sessions run in one process on one filesystem. On Pipecat Cloud each bot runs in its own container, so report outcomes to a webhook or shared storage (database, S3) instead.
+> **Production note**: results live in the server's memory and are gone when it restarts. That's on purpose: this is a demo, and the in-memory store plus terminal logging stand in for a database. In a real production app, have `POST /call_result` write to a database, and remember that on Pipecat Cloud each bot runs in its own container, so `SERVER_URL` must point at a server the bots can reach (not localhost).
 
 ## Environment Configuration
 
@@ -172,7 +172,6 @@ outbound-sales/
 │   ├── server.py            # FastAPI webhook server for Daily PSTN dial-out
 │   ├── server_utils.py      # Data models, room creation, bot starting
 │   ├── dialer.py            # Batch dialer (5 calls at a time)
-│   ├── results.py           # Shared results.csv helpers
 │   ├── leads.csv            # Who to call (phone,name,company)
 │   ├── evals.yaml           # Eval suite manifest
 │   ├── scenarios/           # Text-mode eval scenarios
@@ -195,7 +194,9 @@ Key pieces in `bot.py`:
 
 This project is configured for deployment to Pipecat Cloud. You can learn how to deploy in the [Pipecat Quickstart Guide](https://docs.pipecat.ai/getting-started/quickstart#step-2-deploy-to-production).
 
-Refer to the [Pipecat Cloud Documentation](https://docs.pipecat.ai/deployment/pipecat-cloud/introduction) to learn more about configuring, deploying, and managing your agents. Remember the production note above: `results.csv` aggregation needs replacing with a webhook or shared storage when bots run in separate containers.
+> **Before you deploy**: update the fields in `server/pcc-deploy.toml` for your own account. `image` points at the example author's Docker Hub repo, so change it to your own registry repo and tag. Also set `agent_name` to the agent name in your Pipecat Cloud account and `secret_set` to the secret set you created with `pipecat cloud secrets set`.
+
+Refer to the [Pipecat Cloud Documentation](https://docs.pipecat.ai/deployment/pipecat-cloud/introduction) to learn more about configuring, deploying, and managing your agents. Remember the production note above: the in-memory results store needs replacing with a database (and a reachable `SERVER_URL`) when bots run in separate containers.
 
 ## Learn More
 

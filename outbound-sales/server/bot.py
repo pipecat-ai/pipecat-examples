@@ -8,7 +8,8 @@
 
 Hailey calls a lead, introduces herself, and tries to reach the person who
 handles IT decisions. She either gets transferred or collects the decision
-maker's contact info, saves it to results.csv, says thanks, and hangs up.
+maker's contact info, reports it to server.py (which logs it to the terminal),
+says thanks, and hangs up.
 
 Required AI services:
 - Deepgram (Speech-to-Text)
@@ -66,8 +67,7 @@ from pipecat.turns.user_stop import TurnAnalyzerUserTurnStopStrategy
 from pipecat.turns.user_turn_strategies import UserTurnStrategies
 from pipecat.workers.runner import WorkerRunner
 
-from results import append_result
-from server_utils import AgentRequest, DialoutSettings, Lead
+from server_utils import AgentRequest, DialoutSettings, Lead, report_result
 
 load_dotenv(override=True)
 
@@ -146,11 +146,11 @@ class DialoutManager:
 
 @dataclass
 class CallResult:
-    """What we learned on one call. Written to results.csv when the call ends."""
+    """What we learned on one call. Reported to server.py when the call ends."""
 
     call_id: str
     lead: Lead
-    contact: dict | None = None
+    contact: dict[str, str] | None = None
     end_reason: str | None = None
     notes: str = ""
     # True once end_call has started the graceful pipeline shutdown.
@@ -164,7 +164,7 @@ class CallResult:
         # e.g. the callee hung up on her.
         return self.end_reason or "hung_up"
 
-    def to_row(self) -> dict:
+    def to_row(self) -> dict[str, str]:
         contact = self.contact or {}
         return {
             "call_id": self.call_id,
@@ -192,16 +192,21 @@ class CannedGreetingGate(FrameProcessor):
 
     Hailey's opening line never changes, so the first turn skips the LLM
     round-trip entirely: when the first user turn ends, the LLMContextFrame
-    that would have triggered a completion is swallowed and the greeting is
-    emitted as if the LLM had said it (start/text/end frames). Downstream
-    nothing can tell the difference: TTS speaks it, the assistant aggregator
-    appends it to the context, and evals see a normal response. Every later
-    turn passes through untouched.
+    that would have triggered a completion is swallowed and a TTSSpeakFrame
+    with the greeting is pushed instead. append_to_context=True makes the
+    spoken text land in the LLM context, so later turns see it as a normal
+    assistant message. Every later turn passes through untouched.
+
+    Text-mode evals only observe LLM text events, never TTS output, so eval
+    runs (as_llm_response=True) push the greeting as LLM response frames
+    instead. Same text, same skipped round-trip, just a frame shape the eval
+    harness can see.
     """
 
-    def __init__(self, greeting: str):
+    def __init__(self, greeting: str, *, as_llm_response: bool = False):
         super().__init__()
         self._greeting = greeting
+        self._as_llm_response = as_llm_response
         self._greeted = False
 
     async def process_frame(self, frame: Frame, direction: FrameDirection):
@@ -212,9 +217,12 @@ class CannedGreetingGate(FrameProcessor):
             and isinstance(frame, LLMContextFrame)
         ):
             self._greeted = True
-            await self.push_frame(LLMFullResponseStartFrame())
-            await self.push_frame(LLMTextFrame(self._greeting))
-            await self.push_frame(LLMFullResponseEndFrame())
+            if self._as_llm_response:
+                await self.push_frame(LLMFullResponseStartFrame())
+                await self.push_frame(LLMTextFrame(self._greeting))
+                await self.push_frame(LLMFullResponseEndFrame())
+            else:
+                await self.push_frame(TTSSpeakFrame(self._greeting, append_to_context=True))
             return
         await self.push_frame(frame, direction)
 
@@ -254,7 +262,7 @@ async def run_bot(
     lead: Lead,
     dialout_settings: DialoutSettings | None,
     call_id: str,
-    save_results: bool,
+    report_results: bool,
 ) -> None:
     """Run Hailey for one session.
 
@@ -265,7 +273,7 @@ async def run_bot(
         lead: Who we're calling (name personalizes the greeting).
         dialout_settings: Dial-out settings for real calls; None on eval runs.
         call_id: Identifier for this call, minted by dialer.py ("eval" on eval runs).
-        save_results: Whether to append an outcome row to results.csv at call end.
+        report_results: Whether to report an outcome row to server.py at call end.
     """
     logger.info(f"Starting bot for call {call_id} to {lead.phone}")
 
@@ -376,7 +384,7 @@ async def run_bot(
             stt,
             user_aggregator,
             # First reply is canned, so the greeting starts without an LLM round-trip
-            CannedGreetingGate(greeting_line(lead)),
+            CannedGreetingGate(greeting_line(lead), as_llm_response=dialout_settings is None),
             llm,
             tts,
             transport.output(),
@@ -409,12 +417,6 @@ async def run_bot(
         async def on_dialout_answered(transport, data):
             logger.debug(f"Dial-out answered: {data}")
             dialout_manager.mark_successful()
-            # Record the call. Daily cloud recording; server.py enables it on
-            # the room. Download recordings via Daily's REST API afterwards.
-            try:
-                await transport.start_recording()
-            except Exception as e:
-                logger.warning(f"Could not start recording: {e}")
 
         @transport.event_handler("on_dialout_stopped")
         async def on_dialout_stopped(transport, data):
@@ -462,11 +464,13 @@ async def run_bot(
     try:
         await runner.run()
     finally:
-        # The outcome row doubles as the "this call finished" signal for
-        # dialer.py, so it must be written no matter how the call ended.
-        if save_results:
-            append_result(result.to_row())
-            logger.info(f"Call {call_id}: recorded outcome '{result.outcome}'")
+        # The outcome report doubles as the "this call finished" signal for
+        # dialer.py, so it must be sent no matter how the call ended. This is
+        # where a real app would write to a database; the demo logs the row
+        # and hands it to server.py, which keeps it in memory.
+        if report_results:
+            logger.info(f"Call {call_id}: outcome '{result.outcome}': {result.to_row()}")
+            await report_result(result.to_row())
 
 
 async def bot(runner_args: RunnerArguments):
@@ -491,7 +495,7 @@ async def bot(runner_args: RunnerArguments):
             lead=lead,
             dialout_settings=None,
             call_id="eval",
-            save_results=False,
+            report_results=False,
         )
         return
 
@@ -515,7 +519,7 @@ async def bot(runner_args: RunnerArguments):
             lead=request.lead,
             dialout_settings=request.dialout_settings,
             call_id=request.call_id,
-            save_results=True,
+            report_results=True,
         )
 
     except Exception as e:
