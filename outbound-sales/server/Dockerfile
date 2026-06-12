@@ -9,6 +9,10 @@ ENV UV_LINK_MODE=copy
 # Uncomment if you wish to print a summary of the features available in the base image
 # ENV PCC_LOG_FEATURES_SUMMARY=true
 
+# Git is needed to install the pipecat-ai git dependency.
+# TODO: remove once pipecat-ai 1.4.0 ships on PyPI and pyproject.toml points at it.
+RUN apt-get update && apt-get install -y --no-install-recommends git && rm -rf /var/lib/apt/lists/*
+
 # Install the project's dependencies using the lockfile and settings
 RUN --mount=type=cache,target=/root/.cache/uv \
     --mount=type=bind,source=uv.lock,target=uv.lock \

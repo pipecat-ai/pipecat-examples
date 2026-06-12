@@ -32,7 +32,15 @@ from typing import Any
 from dotenv import load_dotenv
 from loguru import logger
 from pipecat.audio.vad.silero import SileroVADAnalyzer
-from pipecat.frames.frames import EndWorkerFrame, FunctionCallResultProperties
+from pipecat.frames.frames import (
+    EndWorkerFrame,
+    Frame,
+    FunctionCallResultProperties,
+    LLMContextFrame,
+    LLMFullResponseEndFrame,
+    LLMFullResponseStartFrame,
+    LLMTextFrame,
+)
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.worker import PipelineParams, PipelineWorker
 from pipecat.processors.aggregators.llm_context import LLMContext
@@ -40,7 +48,7 @@ from pipecat.processors.aggregators.llm_response_universal import (
     LLMContextAggregatorPair,
     LLMUserAggregatorParams,
 )
-from pipecat.processors.frame_processor import FrameDirection
+from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
 from pipecat.runner.types import EvalRunnerArguments, RunnerArguments
 from pipecat.runner.utils import create_transport
 from pipecat.services.cartesia.tts import CartesiaTTSService
@@ -82,6 +90,7 @@ class DialoutManager:
     ):
         self._transport = transport
         self._phone_number = dialout_settings.phone_number
+        self._caller_id = dialout_settings.caller_id
         self._max_retries = max_retries
         self._attempt_count = 0
         self._is_successful = False
@@ -108,7 +117,11 @@ class DialoutManager:
             f"Attempting dialout (attempt {self._attempt_count}/{self._max_retries}) to: {self._phone_number}"
         )
 
-        await self._transport.start_dialout({"phoneNumber": self._phone_number})
+        dialout_params = {"phoneNumber": self._phone_number}
+        if self._caller_id:
+            # The id (UUID) of a phone number purchased through Daily.
+            dialout_params["callerId"] = self._caller_id
+        await self._transport.start_dialout(dialout_params)
         return True
 
     def mark_successful(self):
@@ -161,14 +174,51 @@ class CallResult:
         }
 
 
+def greeting_line(lead: Lead) -> str:
+    """Hailey's opening line. Spoken via a canned TTSSpeakFrame, skipping the LLM."""
+    if lead.name:
+        return f"Hi, this is Hailey from Pipecat Labs. Am I speaking with {lead.name}?"
+    return "Hi, this is Hailey from Pipecat Labs. Who am I speaking with?"
+
+
+class CannedGreetingGate(FrameProcessor):
+    """Replies to the caller's first utterance with a canned greeting.
+
+    Hailey's opening line never changes, so the first turn skips the LLM
+    round-trip entirely: when the first user turn ends, the LLMContextFrame
+    that would have triggered a completion is swallowed and the greeting is
+    emitted as if the LLM had said it (start/text/end frames). Downstream
+    nothing can tell the difference: TTS speaks it, the assistant aggregator
+    appends it to the context, and evals see a normal response. Every later
+    turn passes through untouched.
+    """
+
+    def __init__(self, greeting: str):
+        super().__init__()
+        self._greeting = greeting
+        self._greeted = False
+
+    async def process_frame(self, frame: Frame, direction: FrameDirection):
+        await super().process_frame(frame, direction)
+        if (
+            not self._greeted
+            and direction == FrameDirection.DOWNSTREAM
+            and isinstance(frame, LLMContextFrame)
+        ):
+            self._greeted = True
+            await self.push_frame(LLMFullResponseStartFrame())
+            await self.push_frame(LLMTextFrame(self._greeting))
+            await self.push_frame(LLMFullResponseEndFrame())
+            return
+        await self.push_frame(frame, direction)
+
+
 def system_prompt(lead: Lead) -> str:
     if lead.name:
         lead_line = f"The lead list says this number belongs to {lead.name}"
         lead_line += f" at {lead.company}." if lead.company else "."
-        greeting = f'"Hi, this is Hailey from Pipecat Labs. Am I speaking with {lead.name}?"'
     else:
         lead_line = "You don't know the name of the person who will answer."
-        greeting = '"Hi, this is Hailey from Pipecat Labs." Then ask who you are speaking with.'
 
     return f"""You are Hailey, a friendly sales development representative at Pipecat Labs. You are on an outbound phone call. {lead_line}
 
@@ -177,7 +227,7 @@ This is a real phone conversation: your replies are spoken aloud. Keep them shor
 Your goal: find out who handles IT decisions at this company and get their contact information (name, role, and a phone number or email), or get transferred to them directly.
 
 Follow this flow:
-1. The person answering speaks first. Greet them with: {greeting}
+1. The person answering speaks first, and your opening line ("{greeting_line(lead)}") is sent for you automatically. Don't repeat it; continue the conversation from their reply.
 2. Briefly explain why you're calling: Pipecat Labs helps companies add AI voice agents to their phone systems, and you'd love to share details with whoever runs IT.
 3. Ask who handles IT decisions and how to reach them.
 4. If they offer to transfer you, thank them briefly and stop talking. Do not introduce yourself again until the new person actually speaks. When they do, introduce yourself and continue from step 2. If you get transferred to the decision maker, you still want their direct contact info for follow-up.
@@ -222,7 +272,8 @@ async def run_bot(
     tts = CartesiaTTSService(
         api_key=os.getenv("CARTESIA_API_KEY"),
         settings=CartesiaTTSService.Settings(
-            voice=os.getenv("CARTESIA_VOICE_ID", "71a7ad14-091c-4e8e-a314-022ece01c121"),
+            # Default: Cartesia "Sierra - California Girl"
+            voice=os.getenv("CARTESIA_VOICE_ID", "b7d50908-b17c-442d-ad8d-810c63997ed9"),
         ),
     )
 
@@ -296,6 +347,8 @@ async def run_bot(
             transport.input(),
             stt,
             user_aggregator,
+            # First reply is canned, so the greeting starts without an LLM round-trip
+            CannedGreetingGate(greeting_line(lead)),
             llm,
             tts,
             transport.output(),

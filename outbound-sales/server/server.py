@@ -88,6 +88,10 @@ async def handle_dial_out_request(request: Request) -> JSONResponse:
     lead = dialout_request.lead or Lead(phone=dialout_request.dialout_settings.phone_number)
     call_id = dialout_request.call_id or uuid.uuid4().hex
 
+    # Default the caller ID to the purchased number's id from the environment.
+    if not dialout_request.dialout_settings.caller_id and os.getenv("CALLER_ID"):
+        dialout_request.dialout_settings.caller_id = os.getenv("CALLER_ID")
+
     agent_request = AgentRequest(
         room_url=daily_room_config.room_url,
         token=daily_room_config.token,
