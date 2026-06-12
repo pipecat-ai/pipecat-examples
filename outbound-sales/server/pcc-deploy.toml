@@ -1,5 +1,5 @@
 agent_name = "outbound-sales"
-image = "hushdaily/outbound-sales:0.3"
+image = "hushdaily/outbound-sales:0.4"
 secret_set = "outbound-sales-secrets"
 agent_profile = "agent-1x"
 

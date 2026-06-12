@@ -42,6 +42,7 @@ from pipecat.frames.frames import (
     LLMFullResponseEndFrame,
     LLMFullResponseStartFrame,
     LLMTextFrame,
+    TTSSpeakFrame,
 )
 from pipecat.observers.user_bot_latency_observer import UserBotLatencyObserver
 from pipecat.pipeline.pipeline import Pipeline
@@ -336,6 +337,14 @@ async def run_bot(
         # EndWorkerFrame flows upstream and shuts the pipeline down gracefully.
         result.ending = True
         await params.llm.push_frame(EndWorkerFrame(), FrameDirection.UPSTREAM)
+
+    @llm.event_handler("on_function_calls_started")
+    async def on_function_calls_started(service, function_calls):
+        # Tool-call turns cost a second LLM round-trip (call, then the spoken
+        # reply). Mask it with a short filler while the contact info saves.
+        # No filler for end_call: its goodbye was already spoken.
+        if any(fc.function_name == "save_contact_info" for fc in function_calls):
+            await tts.queue_frame(TTSSpeakFrame("One sec, let me jot that down."))
 
     # Direct functions listed in the context are registered with the LLM automatically
     context = LLMContext(tools=[save_contact_info, end_call])
