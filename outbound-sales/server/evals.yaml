@@ -1,0 +1,14 @@
+# Eval suite manifest: `uv run pipecat eval suite evals.yaml -v`
+#
+# Hailey hangs up at the end of every scenario (that's the point of the bot),
+# which shuts the bot process down. The suite spawns a fresh bot per scenario,
+# so every run starts clean. To iterate on a single scenario instead:
+#
+#     uv run bot.py -t eval          # terminal 1 (restart after each run)
+#     uv run pipecat eval run scenarios/happy_path.yaml -v   # terminal 2
+concurrency: 3
+runs_dir: test-runs
+scenarios_dir: scenarios
+suite:
+  - bot: bot.py
+    scenarios: [happy_path, transfer_path, gatekeeper_refusal]
