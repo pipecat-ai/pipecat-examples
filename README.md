@@ -71,6 +71,7 @@ Ready to explore more? These are two of the most useful examples for common use 
 - **[daily-custom-tracks](daily-custom-tracks/)** - Custom audio/video track handling
 - **[local-input-select-stt](local-input-select-stt/)** - Local audio input selection
 - **[bot-ready-signalling](bot-ready-signalling/)** - Bot connect management
+- **[speculative-user-aggregator](speculative-user-aggregator/)** - Speculative inference to reduce latency
 
 ### **Deployment & Infrastructure**
 
