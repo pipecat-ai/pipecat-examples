@@ -1,12 +1,12 @@
-# studypal
+# cartesia-studypal
 
-### Have a conversation about any article on the web
+## Have a conversation about any article on the web
 
-studypal is a fast conversational AI built using [Daily](https://www.daily.co/) or SmallWebRTC for real-time media transport, [Deepgram](https://deepgram.com/) for speech-to-text, [OpenAI](https://openai.com/) for LLM inference, and [Cartesia](https://cartesia.ai) for text-to-speech. Everything is orchestrated together (VAD -> STT -> LLM -> TTS) using [Pipecat](https://www.pipecat.ai/).
+`cartesia-studypal` is a fast conversational AI built using [Daily](https://www.daily.co/) or SmallWebRTC for real-time media transport, and [Cartesia](https://cartesia.ai) for speech-to-text and text-to-speech. Everything is orchestrated together (STT -> LLM -> TTS) using [Pipecat](https://www.pipecat.ai/).
 
 ## Supported Content Sources
 
-studypal can extract and discuss content from:
+`cartesia-studypal` can extract and discuss content from:
 
 - **Wikipedia articles** - Any Wikipedia URL in any language
 
@@ -14,8 +14,8 @@ studypal can extract and discuss content from:
   - Example: `https://es.wikipedia.org/wiki/Inteligencia_artificial`
 
 - **arXiv papers** - Academic papers from arXiv.org
-  - Example: `https://arxiv.org/abs/1706.03762` (Attention Is All You Need)
-  - Example: `https://arxiv.org/pdf/1706.03762.pdf` (PDF URLs also work)
+  - Example: `https://arxiv.org/abs/2312.00752` (Mamba: Linear-Time Sequence Modeling with Selective State Spaces)
+  - Example: `https://arxiv.org/pdf/2312.00752` (PDF URLs also work)
 
 **Note:** Content is automatically truncated to 10,000 tokens to fit within the LLM context window.
 
