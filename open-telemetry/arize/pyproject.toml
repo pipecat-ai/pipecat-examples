@@ -7,7 +7,7 @@ dependencies = [
     "arize-otel>=0.11.0",
     "openinference-instrumentation>=0.1.42",
     "openinference-instrumentation-pipecat>=0.1.0",
-    "pipecat-ai[cartesia,daily,deepgram,google,runner,silero,webrtc,websocket]>=0.0.100",
+    "pipecat-ai[cartesia,daily,deepgram,google,runner,silero,webrtc,websocket]>=1.4.0",
     "pipecatcloud>=0.7.1",
 ]
 

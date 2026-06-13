@@ -14,11 +14,9 @@ from typing import Any
 
 from dotenv import load_dotenv
 from loguru import logger
-from pipecat.adapters.schemas.function_schema import FunctionSchema
-from pipecat.adapters.schemas.tools_schema import ToolsSchema
 from pipecat.audio.vad.silero import SileroVADAnalyzer
 from pipecat.extensions.ivr.ivr_navigator import IVRNavigator
-from pipecat.frames.frames import EndTaskFrame
+from pipecat.frames.frames import EndWorkerFrame
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.worker import PipelineParams, PipelineWorker
 from pipecat.processors.aggregators.llm_context import LLMContext
@@ -39,8 +37,13 @@ from pipecat.workers.runner import WorkerRunner
 load_dotenv()
 
 
-async def handle_end_call(params: FunctionCallParams):
-    await params.llm.push_frame(EndTaskFrame(), FrameDirection.UPSTREAM)
+async def end_call(params: FunctionCallParams, reason: str):
+    """End the call.
+
+    Args:
+        reason: The reason for ending the call.
+    """
+    await params.llm.push_frame(EndWorkerFrame())
 
 
 async def run_bot(transport: BaseTransport, handle_sigint: bool) -> None:
@@ -56,22 +59,6 @@ async def run_bot(transport: BaseTransport, handle_sigint: bool) -> None:
 
     llm = OpenAILLMService(api_key=os.getenv("OPENAI_API_KEY"))
 
-    llm.register_function("end_call", handle_end_call)
-
-    end_call_function = FunctionSchema(
-        name="end_call",
-        description="End the call",
-        properties={
-            "reason": {
-                "type": "string",
-                "description": "The reason for ending the call",
-            },
-        },
-        required=["reason"],
-    )
-
-    tools = ToolsSchema(standard_tools=[end_call_function])
-
     ivr_navigator = IVRNavigator(
         llm=llm,
         ivr_prompt="""You are calling Daily Pharmacy on behalf of Mark Backman. Your goal is to obtain status of his prescription and whether it's ready for pickup. Once you have received that information, call the end_call function with the reason 'Call completed' to end the call.
@@ -81,7 +68,7 @@ Relevant information:
 - Prescription number: 1234567""",
     )
 
-    context = LLMContext(tools=tools)
+    context = LLMContext(tools=[end_call])
     user_aggregator, assistant_aggregator = LLMContextAggregatorPair(
         context,
         user_params=LLMUserAggregatorParams(

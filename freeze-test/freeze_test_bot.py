@@ -22,7 +22,7 @@ from pipecat.audio.vad.silero import SileroVADAnalyzer
 from pipecat.frames.frames import (
     CancelFrame,
     EndFrame,
-    EndTaskFrame,
+    EndWorkerFrame,
     Frame,
     InterimTranscriptionFrame,
     InterruptionFrame,
@@ -198,7 +198,7 @@ class IdleHandler:
             await aggregator.push_frame(
                 TTSSpeakFrame("It seems like you're busy right now. Have a nice day!")
             )
-            await aggregator.push_frame(EndTaskFrame(), FrameDirection.UPSTREAM)
+            await aggregator.push_frame(EndWorkerFrame())
 
 
 async def run_example(websocket_client):
