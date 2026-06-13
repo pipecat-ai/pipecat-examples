@@ -2,7 +2,7 @@
 
 ## Have a conversation about any article on the web
 
-studypal is a fast conversational AI built using [Daily](https://www.daily.co/) or SmallWebRTC for real-time media transport, [Cartesia](https://cartesia.ai) for speech-to-text, [OpenAI](https://openai.com/) for LLM inference, and [Cartesia](https://cartesia.ai) for text-to-speech. Everything is orchestrated together (VAD -> STT -> LLM -> TTS) using [Pipecat](https://www.pipecat.ai/).
+studypal is a fast conversational AI built using [Daily](https://www.daily.co/) or SmallWebRTC for real-time media transport, [Cartesia](https://cartesia.ai) for speech-to-text, [OpenAI](https://openai.com/) for LLM inference, and [Cartesia](https://cartesia.ai) for text-to-speech. Everything is orchestrated together (STT -> LLM -> TTS) using [Pipecat](https://www.pipecat.ai/).
 
 ## Supported Content Sources
 
