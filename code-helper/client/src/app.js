@@ -36,8 +36,7 @@ class VoiceChatClient {
     this.conversationLog = document.getElementById('conversation-log');
     this.eventsLog = document.getElementById('events-log');
     this.lastConversationBubble = null;
-    this.botSpans = [];
-    this.curBotSpan = -1;
+    this.botSpans = {};
     this.sendBtn = document.getElementById('send-btn');
 
     // Populate transport selector with available transports
@@ -63,7 +62,7 @@ class VoiceChatClient {
     // Add placeholder message
     this.addConversationMessage(
       'Connect to start talking with your bot',
-      'placeholder'
+      'placeholder',
     );
   }
 
@@ -147,14 +146,18 @@ class VoiceChatClient {
             }
           },
           onBotOutput: (data) => {
-            // Check the aggregation type. If WORD, embolden the word already rendered
-            // in the bot transcript. Otherwise, add to the latest bot message or start
-            // a new one.
-            if (data.aggregated_by === AggregationType.WORD) {
-              this.emboldenBotWord(data.text);
+            // Check the spoken states. If this output represents spoken text that
+            // is currently being spoken, highlight it.
+            if (data.will_be_spoken && data.spoken_status !== 'new') {
+              this.highlightSpokenText(data);
               return;
             } else {
-              this.addConversationMessage(data.text, 'bot', data.aggregated_by);
+              this.addConversationMessage(
+                data.text,
+                'bot',
+                data.aggregated_by,
+                data.segment_id,
+              );
             }
           },
           onError: (error) => {
@@ -230,60 +233,18 @@ class VoiceChatClient {
     this.micBtn.style.backgroundColor = enabled ? '#10b981' : '#1f2937';
   }
 
-  emboldenBotWord(word) {
-    // This method does it's best to find the word provided in the rendered bot
-    // transcript and embolden it. It keeps track of which bubble and index
-    // it's at to avoid searching from the start each time. It simply looks for
-    // the next occurrence of the word in the current bubble and emboldens all the
-    // text up to that word. This means it may fail if the word does not
-    // match exactly what was rendered (e.g., punctuation, casing, etc), but
-    // it's a best effort.
-    if (this.curBotSpan < 0) return;
-    const curSpan = this.botSpans[this.curBotSpan];
+  highlightSpokenText(data) {
+    const curSpan = this.botSpans[data.segment_id];
     if (!curSpan) return;
-    // Get the inner HTML without <strong> tags
-    const spanInnards = curSpan.innerHTML.replace(/<\/?strong>/g, '');
-    // Split into already spoken (and emboldened) and yet to be spoken (and emboldened)
-    const alreadyEmboldened = spanInnards.slice(0, this.lastBotWordIndex || 0);
-    const yetToEmbolden = spanInnards.slice(this.lastBotWordIndex || 0);
-
-    // For the yet to embolden part, find the next occurrence of the word
-    const wordIndex = yetToEmbolden.indexOf(word);
-    if (wordIndex === -1) {
-      // If the word is not found, we may have finished this span
-      // move to the next span if available
-      if (this.botSpans.length > this.curBotSpan + 1) {
-        // Once we complete a span, mark it as spoken. This removes the need
-        // for inserting <strong> tags and simplifies the innerHTML.
-        curSpan.innerHTML = spanInnards;
-        curSpan.classList.add('spoken');
-
-        // Move to next bubble
-        this.curBotSpan = this.curBotSpan + 1;
-        this.lastBotWordIndex = 0;
-        // Try again with the next span
-        this.emboldenBotWord(word);
-        return;
-      }
-      return;
-    }
-    // Replace the first occurrence of the word with word</strong>
-    // Use word boundaries to match the whole word
-    const replaced = yetToEmbolden.replace(word, `${word}</strong>`);
-
-    // Update the inner HTML so that <strong> wraps all text up until
-    // and including the current word
-    curSpan.innerHTML = '<strong>' + alreadyEmboldened + replaced;
+    // Get the inner HTML
+    const spanInnards = `<strong>${data.spoken_progress.accumulated_text}</strong>${data.spoken_progress.remaining_text}`;
+    curSpan.innerHTML = spanInnards;
     // Scroll to bottom
     this.conversationLog.scrollTop = this.conversationLog.scrollHeight;
-
-    // Update lastBotWordIndex
-    this.lastBotWordIndex =
-      (this.lastBotWordIndex || 0) + wordIndex + word.length;
   }
 
   // Create a new element to add to the bot bubble based on aggregation type
-  createBotBubbleElement(text, type) {
+  createBotBubbleElement(text, type, segmentId) {
     let newElement;
     switch (type) {
       case 'code':
@@ -311,29 +272,24 @@ class VoiceChatClient {
         {
           // All other text is rendered in a simple span and new lines are converted to <br>
           newElement = document.createElement('span');
-          text = text.trim();
-          // We add spaces around the <br> to ensure we don't break our emboldening logic
-          newElement.innerHTML = text.replace(/\n/g, ' <br> ');
-          this.botSpans.push(newElement);
-          if (this.curBotSpan === -1) {
-            this.curBotSpan = 0;
-          }
+          newElement.innerHTML = text;
+          newElement.classList.add('text-segment');
+          newElement.classList.add(type);
+          this.botSpans[segmentId] = newElement;
         }
         break;
     }
     // Attach the aggregation type for later reference
     newElement.type = type;
+    newElement.id = segmentId;
     return newElement;
   }
 
   // Add text to the last bubble, handling different types appropriately
-  addToLastBubble(text, role, type) {
+  addToLastBubble(text, role, type, segmentId) {
     const appendText = (element, text) => {
       text = text.trim();
       element.innerHTML += ' ' + text.replace(/\n/g, ' <br> ');
-    };
-    const typeIsText = (t) => {
-      return !['code', 'link'].includes(t);
     };
 
     if (role === 'user') {
@@ -343,42 +299,38 @@ class VoiceChatClient {
       return;
     }
 
-    // For bot messages, if the last element is text and the new type is also text,
-    // we can simply append to it.
-    const lastChild = this.lastConversationBubble.lastChild;
-    if (lastChild && typeIsText(lastChild.type) && typeIsText(type)) {
-      appendText(lastChild, text);
-      return;
-    }
-    // If we're here, then the text is part of the bot transcript and either not
-    // text or a different type than the last element. Create a new element to add
-    // to the bot transcript bubble.
     this.lastConversationBubble.appendChild(
-      this.createBotBubbleElement(text, type)
+      this.createBotBubbleElement(text, type, segmentId),
     );
   }
 
   // Entry point for adding text to the conversation log
-  addConversationMessage(text, role, type = AggregationType.SENTENCE) {
+  addConversationMessage(
+    text,
+    role,
+    type = AggregationType.SENTENCE,
+    segmentId,
+  ) {
     // If the role changes, create a new bubble. Otherwise, add to the last bubble.
     if (this.lastConversationBubble?.role === role) {
-      this.addToLastBubble(text, role, type);
+      this.addToLastBubble(text, role, type, segmentId);
     } else {
-      this.createConversationBubble(text, role, type);
+      this.createConversationBubble(text, role, type, segmentId);
     }
   }
 
   // Create a new conversation bubble along with its initial text
-  createConversationBubble(text, role, type) {
+  createConversationBubble(text, role, type, segmentId) {
     const messageDiv = document.createElement('div');
     messageDiv.className = `conversation-message ${role} ${type}`;
     this.lastConversationBubble = messageDiv;
     this.lastConversationBubble.role = role;
+    this.lastConversationBubble.segmentId = segmentId;
 
     if (role === 'placeholder') {
       messageDiv.textContent = text;
     } else {
-      this.addToLastBubble(text, role, type);
+      this.addToLastBubble(text, role, type, segmentId);
     }
 
     this.conversationLog.appendChild(messageDiv);
