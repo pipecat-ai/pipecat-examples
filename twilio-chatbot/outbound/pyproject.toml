@@ -9,3 +9,14 @@ dependencies = [
   "pipecatcloud>=0.7.1",
   "twilio"
 ]
+
+[dependency-groups]
+dev = [
+    "pyright>=1.1.404,<2",
+    "ruff>=0.12.11,<1",
+]
+
+[tool.ruff]
+line-length = 100
+[tool.ruff.lint]
+select = ["I", "UP"]

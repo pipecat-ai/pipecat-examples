@@ -4,15 +4,25 @@
 # SPDX-License-Identifier: BSD 2-Clause License
 #
 
-"""Pipecat Cloud-compatible bot example.
+"""Multi-transport bot using create_transport (recommended pattern).
 
-Transports are:
+One bot, every transport: create_transport picks the right transport from the
+runner arguments and builds it — including telephony serializers — from the
+factories in ``transport_params``. This is the recommended way to construct
+transports; see 02-verbose-transport-bot.py for the manual equivalent.
 
-- Daily
-- SmallWebRTC
-- Twilio
-- Telnyx
-- Plivo
+Supported transports: Daily, SmallWebRTC, Twilio, Telnyx, Plivo, Exotel.
+
+Run it with::
+
+    python 01-create-transport-bot.py                       # SmallWebRTC (open /client)
+    python 01-create-transport-bot.py -t daily
+    python 01-create-transport-bot.py -t twilio -x yourproxy.ngrok.io
+
+create_transport also wires up the headless eval transport for free (no entry
+needed in transport_params), so you can behaviorally test the pipeline::
+
+    python 01-create-transport-bot.py -t eval
 """
 
 import os

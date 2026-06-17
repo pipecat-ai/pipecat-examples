@@ -17,16 +17,12 @@ from pipecat.processors.aggregators.llm_response_universal import (
     LLMUserAggregatorParams,
 )
 from pipecat.runner.types import RunnerArguments
-from pipecat.runner.utils import parse_telephony_websocket
-from pipecat.serializers.plivo import PlivoFrameSerializer
+from pipecat.runner.utils import create_transport
 from pipecat.services.cartesia.tts import CartesiaTTSService
 from pipecat.services.deepgram.stt import DeepgramSTTService
 from pipecat.services.openai.llm import OpenAILLMService
 from pipecat.transports.base_transport import BaseTransport
-from pipecat.transports.websocket.fastapi import (
-    FastAPIWebsocketParams,
-    FastAPIWebsocketTransport,
-)
+from pipecat.transports.websocket.fastapi import FastAPIWebsocketParams
 from pipecat.workers.runner import WorkerRunner
 
 load_dotenv(override=True)
@@ -103,26 +99,22 @@ async def run_bot(transport: BaseTransport, handle_sigint: bool):
 async def bot(runner_args: RunnerArguments):
     """Main bot entry point compatible with Pipecat Cloud."""
 
-    transport_type, call_data = await parse_telephony_websocket(runner_args.websocket)
-    logger.info(f"Auto-detected transport: {transport_type}")
-
-    serializer = PlivoFrameSerializer(
-        stream_id=call_data["stream_id"],
-        call_id=call_data["call_id"],
-        auth_id=os.getenv("PLIVO_AUTH_ID", ""),
-        auth_token=os.getenv("PLIVO_AUTH_TOKEN", ""),
-    )
-
-    transport = FastAPIWebsocketTransport(
-        websocket=runner_args.websocket,
-        params=FastAPIWebsocketParams(
+    transport_params = {
+        "plivo": lambda: FastAPIWebsocketParams(
             audio_in_enabled=True,
             audio_out_enabled=True,
-            add_wav_header=False,
-            serializer=serializer,
         ),
-    )
+    }
 
-    handle_sigint = runner_args.handle_sigint
+    # create_transport auto-detects the telephony provider, builds the matching
+    # serializer (here the PlivoFrameSerializer, using PLIVO_AUTH_ID / PLIVO_AUTH_TOKEN)
+    # and sets add_wav_header=False, so the bot only supplies the params it cares about.
+    transport = await create_transport(runner_args, transport_params)
 
-    await run_bot(transport, handle_sigint)
+    await run_bot(transport, runner_args.handle_sigint)
+
+
+if __name__ == "__main__":
+    from pipecat.runner.run import main
+
+    main()

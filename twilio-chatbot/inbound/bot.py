@@ -8,7 +8,6 @@ import datetime
 import io
 import os
 import wave
-from typing import Optional
 
 import aiofiles
 import aiohttp
@@ -25,36 +24,43 @@ from pipecat.processors.aggregators.llm_response_universal import (
 )
 from pipecat.processors.audio.audio_buffer_processor import AudioBufferProcessor
 from pipecat.runner.types import RunnerArguments
-from pipecat.runner.utils import parse_telephony_websocket
-from pipecat.serializers.twilio import TwilioFrameSerializer
+from pipecat.runner.utils import create_transport
 from pipecat.services.cartesia.tts import CartesiaTTSService
 from pipecat.services.deepgram.stt import DeepgramSTTService
 from pipecat.services.google.llm import GoogleLLMService
 from pipecat.transports.base_transport import BaseTransport
-from pipecat.transports.websocket.fastapi import (
-    FastAPIWebsocketParams,
-    FastAPIWebsocketTransport,
-)
+from pipecat.transports.websocket.fastapi import FastAPIWebsocketParams
 from pipecat.workers.runner import WorkerRunner
+from pydantic import BaseModel
 
 load_dotenv(override=True)
 
 
-async def get_call_info(call_sid: str) -> dict:
-    """Fetch call information from Twilio REST API using aiohttp.
+class CallInfo(BaseModel):
+    """Caller details fetched from the Twilio REST API."""
+
+    from_number: str | None = None
+    to_number: str | None = None
+
+
+async def get_call_info(call_sid: str | None) -> CallInfo | None:
+    """Fetch call information from the Twilio REST API using aiohttp.
 
     Args:
-        call_sid: The Twilio call SID
+        call_sid: The Twilio call SID (e.g. call_data.call_id), or None.
 
     Returns:
-        Dictionary containing call information including from_number, to_number, status, etc.
+        A CallInfo with the caller's numbers, or None if it couldn't be fetched.
     """
+    if not call_sid:
+        return None
+
     account_sid = os.getenv("TWILIO_ACCOUNT_SID")
     auth_token = os.getenv("TWILIO_AUTH_TOKEN")
 
     if not account_sid or not auth_token:
         logger.warning("Missing Twilio credentials, cannot fetch call info")
-        return {}
+        return None
 
     url = f"https://api.twilio.com/2010-04-01/Accounts/{account_sid}/Calls/{call_sid}.json"
 
@@ -67,20 +73,15 @@ async def get_call_info(call_sid: str) -> dict:
                 if response.status != 200:
                     error_text = await response.text()
                     logger.error(f"Twilio API error ({response.status}): {error_text}")
-                    return {}
+                    return None
 
                 data = await response.json()
 
-                call_info = {
-                    "from_number": data.get("from"),
-                    "to_number": data.get("to"),
-                }
-
-                return call_info
+                return CallInfo(from_number=data.get("from"), to_number=data.get("to"))
 
     except Exception as e:
         logger.error(f"Error fetching call info from Twilio: {e}")
-        return {}
+        return None
 
 
 async def save_audio(audio: bytes, sample_rate: int, num_channels: int):
@@ -178,34 +179,30 @@ async def run_bot(transport: BaseTransport, handle_sigint: bool, testing: bool):
     await runner.run()
 
 
-async def bot(runner_args: RunnerArguments, testing: Optional[bool] = False):
+async def bot(runner_args: RunnerArguments, testing: bool | None = False):
     """Main bot entry point compatible with Pipecat Cloud."""
 
-    _, call_data = await parse_telephony_websocket(runner_args.websocket)
-
-    # Fetch call information from Twilio REST API
-    # With the call information, you can make a request to your API to get the user's information
-    # and inject that information into your bot's configuration.
-    call_info = await get_call_info(call_data["call_id"])
-    if call_info:
-        logger.info(f"Call from: {call_info.get('from_number')} to: {call_info.get('to_number')}")
-
-    serializer = TwilioFrameSerializer(
-        stream_sid=call_data["stream_id"],
-        call_sid=call_data["call_id"],
-        account_sid=os.getenv("TWILIO_ACCOUNT_SID", ""),
-        auth_token=os.getenv("TWILIO_AUTH_TOKEN", ""),
-    )
-
-    transport = FastAPIWebsocketTransport(
-        websocket=runner_args.websocket,
-        params=FastAPIWebsocketParams(
+    transport_params = {
+        "twilio": lambda: FastAPIWebsocketParams(
             audio_in_enabled=True,
             audio_out_enabled=True,
-            add_wav_header=False,
-            serializer=serializer,
         ),
-    )
+    }
+
+    # create_transport auto-detects the telephony provider, builds the matching
+    # serializer (here the TwilioFrameSerializer, using TWILIO_ACCOUNT_SID /
+    # TWILIO_AUTH_TOKEN), and sets add_wav_header=False, so the bot only supplies
+    # the params it cares about.
+    transport = await create_transport(runner_args, transport_params)
+
+    # Look up the caller via the Twilio REST API and personalize the bot.
+    # The call_data is available via runner_args.call_data as a typed CallData model.
+    call_data = runner_args.call_data
+    call_info = await get_call_info(call_data.call_id) if call_data else None
+    if call_info:
+        logger.info(
+            f"Call from: {call_info.from_number} to: {call_info.to_number}"
+        ) if call_info else None
 
     await run_bot(transport, runner_args.handle_sigint, testing)
 

@@ -83,12 +83,12 @@
   },
   {
     "path": "exotel-chatbot/inbound",
-    "runCommand": "uv run bot.py -t exotel",
+    "runCommand": "uv run bot.py",
     "skip": false
   },
   {
     "path": "exotel-chatbot/outbound",
-    "runCommand": "uv run bot.py -t exotel",
+    "runCommand": "uv run bot.py",
     "skip": false
   },
   {
@@ -165,7 +165,7 @@
   },
   {
     "path": "phone-chatbot/daily-pstn-dial-in",
-    "runCommand": "uv run bot.py -t daily --dialin",
+    "runCommand": "uv run bot.py",
     "skip": false
   },
   {
@@ -185,42 +185,32 @@
   },
   {
     "path": "plivo-chatbot/inbound",
-    "runCommand": "uv run bot.py -t plivo",
+    "runCommand": "uv run bot.py",
     "skip": false
   },
   {
     "path": "plivo-chatbot/outbound",
-    "runCommand": "uv run bot.py -t plivo",
+    "runCommand": "uv run bot.py",
     "skip": false
   },
   {
     "path": "push-to-talk/server",
-    "runCommand": "uv run bot.py -t daily",
+    "runCommand": "uv run bot.py",
     "skip": false
   },
   {
     "path": "runner-examples",
-    "runCommand": "uv run 01-single-transport-bot.py -t daily",
+    "runCommand": "uv run 01-create-transport-bot.py",
     "skip": false
   },
   {
     "path": "runner-examples",
-    "runCommand": "uv run 02-two-transport-bot.py -t daily",
-    "skip": false
-  },
-  {
-    "path": "runner-examples",
-    "runCommand": "uv run 03-all-transport-bot.py -t daily",
-    "skip": false
-  },
-  {
-    "path": "runner-examples",
-    "runCommand": "uv run 04-all-transport-factory-bot.py -t daily",
+    "runCommand": "uv run 02-verbose-transport-bot.py",
     "skip": false
   },
   {
     "path": "simple-chatbot/server",
-    "runCommand": "uv run bot-openai.py -t daily",
+    "runCommand": "uv run bot-openai.py",
     "skip": false
   },
   {
@@ -235,12 +225,12 @@
   },
   {
     "path": "telnyx-chatbot/inbound",
-    "runCommand": "uv run bot.py -t telnyx",
+    "runCommand": "uv run bot.py",
     "skip": false
   },
   {
     "path": "telnyx-chatbot/outbound",
-    "runCommand": "uv run bot.py -t telnyx",
+    "runCommand": "uv run bot.py",
     "skip": false
   },
   {
@@ -250,12 +240,12 @@
   },
   {
     "path": "twilio-chatbot/inbound",
-    "runCommand": "uv run bot.py -t twilio",
+    "runCommand": "uv run bot.py",
     "skip": false
   },
   {
     "path": "twilio-chatbot/outbound",
-    "runCommand": "uv run bot.py -t twilio",
+    "runCommand": "uv run bot.py",
     "skip": false
   },
   {

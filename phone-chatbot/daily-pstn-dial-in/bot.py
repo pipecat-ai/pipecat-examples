@@ -24,11 +24,12 @@ from pipecat.processors.aggregators.llm_response_universal import (
     LLMUserAggregatorParams,
 )
 from pipecat.runner.types import DailyDialinRequest, RunnerArguments
+from pipecat.runner.utils import create_transport
 from pipecat.services.cartesia.tts import CartesiaTTSService
 from pipecat.services.deepgram.stt import DeepgramSTTService
 from pipecat.services.openai.llm import OpenAILLMService
 from pipecat.transports.base_transport import BaseTransport
-from pipecat.transports.daily.transport import DailyDialinSettings, DailyParams, DailyTransport
+from pipecat.transports.daily.transport import DailyParams
 from pipecat.workers.runner import WorkerRunner
 
 load_dotenv(override=True)
@@ -151,44 +152,28 @@ async def bot(runner_args: RunnerArguments):
         Exception: If bot initialization or execution fails
     """
 
-    try:
-        # Parse the dial-in request from the runner
+    transport_params = {
+        "daily": lambda: DailyParams(
+            audio_in_enabled=True,
+            audio_out_enabled=True,
+        ),
+    }
+
+    # create_transport builds the Daily transport and transparently applies the
+    # PSTN dial-in settings from runner_args.body (the Daily API key/url and the
+    # call_id/call_domain), so the bot only supplies the params it cares about.
+    transport = await create_transport(runner_args, transport_params)
+
+    # Optional: personalize using the dial-in request (which number called, which
+    # number was dialed).
+    if isinstance(runner_args.body, dict) and "dialin_settings" in runner_args.body:
         request = DailyDialinRequest.model_validate(runner_args.body)
-
-        # Configure Daily transport with dial-in settings
-        daily_dialin_settings = DailyDialinSettings(
-            call_id=request.dialin_settings.call_id,
-            call_domain=request.dialin_settings.call_domain,
-        )
-        logger.info(f"Starting dial-in bot, settings: {request.dialin_settings}")
-
-        transport = DailyTransport(
-            runner_args.room_url,
-            runner_args.token,
-            "Daily PSTN Dial-in Bot",
-            params=DailyParams(
-                api_key=request.daily_api_key,
-                api_url=request.daily_api_url,
-                dialin_settings=daily_dialin_settings,
-                audio_in_enabled=True,
-                audio_out_enabled=True,
-            ),
-        )
-
-        # Log caller information if available (which number is calling)
-        # You can use this to look up customer information to personalize the conversation
         if request.dialin_settings.From:
             logger.info(f"Handling call from: {request.dialin_settings.From}")
-        # Log callee information if available (which number was called)
-        # You can use this to load different prompts based on which number was called
         if request.dialin_settings.To:
             logger.info(f"Handling call to: {request.dialin_settings.To}")
 
-        await run_bot(transport, runner_args.handle_sigint)
-
-    except Exception as e:
-        logger.error(f"Error running bot: {e}")
-        raise e
+    await run_bot(transport, runner_args.handle_sigint)
 
 
 if __name__ == "__main__":

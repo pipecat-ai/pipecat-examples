@@ -21,7 +21,6 @@ This example uses Pipecat's development runner to handle the webhook and bot lif
   - Handles the conversation with the caller
   - Uses `DailyDialinRequest` from the runner for type-safe dial-in data
   - Deployed to Pipecat Cloud in production or run locally for development
-  - The runner automatically provides webhook handling when using `--dialin` flag
 
 ## Prerequisites
 
@@ -87,7 +86,7 @@ This example uses Pipecat's development runner to handle the webhook and bot lif
 1. **Run your bot with dial-in support**
 
    ```bash
-   uv run bot.py -t daily --dialin
+   uv run bot.py
    ```
 
    This starts a FastAPI server on port 7860 with the `/daily-dialin-webhook` endpoint.
@@ -176,7 +175,6 @@ async def bot(runner_args: RunnerArguments):
 ### Call is not being answered
 
 - Check that your dial-in config's `room_creation_api` points to your ngrok URL + `/daily-dialin-webhook`
-- Verify the bot is running with `uv run bot.py -t daily --dialin`
 - Make sure ngrok is running and pointing to port 7860
 - Check the bot logs for webhook reception
 - Ensure your `DAILY_API_KEY` has the phone number associated with it
@@ -200,7 +198,7 @@ async def bot(runner_args: RunnerArguments):
 
 ## Daily SIP Configuration
 
-The runner automatically configures Daily rooms with SIP capabilities when using `--dialin`:
+The runner automatically configures Daily rooms with SIP capabilities:
 
 ```python
 # The runner calls this for you:
