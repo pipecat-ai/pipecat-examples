@@ -9,11 +9,9 @@ import uuid
 
 from dotenv import load_dotenv
 from loguru import logger
-from pipecat.adapters.schemas.function_schema import FunctionSchema
-from pipecat.adapters.schemas.tools_schema import ToolsSchema
 from pipecat.audio.vad.silero import SileroVADAnalyzer
 from pipecat.frames.frames import (
-    EndTaskFrame,
+    EndWorkerFrame,
     LLMRunFrame,
     TTSSpeakFrame,
 )
@@ -25,7 +23,6 @@ from pipecat.processors.aggregators.llm_response_universal import (
     LLMUserAggregatorParams,
 )
 from pipecat.processors.audio.audio_buffer_processor import AudioBufferProcessor
-from pipecat.processors.frame_processor import FrameDirection
 from pipecat.runner.types import RunnerArguments
 from pipecat.runner.utils import create_transport
 from pipecat.services.cartesia.tts import CartesiaTTSService
@@ -44,10 +41,11 @@ load_dotenv(override=True)
 
 
 async def terminate_call(params: FunctionCallParams) -> None:
+    """Terminate the call when user says 'Goodbye' and the call is over."""
     logger.info("Conversation complete. Terminating call.")
 
     await params.llm.queue_frame(TTSSpeakFrame("Goodbye."))
-    await params.llm.queue_frame(EndTaskFrame(), FrameDirection.UPSTREAM)
+    await params.llm.queue_frame(EndWorkerFrame())
 
 
 async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
@@ -73,18 +71,7 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
         ),
     )
 
-    llm.register_function("terminate_call", terminate_call)
-
-    # Function to terminate call
-    terminate_function = FunctionSchema(
-        name="terminate_call",
-        description="Terminate the call when user says 'Goodbye' and the call is over.",
-        properties={},
-        required=[],
-    )
-
-    tools = ToolsSchema(standard_tools=[terminate_function])
-    context = LLMContext(tools=tools)
+    context = LLMContext(tools=[terminate_call])
     user_aggregator, assistant_aggregator = LLMContextAggregatorPair(
         context,
         user_params=LLMUserAggregatorParams(

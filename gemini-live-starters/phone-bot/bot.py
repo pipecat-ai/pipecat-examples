@@ -24,10 +24,8 @@ import os
 from dotenv import load_dotenv
 from google.genai.types import ThinkingConfig
 from loguru import logger
-from pipecat.adapters.schemas.function_schema import FunctionSchema
-from pipecat.adapters.schemas.tools_schema import ToolsSchema
 from pipecat.audio.vad.silero import SileroVADAnalyzer
-from pipecat.frames.frames import EndTaskFrame, LLMRunFrame
+from pipecat.frames.frames import EndWorkerFrame, LLMRunFrame
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.worker import PipelineParams, PipelineWorker
 from pipecat.processors.aggregators.llm_context import LLMContext
@@ -53,15 +51,14 @@ load_dotenv(override=True)
 NUM_ROUNDS = 4
 
 
-# Define the end_game function handler (needs access to task)
-async def end_game_handler(params: FunctionCallParams):
-    """Handle end_game function call by pushing EndTaskFrame to end the conversation."""
-    logger.info("Game ended - pushing EndTaskFrame")
+async def end_game(params: FunctionCallParams):
+    """Call this function after completing all rounds to end the game and say goodbye to the player."""
+    logger.info("Game ended - pushing EndWorkerFrame")
     await params.result_callback({"status": "game_ended"})
     # TODO: Remove this once we handle frame queueing more gracefully
     await asyncio.sleep(3)
-    # Push EndTaskFrame to gracefully end the task
-    await params.llm.push_frame(EndTaskFrame(), FrameDirection.UPSTREAM)
+    # Push EndWorkerFrame to gracefully end the task
+    await params.llm.push_frame(EndWorkerFrame())
 
 
 async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
@@ -70,16 +67,6 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     # Generate game rounds (2 truths + 1 lie each)
     game = GameContent(num_rounds=NUM_ROUNDS)
     all_rounds = game.get_formatted_rounds()
-
-    # Define end_game function for graceful disconnect
-    end_game_function = FunctionSchema(
-        name="end_game",
-        description=f"Call this function after completing all {NUM_ROUNDS} rounds to end the game and say goodbye to the player",
-        properties={},
-        required=[],
-    )
-
-    tools = ToolsSchema(standard_tools=[end_game_function])
 
     instructions = f"""You are an enthusiastic game show host playing "Two Truths and a Lie."
 
@@ -134,11 +121,7 @@ Remember: Present the pre-written statements exactly as shown, keep your comment
             system_instruction=instructions,
             thinking=ThinkingConfig(thinking_budget=0),
         ),
-        tools=tools,
     )
-
-    # Register the function with the LLM
-    llm.register_function("end_game", end_game_handler)
 
     messages = [
         {
@@ -147,7 +130,7 @@ Remember: Present the pre-written statements exactly as shown, keep your comment
         },
     ]
 
-    context = LLMContext(messages)
+    context = LLMContext(messages, tools=[end_game])
     user_aggregator, assistant_aggregator = LLMContextAggregatorPair(
         context,
         user_params=LLMUserAggregatorParams(

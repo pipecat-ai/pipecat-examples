@@ -6,5 +6,5 @@ requires-python = ">=3.11"
 dependencies = [
     "aiohttp",
     "bedrock-agentcore",
-    "pipecat-ai[aws,daily,silero,deepgram,openai,cartesia,runner]>=1.3.0",
+    "pipecat-ai[aws,daily,silero,deepgram,openai,cartesia,runner]>=1.4.0",
 ]

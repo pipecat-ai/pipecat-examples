@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Gemini Live + Twilio example for building voice AI bots with Pipecat"
 requires-python = ">=3.11"
 dependencies = [
-    "pipecat-ai[webrtc,websocket,silero,google,runner]>=1.3.0",
+    "pipecat-ai[webrtc,websocket,silero,google,runner]>=1.4.0",
     "pipecatcloud>=0.7.1"
 ]
 

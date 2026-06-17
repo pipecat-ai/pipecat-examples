@@ -25,13 +25,12 @@ from typing import Any
 
 from dotenv import load_dotenv
 from loguru import logger
-from pipecat.adapters.schemas.tools_schema import ToolsSchema
 from pipecat.audio.mixers.soundfile_mixer import SoundfileMixer
 from pipecat.audio.vad.silero import SileroVADAnalyzer
 from pipecat.frames.frames import (
     BotStoppedSpeakingFrame,
     ControlFrame,
-    EndTaskFrame,
+    EndWorkerFrame,
     Frame,
     LLMMessagesAppendFrame,
     LLMRunFrame,
@@ -225,7 +224,7 @@ class TransferCoordinator(FrameProcessor):
         elif isinstance(frame, DialoutStoppedFrame):
             if self._state == TransferState.CONNECTED:
                 logger.info("Agent hung up after successful transfer, ending call")
-                await self.push_frame(EndTaskFrame(), FrameDirection.UPSTREAM)
+                await self.push_frame(EndWorkerFrame())
             else:
                 logger.info("Dialout failed before agent answered, returning to customer")
                 await self._handle_dialout_error()
@@ -240,7 +239,7 @@ class TransferCoordinator(FrameProcessor):
         elif isinstance(frame, ParticipantLeftFrame):
             if self._state in (TransferState.TALKING_TO_CUSTOMER, TransferState.CONNECTED):
                 logger.info(f"Participant left during {self._state.value}, ending call")
-                await self.push_frame(EndTaskFrame(), FrameDirection.UPSTREAM)
+                await self.push_frame(EndWorkerFrame())
             return
 
         await self.push_frame(frame, direction)
@@ -349,7 +348,7 @@ async def run_bot(
 
     async def terminate_call(params: FunctionCallParams, **kwargs: Any) -> None:
         """Terminate the call when the customer is done or says goodbye."""
-        await params.llm.queue_frame(EndTaskFrame(), FrameDirection.UPSTREAM)
+        await params.llm.queue_frame(EndWorkerFrame())
 
     async def initiate_warm_transfer(
         params: FunctionCallParams, target_name: str, summary: str, **kwargs: Any
@@ -386,14 +385,9 @@ async def run_bot(
         # TransferCoordinator will handle the rest after BotStoppedSpeakingFrame
         await params.llm.push_frame(StartTransferFrame(target=target, summary=summary))
 
-    llm.register_direct_function(terminate_call)
-    llm.register_direct_function(initiate_warm_transfer)
-
-    tools = ToolsSchema(standard_tools=[terminate_call, initiate_warm_transfer])
-
     # Initialize LLM context and aggregator
     hold_mute_strategy = HoldMuteStrategy()
-    context = LLMContext(tools=tools)
+    context = LLMContext(tools=[terminate_call, initiate_warm_transfer])
     user_aggregator, assistant_aggregator = LLMContextAggregatorPair(
         context,
         user_params=LLMUserAggregatorParams(

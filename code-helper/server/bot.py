@@ -29,8 +29,6 @@ import os
 
 from dotenv import load_dotenv
 from loguru import logger
-from pipecat.adapters.schemas.function_schema import FunctionSchema
-from pipecat.adapters.schemas.tools_schema import ToolsSchema
 from pipecat.audio.vad.silero import SileroVADAnalyzer
 from pipecat.frames.frames import LLMRunFrame
 from pipecat.pipeline.pipeline import Pipeline
@@ -60,7 +58,8 @@ load_dotenv(override=True)
 # Example/stand-in function to exemplify function calling
 # and handling sensitive info like credit cards.
 # This function simply returns dummy credit card info.
-async def fetch_credit_card_info(params: FunctionCallParams):
+async def get_credit_card_info(params: FunctionCallParams):
+    """Get credit card information for the user."""
     await params.result_callback(
         {"card_number": "1234-5678-9012-3456", "expiration_date": "12/24", "cvv": "123"}
     )
@@ -141,20 +140,12 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
         api_key=os.getenv("OPENAI_API_KEY"),
         settings=OpenAILLMService.Settings(system_instruction=system_prompt),
     )
-    llm.register_function("get_credit_card_info", fetch_credit_card_info)
 
     # RTVI text transformer to obfuscate credit card numbers in the bot's output.
     async def obfuscate_credit_card(text: str, type: str) -> str:
         return "XXXX-XXXX-XXXX-" + text[-4:]
 
-    credit_card_function = FunctionSchema(
-        name="get_credit_card_info",
-        description="Get credit card information for the user.",
-        properties={},
-        required=[],
-    )
-    tools = ToolsSchema(standard_tools=[credit_card_function])
-    context = LLMContext(tools=tools)
+    context = LLMContext(tools=[get_credit_card_info])
     user_aggregator, assistant_aggregator = LLMContextAggregatorPair(
         context,
         user_params=LLMUserAggregatorParams(

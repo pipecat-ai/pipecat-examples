@@ -9,12 +9,10 @@ import sys
 
 from dotenv import load_dotenv
 from loguru import logger
-from pipecat.adapters.schemas.function_schema import FunctionSchema
-from pipecat.adapters.schemas.tools_schema import ToolsSchema
 from pipecat.audio.vad.silero import SileroVADAnalyzer
 from pipecat.frames.frames import (
     EndFrame,
-    EndTaskFrame,
+    EndWorkerFrame,
     LLMMessagesAppendFrame,
     LLMRunFrame,
 )
@@ -43,42 +41,7 @@ logger.add(sys.stderr, level="DEBUG")
 
 async def terminate_call(params: FunctionCallParams):
     """Function the bot can call to terminate the call."""
-    await params.llm.queue_frame(EndTaskFrame(), FrameDirection.UPSTREAM)
-
-
-async def dial_operator(transport: BaseTransport, params: FunctionCallParams):
-    """Function the bot can call to dial an operator and transfer the call."""
-    operator_number = os.getenv("OPERATOR_NUMBER", None)
-
-    if operator_number:
-        logger.info(f"Transferring call to operator: {operator_number}")
-
-        # Inform the user about the transfer
-        content = "I'm transferring you to a supervisor now. Please hold while I connect you."
-        message = {
-            "role": "system",
-            "content": content,
-        }
-
-        # Queue the message to the context and let it speak
-        await params.llm.push_frame(LLMMessagesAppendFrame([message], run_llm=True))
-
-        # Start the dialout to transfer the call
-        transfer_params = {"toEndPoint": operator_number}
-        logger.debug(f"SIP call transfer parameters: {transfer_params}")
-        await transport.sip_call_transfer(transfer_params)
-
-    else:
-        # No operator number configured
-        content = "I'm sorry, but supervisor transfer is not available at this time. Is there anything else I can help you with?"
-        message = {
-            "role": "system",
-            "content": content,
-        }
-
-        # Queue the message to the context
-        await params.llm.push_frame(LLMMessagesAppendFrame([message], run_llm=True))
-        logger.warning("No operator dialout settings available")
+    await params.llm.queue_frame(EndWorkerFrame())
 
 
 async def run_bot(transport: BaseTransport, handle_sigint: bool) -> None:
@@ -120,30 +83,42 @@ Available functions:
 
     # ------------ FUNCTION DEFINITIONS ------------
 
-    # Define function schemas for tools
-    terminate_call_function = FunctionSchema(
-        name="terminate_call",
-        description="Call this function to terminate the call.",
-        properties={},
-        required=[],
-    )
+    async def dial_operator(params: FunctionCallParams):
+        """Call this function when the user asks to speak with a human."""
+        operator_number = os.getenv("OPERATOR_NUMBER", None)
 
-    dial_operator_function = FunctionSchema(
-        name="dial_operator",
-        description="Call this function when the user asks to speak with a human",
-        properties={},
-        required=[],
-    )
+        if operator_number:
+            logger.info(f"Transferring call to operator: {operator_number}")
 
-    # Create tools schema
-    tools = ToolsSchema(standard_tools=[terminate_call_function, dial_operator_function])
+            # Inform the user about the transfer
+            content = "I'm transferring you to a supervisor now. Please hold while I connect you."
+            message = {
+                "role": "system",
+                "content": content,
+            }
 
-    # Register functions with the LLM
-    llm.register_function("terminate_call", terminate_call)
-    llm.register_function("dial_operator", lambda params: dial_operator(transport, params))
+            # Queue the message to the context and let it speak
+            await params.llm.push_frame(LLMMessagesAppendFrame([message], run_llm=True))
+
+            # Start the dialout to transfer the call
+            transfer_params = {"toEndPoint": operator_number}
+            logger.debug(f"SIP call transfer parameters: {transfer_params}")
+            await transport.sip_call_transfer(transfer_params)
+
+        else:
+            # No operator number configured
+            content = "I'm sorry, but supervisor transfer is not available at this time. Is there anything else I can help you with?"
+            message = {
+                "role": "system",
+                "content": content,
+            }
+
+            # Queue the message to the context
+            await params.llm.push_frame(LLMMessagesAppendFrame([message], run_llm=True))
+            logger.warning("No operator dialout settings available")
 
     # Initialize LLM context and aggregator
-    context = LLMContext(tools=tools)
+    context = LLMContext(tools=[terminate_call, dial_operator])
     user_aggregator, assistant_aggregator = LLMContextAggregatorPair(
         context,
         user_params=LLMUserAggregatorParams(

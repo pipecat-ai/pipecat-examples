@@ -10,7 +10,6 @@ import time
 
 from dotenv import load_dotenv
 from loguru import logger
-from pipecat.adapters.schemas.tools_schema import ToolsSchema
 from pipecat.audio.vad.silero import SileroVADAnalyzer
 from pipecat.frames.frames import LLMRunFrame, TTSSpeakFrame
 from pipecat.pipeline.pipeline import Pipeline
@@ -191,13 +190,9 @@ async def run_bot(transport: BaseTransport):
         result = await loop.run_in_executor(None, strands_agent, query)
         await params.result_callback(result.message)
 
-    llm.register_direct_function(handle_location_or_weather_related_queries)
-
     @llm.event_handler("on_function_calls_started")
     async def on_function_calls_started(service, function_calls):
         await tts.queue_frame(TTSSpeakFrame("Let me check on that."))
-
-    tools = ToolsSchema(standard_tools=[handle_location_or_weather_related_queries])
 
     messages = [
         {
@@ -206,7 +201,7 @@ async def run_bot(transport: BaseTransport):
         },
     ]
 
-    context = LLMContext(messages, tools)
+    context = LLMContext(messages, tools=[handle_location_or_weather_related_queries])
     user_aggregator, assistant_aggregator = LLMContextAggregatorPair(
         context,
         user_params=LLMUserAggregatorParams(
