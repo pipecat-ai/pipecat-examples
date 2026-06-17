@@ -237,8 +237,15 @@ class VoiceChatClient {
     const curSpan = this.botSpans[data.segment_id];
     if (!curSpan) return;
     // Get the inner HTML
-    const spanInnards = `<strong>${data.spoken_progress.accumulated_text}</strong>${data.spoken_progress.remaining_text}`;
-    curSpan.innerHTML = spanInnards;
+    const accumulatedText = data.spoken_progress.accumulated_text.replace(
+      /\n/g,
+      ' <br> ',
+    );
+    const remainingText = data.spoken_progress.remaining_text.replace(
+      /\n/g,
+      ' <br> ',
+    );
+    curSpan.innerHTML = `<strong>${accumulatedText}</strong>${remainingText}`;
     // Scroll to bottom
     this.conversationLog.scrollTop = this.conversationLog.scrollHeight;
   }
@@ -272,7 +279,7 @@ class VoiceChatClient {
         {
           // All other text is rendered in a simple span and new lines are converted to <br>
           newElement = document.createElement('span');
-          newElement.innerHTML = text;
+          newElement.innerHTML = text.replace(/\n/g, ' <br> ');
           newElement.classList.add('text-segment');
           newElement.classList.add(type);
           this.botSpans[segmentId] = newElement;
