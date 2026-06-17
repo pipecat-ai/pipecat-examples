@@ -140,6 +140,7 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
         api_key=os.getenv("OPENAI_API_KEY"),
         settings=OpenAILLMService.Settings(system_instruction=system_prompt),
     )
+
     # RTVI text transformer to obfuscate credit card numbers in the bot's output.
     async def obfuscate_credit_card(text: str, type: str) -> str:
         return "XXXX-XXXX-XXXX-" + text[-4:]
