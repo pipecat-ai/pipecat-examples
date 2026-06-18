@@ -5,9 +5,9 @@
 body {
   margin: 0;
   padding: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu',
+    'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
   background-color: #000;
   color: #e5e7eb;
   height: 100vh;
@@ -166,6 +166,15 @@ span.spoken {
   color: #6b7280;
   font-style: italic;
   background-color: transparent;
+}
+
+.conversation-message .text-segment {
+  /* This class is added to spans that wrap segments of text in bot messages, allowing us to target them for highlighting as they are spoken */
+  padding-left: 0.5em;
+}
+
+.conversation-message .credit_card {
+  font-family: 'Courier New', monospace;
 }
 
 /* Text Entry Area */
