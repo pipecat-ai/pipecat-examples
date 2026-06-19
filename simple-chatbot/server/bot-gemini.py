@@ -45,6 +45,7 @@ from pipecat.processors.aggregators.llm_response_universal import (
 )
 from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
 from pipecat.runner.types import DailyRunnerArguments, RunnerArguments, SmallWebRTCRunnerArguments
+from pipecat.runner.utils import create_transport
 from pipecat.services.google.gemini_live.llm import GeminiLiveLLMService
 from pipecat.transports.base_transport import BaseTransport, TransportParams
 from pipecat.transports.daily.transport import DailyParams, DailyTransport
@@ -53,6 +54,25 @@ from pipecat.transports.smallwebrtc.transport import SmallWebRTCTransport
 from pipecat.workers.runner import WorkerRunner
 
 load_dotenv(override=True)
+
+# We use lambdas to defer transport parameter creation until the transport
+# type is selected at runtime.
+transport_params = {
+    "daily": lambda: DailyParams(
+        audio_in_enabled=True,
+        audio_out_enabled=True,
+        video_out_enabled=True,
+        video_out_width=1024,
+        video_out_height=576,
+    ),
+    "webrtc": lambda: TransportParams(
+        audio_in_enabled=True,
+        audio_out_enabled=True,
+        video_out_enabled=True,
+        video_out_width=1024,
+        video_out_height=576,
+    ),
+}
 
 sprites = []
 script_dir = os.path.dirname(__file__)
@@ -108,7 +128,7 @@ class TalkingAnimation(FrameProcessor):
         await self.push_frame(frame, direction)
 
 
-async def run_bot(transport: BaseTransport):
+async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     """Main bot execution function.
 
     Sets up and runs the bot pipeline including:
@@ -127,18 +147,10 @@ async def run_bot(transport: BaseTransport):
         ),
     )
 
-    messages = [
-        {
-            "role": "user",
-            "content": "Start by introducing yourself.",
-        },
-    ]
-
-    # Set up conversation context and management
-    # The context_aggregator will automatically collect conversation context
-    context = LLMContext(messages)
+    context = LLMContext()
     user_aggregator, assistant_aggregator = LLMContextAggregatorPair(
         context,
+        realtime_service_mode=True,
         user_params=LLMUserAggregatorParams(
             vad_analyzer=SileroVADAnalyzer(),
         ),
@@ -164,6 +176,7 @@ async def run_bot(transport: BaseTransport):
             enable_metrics=True,
             enable_usage_metrics=True,
         ),
+        idle_timeout_secs=runner_args.pipeline_idle_timeout_secs,
     )
 
     # Queue initial static frame so video starts immediately
@@ -172,6 +185,9 @@ async def run_bot(transport: BaseTransport):
     @worker.rtvi.event_handler("on_client_ready")
     async def on_client_ready(rtvi):
         # Kick off the conversation
+        context.add_message(
+            {"role": "developer", "content": "Start by introducing yourself."},
+        )
         await worker.queue_frames([LLMRunFrame()])
 
     @transport.event_handler("on_client_connected")
@@ -183,49 +199,16 @@ async def run_bot(transport: BaseTransport):
         logger.info("Client disconnected")
         await worker.cancel()
 
-    runner = WorkerRunner(handle_sigint=False)
+    runner = WorkerRunner(handle_sigint=runner_args.handle_sigint)
 
     await runner.add_workers(worker)
     await runner.run()
 
 
 async def bot(runner_args: RunnerArguments):
-    """Main bot entry point."""
-
-    transport = None
-
-    match runner_args:
-        case DailyRunnerArguments():
-            transport = DailyTransport(
-                runner_args.room_url,
-                runner_args.token,
-                "Pipecat Bot",
-                params=DailyParams(
-                    audio_in_enabled=True,
-                    audio_out_enabled=True,
-                    video_out_enabled=True,
-                    video_out_width=1024,
-                    video_out_height=576,
-                ),
-            )
-        case SmallWebRTCRunnerArguments():
-            webrtc_connection: SmallWebRTCConnection = runner_args.webrtc_connection
-
-            transport = SmallWebRTCTransport(
-                webrtc_connection=webrtc_connection,
-                params=TransportParams(
-                    audio_in_enabled=True,
-                    audio_out_enabled=True,
-                    video_out_enabled=True,
-                    video_out_width=1024,
-                    video_out_height=576,
-                ),
-            )
-        case _:
-            logger.error(f"Unsupported runner arguments type: {type(runner_args)}")
-            return
-
-    await run_bot(transport)
+    """Main bot entry point compatible with Pipecat Cloud."""
+    transport = await create_transport(runner_args, transport_params)
+    await run_bot(transport, runner_args)
 
 
 if __name__ == "__main__":

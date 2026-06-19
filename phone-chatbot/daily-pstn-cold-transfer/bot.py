@@ -196,7 +196,7 @@ Available functions:
         logger.info(f"Operator dial-out stopped: {data}")
         # Inform the customer that transfer stopped
         content = "I'm sorry, but I'm unable to connect you with a supervisor at this time. Is there anything else I can help you with?"
-        message = {"role": "user", "content": content}
+        message = {"role": "developer", "content": content}
         await worker.queue_frames([LLMMessagesAppendFrame([message], run_llm=True)])
 
     @transport.event_handler("on_dialout_warning")
@@ -208,7 +208,7 @@ Available functions:
         logger.error(f"Operator dial-out error: {data}")
         # Inform the customer that transfer failed
         content = "I'm sorry, but I'm unable to connect you with a supervisor at this time. Is there anything else I can help you with?"
-        message = {"role": "user", "content": content}
+        message = {"role": "developer", "content": content}
         await worker.queue_frames([LLMMessagesAppendFrame([message], run_llm=True)])
 
     @transport.event_handler("on_dtmf_event")

@@ -92,16 +92,10 @@ async def run_bot(
         ),
     )
 
-    messages = [
-        {
-            "role": "user",
-            "content": "Start by greeting the user warmly and introducing yourself.",
-        }
-    ]
-
-    context = LLMContext(messages)
+    context = LLMContext()
     user_aggregator, assistant_aggregator = LLMContextAggregatorPair(
         context,
+        realtime_service_mode=True,
         user_params=LLMUserAggregatorParams(
             vad_analyzer=SileroVADAnalyzer(),
         ),
@@ -126,12 +120,19 @@ async def run_bot(
             enable_metrics=True,
             enable_usage_metrics=True,
         ),
+        idle_timeout_secs=runner_args.pipeline_idle_timeout_secs,
     )
 
     @worker.rtvi.event_handler("on_client_ready")
     async def on_client_ready(rtvi):
         logger.info("Pipecat client ready.")
         # Kick off the conversation.
+        context.add_message(
+            {
+                "role": "developer",
+                "content": "Start by greeting the user warmly and introducing yourself.",
+            }
+        )
         await worker.queue_frames([LLMRunFrame()])
 
     @transport.event_handler("on_client_connected")

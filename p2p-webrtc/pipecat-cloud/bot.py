@@ -18,12 +18,11 @@ from pipecat.processors.aggregators.llm_response_universal import (
     LLMUserAggregatorParams,
 )
 from pipecat.runner.types import RunnerArguments
+from pipecat.runner.utils import create_transport
 from pipecat.services.cartesia.tts import CartesiaTTSService
 from pipecat.services.deepgram.stt import DeepgramSTTService
 from pipecat.services.openai.llm import OpenAILLMService
 from pipecat.transports.base_transport import BaseTransport, TransportParams
-from pipecat.transports.smallwebrtc.connection import SmallWebRTCConnection
-from pipecat.transports.smallwebrtc.transport import SmallWebRTCTransport
 from pipecat.workers.runner import WorkerRunner
 
 load_dotenv(override=True)
@@ -54,11 +53,8 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
         ),
     )
 
-    # Define and register tools as required
-    tools = NOT_GIVEN
-
     # This sets up the LLM context by providing messages and tools
-    context = LLMContext(tools)
+    context = LLMContext()
     user_aggregator, assistant_aggregator = LLMContextAggregatorPair(
         context,
         user_params=LLMUserAggregatorParams(
@@ -86,17 +82,24 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
             enable_metrics=True,
             enable_usage_metrics=True,
         ),
+        idle_timeout_secs=runner_args.pipeline_idle_timeout_secs,
     )
 
     @worker.rtvi.event_handler("on_client_ready")
     async def on_client_ready(rtvi):
         logger.debug("Client ready event received")
+        # Kick off the conversation
+        context.add_message(
+            {
+                "role": "developer",
+                "content": "Start by greeting the user warmly and introducing yourself.",
+            }
+        )
+        await worker.queue_frames([LLMRunFrame()])
 
     @transport.event_handler("on_client_connected")
     async def on_client_connected(transport, client):
         logger.info("Client connected.")
-        # Kick off the conversation
-        await worker.queue_frames([LLMRunFrame()])
 
     @transport.event_handler("on_client_disconnected")
     async def on_client_disconnected(transport, participant):
@@ -111,34 +114,23 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
 
 async def bot(runner_args: RunnerArguments):
     """Main bot entry point compatible with Pipecat Cloud."""
-    logger.info(f"Starting the bot, received body: {runner_args.body}")
-    webrtc_connection: SmallWebRTCConnection = runner_args.webrtc_connection
-    try:
-        if os.environ.get("ENV") != "local":
-            from pipecat.audio.filters.krisp_viva_filter import KrispVivaFilter
+    if os.environ.get("ENV") != "local":
+        from pipecat.audio.filters.krisp_viva_filter import KrispVivaFilter
 
-            krisp_filter = KrispVivaFilter()
-        else:
-            krisp_filter = None
+        krisp_filter = KrispVivaFilter()
+    else:
+        krisp_filter = None
 
-        transport = SmallWebRTCTransport(
-            webrtc_connection=webrtc_connection,
-            params=TransportParams(
-                audio_in_enabled=True,
-                audio_in_filter=krisp_filter,
-                audio_out_enabled=True,
-            ),
-        )
+    transport_params = {
+        "smallwebrtc": lambda: TransportParams(
+            audio_in_enabled=True,
+            audio_in_filter=krisp_filter,
+            audio_out_enabled=True,
+        ),
+    }
 
-        if transport is None:
-            logger.error("Failed to create transport")
-            return
-
-        await run_bot(transport, runner_args)
-        logger.info("Bot process completed")
-    except Exception as e:
-        logger.exception(f"Error in bot process: {str(e)}")
-        raise
+    transport = await create_transport(runner_args, transport_params)
+    await run_bot(transport, runner_args)
 
 
 if __name__ == "__main__":

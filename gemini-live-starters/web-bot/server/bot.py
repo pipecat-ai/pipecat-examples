@@ -81,18 +81,12 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
         ),
     )
 
-    messages = [
-        {
-            "role": "user",
-            "content": "Start by introducing yourself, asking the user to share their screen to start.",
-        },
-    ]
-
     # Set up conversation context and management
     # The context aggregator will automatically collect conversation context
-    context = LLMContext(messages)
+    context = LLMContext()
     user_aggregator, assistant_aggregator = LLMContextAggregatorPair(
         context,
+        realtime_service_mode=True,
         user_params=LLMUserAggregatorParams(
             vad_analyzer=SileroVADAnalyzer(),
         ),
@@ -114,12 +108,19 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
             enable_metrics=True,
             enable_usage_metrics=True,
         ),
+        idle_timeout_secs=runner_args.pipeline_idle_timeout_secs,
     )
 
     @worker.rtvi.event_handler("on_client_ready")
     async def on_client_ready(rtvi):
         logger.debug("Client ready event received")
         # Start the conversation with initial message
+        context.add_message(
+            {
+                "role": "developer",
+                "content": "Start by introducing yourself, asking the user to share their screen to start.",
+            }
+        )
         await worker.queue_frames([LLMRunFrame()])
 
     @transport.event_handler("on_client_connected")

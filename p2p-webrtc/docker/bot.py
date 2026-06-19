@@ -52,16 +52,10 @@ async def run_bot(webrtc_connection):
         ),
     )
 
-    context = LLMContext(
-        [
-            {
-                "role": "user",
-                "content": "Start by greeting the user warmly and introducing yourself.",
-            }
-        ],
-    )
+    context = LLMContext()
     user_aggregator, assistant_aggregator = LLMContextAggregatorPair(
         context,
+        realtime_service_mode=True,
         user_params=LLMUserAggregatorParams(
             vad_analyzer=SileroVADAnalyzer(),
         ),
@@ -89,6 +83,12 @@ async def run_bot(webrtc_connection):
     async def on_client_connected(transport, client):
         logger.info("Pipecat Client connected")
         # Kick off the conversation.
+        context.add_message(
+            {
+                "role": "developer",
+                "content": "Start by greeting the user warmly and introducing yourself.",
+            }
+        )
         await worker.queue_frames([LLMRunFrame()])
 
     @pipecat_transport.event_handler("on_client_disconnected")

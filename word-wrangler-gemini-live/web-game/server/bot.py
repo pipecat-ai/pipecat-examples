@@ -28,8 +28,10 @@ from pipecat.workers.runner import WorkerRunner
 load_dotenv(override=True)
 
 
+INTRO_MESSAGE = """Start with this exact brief introduction: "Welcome to Word Wrangler! I'll give you words to describe, and the A.I. player will try to guess them. Remember, don't say any part of the word itself. Here's your first word: [word]." """
+
 # Define conversation modes with their respective prompt templates
-game_prompt = """You are the AI host and player for a game of Word Wrangler.
+GAME_PROMPT = """You are the AI host and player for a game of Word Wrangler.
 
 GAME RULES:
 1. The user will be given a word or phrase that they must describe to you
@@ -77,7 +79,7 @@ async def run_bot(transport: DailyTransport, runner_args: RunnerArguments):
 
     personality_prompt = PERSONALITY_PRESETS.get(personality, PERSONALITY_PRESETS["friendly"])
 
-    system_instruction = f"""{game_prompt}
+    system_instruction = f"""{GAME_PROMPT}
 
 {personality_prompt}
 
@@ -86,8 +88,6 @@ Important guidelines:
 2. Don't use special characters or formatting that wouldn't be natural in speech.
 3. Encourage the user to elaborate when appropriate."""
 
-    intro_message = """Start with this exact brief introduction: "Welcome to Word Wrangler! I'll try to guess the words you describe. Remember, don't say any part of the word itself. Ready? Let's go!"""
-
     llm = GeminiLiveLLMService(
         api_key=os.getenv("GOOGLE_API_KEY"),
         settings=GeminiLiveLLMService.Settings(
@@ -95,18 +95,10 @@ Important guidelines:
         ),
     )
 
-    # Set up the initial context for the conversation
-    messages = [
-        {
-            "role": "user",
-            "content": intro_message,
-        },
-    ]
-
-    # This sets up the LLM context by providing messages and tools
-    context = LLMContext(messages)
+    context = LLMContext()
     user_aggregator, assistant_aggregator = LLMContextAggregatorPair(
         context,
+        realtime_service_mode=True,
         user_params=LLMUserAggregatorParams(
             user_mute_strategies=[MuteUntilFirstBotCompleteUserMuteStrategy()],
             vad_analyzer=SileroVADAnalyzer(),
@@ -129,12 +121,19 @@ Important guidelines:
             enable_metrics=True,
             enable_usage_metrics=True,
         ),
+        idle_timeout_secs=runner_args.pipeline_idle_timeout_secs,
     )
 
     @worker.rtvi.event_handler("on_client_ready")
     async def on_client_ready(rtvi):
         logger.debug("Client ready event received")
         # Kick off the conversation
+        context.add_message(
+            {
+                "role": "developer",
+                "content": INTRO_MESSAGE,
+            }
+        )
         await worker.queue_frames([LLMRunFrame()])
 
     @transport.event_handler("on_client_connected")

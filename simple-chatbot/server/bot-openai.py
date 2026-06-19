@@ -113,7 +113,7 @@ class TalkingAnimation(FrameProcessor):
         await self.push_frame(frame, direction)
 
 
-async def run_bot(transport: BaseTransport):
+async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     """Main bot logic."""
     logger.info("Starting bot")
 
@@ -168,6 +168,7 @@ async def run_bot(transport: BaseTransport):
             enable_metrics=True,
             enable_usage_metrics=True,
         ),
+        idle_timeout_secs=runner_args.pipeline_idle_timeout_secs,
     )
 
     # Queue initial static frame so video starts immediately
@@ -177,7 +178,7 @@ async def run_bot(transport: BaseTransport):
     async def on_client_ready(rtvi):
         logger.info("Client ready event received")
         # Kick off the conversation
-        context.add_message({"role": "user", "content": "Start by introducing yourself."})
+        context.add_message({"role": "developer", "content": "Start by introducing yourself."})
         await worker.queue_frames([LLMRunFrame()])
 
     @transport.event_handler("on_client_connected")
@@ -189,7 +190,7 @@ async def run_bot(transport: BaseTransport):
         logger.info("Client disconnected")
         await worker.cancel()
 
-    runner = WorkerRunner(handle_sigint=False)
+    runner = WorkerRunner(handle_sigint=runner_args.handle_sigint)
 
     await runner.add_workers(worker)
     await runner.run()
@@ -231,7 +232,7 @@ async def bot(runner_args: RunnerArguments):
             logger.error(f"Unsupported runner arguments type: {type(runner_args)}")
             return
 
-    await run_bot(transport)
+    await run_bot(transport, runner_args)
 
 
 if __name__ == "__main__":
