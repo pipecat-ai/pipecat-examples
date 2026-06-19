@@ -41,6 +41,8 @@ from pipecat.transports.daily.transport import DailyParams
 from pipecat.transports.websocket.fastapi import FastAPIWebsocketParams
 from typing_extensions import Literal
 
+load_dotenv(override=True)
+
 
 @dataclass
 class TurnEagerEndFrame(SystemFrame):
@@ -193,31 +195,7 @@ transport_params = {
 }
 
 
-async def run_bot(transport: BaseTransport, runner_args: RunnerArguments) -> None:
-    logger.info(f"Starting bot")
-
-    load_dotenv(override=True)
-    cartesia_api_key = os.getenv("CARTESIA_API_KEY")
-    openai_api_key = os.getenv("OPENAI_API_KEY")
-    if not (cartesia_api_key and openai_api_key):
-        missing = [
-            k
-            for k, v in (("CARTESIA_API_KEY", cartesia_api_key), ("OPENAI_API_KEY", openai_api_key))
-            if not v
-        ]
-        missing_str = ", ".join(missing)
-        raise ValueError(f"Missing environment variables: {missing_str}")
-
-    stt = CartesiaTurnsSTTService(
-        api_key=cartesia_api_key, settings=CartesiaTurnsSTTService.Settings(model="ink-2")
-    )
-
-    llm = OpenAILLMService(
-        api_key=openai_api_key,
-        settings=OpenAILLMService.Settings(
-            model="gpt-5-mini",
-            system_instruction="""
-You are a friendly voice assistant built using Pipecat, designed for natural, open-ended conversation.
+SYSTEM_INSTRUCTION = """You are a friendly voice assistant built using Pipecat, designed for natural, open-ended conversation.
 
 # Personality
 
@@ -250,13 +228,27 @@ Anything the caller wants: their day, current events, science, culture, philosop
 
 You were built with speculative user aggregation, triggered by turn.eager_end events coming from the speech to text (STT) service in your audio pipeline.
 This makes you prepare responses slightly sooner than normal, reducing the latency between when the user stops talking and you start.
-You do not have any further details on your implementation. Don't make up how it works.
-""".strip(),
+You do not have any further details on your implementation. Don't make up how it works."""
+
+
+async def run_bot(transport: BaseTransport, runner_args: RunnerArguments) -> None:
+    logger.info(f"Starting bot")
+
+    stt = CartesiaTurnsSTTService(
+        api_key=os.environ["CARTESIA_API_KEY"],
+        settings=CartesiaTurnsSTTService.Settings(model="ink-2"),
+    )
+
+    llm = OpenAILLMService(
+        api_key=os.environ["OPENAI_API_KEY"],
+        settings=OpenAILLMService.Settings(
+            model="gpt-5-mini",
+            system_instruction=SYSTEM_INSTRUCTION,
         ),
     )
 
     tts = CartesiaTTSService(
-        api_key=cartesia_api_key,
+        api_key=os.environ["CARTESIA_API_KEY"],
         settings=CartesiaTTSService.Settings(
             voice="db6b0ed5-d5d3-463d-ae85-518a07d3c2b4",
             model="sonic-3.5",
@@ -306,8 +298,8 @@ You do not have any further details on your implementation. Don't make up how it
         # Kick off the conversation.
         context.add_message(
             {
-                "role": "user",
-                "content": "Hello!",
+                "role": "developer",
+                "content": "Please introduce yourself to the user.",
             }
         )
         await task.queue_frames([LLMRunFrame()])
