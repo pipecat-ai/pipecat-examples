@@ -176,7 +176,7 @@ Remember: Present the pre-written statements exactly as shown, keep your comment
         # Kick off the conversation.
         context.add_message(
             {
-                "role": "user",
+                "role": "developer",
                 "content": "Introduce the game in one sentence, then say 'Ready? Here's the first one:' then present the first three statements from ROUND 1.",
             }
         )

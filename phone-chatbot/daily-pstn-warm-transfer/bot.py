@@ -369,7 +369,7 @@ async def run_bot(
             # Target not found - inform bot
             available = ", ".join(t.name for t in config.transfer_targets)
             message = {
-                "role": "user",
+                "role": "developer",
                 "content": f"Transfer target '{target_name}' not found. Available targets are: {available}. Please try again with a valid target name.",
             }
             await params.llm.push_frame(LLMMessagesAppendFrame([message], run_llm=True))
@@ -378,7 +378,7 @@ async def run_bot(
         logger.info(f"Initiating warm transfer to {target.name}")
 
         # Speak hold message to customer
-        hold_message = {"role": "user", "content": config.transfer_messages.hold_message}
+        hold_message = {"role": "developer", "content": config.transfer_messages.hold_message}
         await params.llm.push_frame(LLMMessagesAppendFrame([hold_message], run_llm=True))
 
         # Push StartTransferFrame to begin the transfer flow

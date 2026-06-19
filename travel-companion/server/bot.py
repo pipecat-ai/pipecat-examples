@@ -126,17 +126,12 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
         tools=tools,
     )
 
-    messages = [
-        {
-            "role": "user",
-            "content": "Start by briefly introduction yourself and tell me what you can do.",
-        },
-    ]
     # Set up conversation context and management
     # The context_aggregator will automatically collect conversation context
-    context = LLMContext(messages)
+    context = LLMContext()
     user_aggregator, assistant_aggregator = LLMContextAggregatorPair(
         context,
+        realtime_service_mode=True,
         user_params=LLMUserAggregatorParams(
             vad_analyzer=SileroVADAnalyzer(),
         ),
@@ -158,6 +153,7 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
             enable_metrics=True,
             enable_usage_metrics=True,
         ),
+        idle_timeout_secs=runner_args.pipeline_idle_timeout_secs,
     )
 
     # Registering the functions to be invoked by RTVI
@@ -166,11 +162,17 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     @worker.rtvi.event_handler("on_client_ready")
     async def on_client_ready(rtvi):
         # Kick off the conversation
+        context.add_message(
+            {
+                "role": "developer",
+                "content": "Start by briefly introduction yourself and tell me what you can do.",
+            }
+        )
         await worker.queue_frames([LLMRunFrame()])
 
     @worker.rtvi.event_handler("on_client_message")
     async def on_client_message(rtvi, msg):
-        print("RTVI client message:", msg.type, msg.data)
+        logger.info(f"Client connected")
         # Sample message to show how it works
         if msg.type == "get-llm-vendor":
             await rtvi.send_server_response(msg, "Google")

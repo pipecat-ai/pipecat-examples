@@ -65,16 +65,10 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
         ),
     )
 
-    context = LLMContext(
-        [
-            {
-                "role": "user",
-                "content": "Start by greeting the user warmly and introducing yourself.",
-            }
-        ],
-    )
+    context = LLMContext()
     user_aggregator, assistant_aggregator = LLMContextAggregatorPair(
         context,
+        realtime_service_mode=True,
         user_params=LLMUserAggregatorParams(
             vad_analyzer=SileroVADAnalyzer(),
         ),
@@ -96,12 +90,16 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
             enable_metrics=True,
             enable_usage_metrics=True,
         ),
+        idle_timeout_secs=runner_args.pipeline_idle_timeout_secs,
     )
 
     @worker.rtvi.event_handler("on_client_ready")
     async def on_client_ready(rtvi):
         logger.info("Pipecat client ready.")
         # Kick off the conversation.
+        context.add_message(
+            {"role": "developer", "content": "Start by introducing yourself."},
+        )
         await worker.queue_frames([LLMRunFrame()])
 
     @transport.event_handler("on_client_connected")
@@ -121,14 +119,8 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
 
 async def bot(runner_args: RunnerArguments):
     """Main bot entry point compatible with Pipecat Cloud."""
-    logger.info(f"Starting the bot, received body: {runner_args.body}")
-    try:
-        transport = await create_transport(runner_args, transport_params)
-        await run_bot(transport, runner_args)
-        logger.info("Bot process completed")
-    except Exception as e:
-        logger.exception(f"Error in bot process: {str(e)}")
-        raise
+    transport = await create_transport(runner_args, transport_params)
+    await run_bot(transport, runner_args)
 
 
 if __name__ == "__main__":

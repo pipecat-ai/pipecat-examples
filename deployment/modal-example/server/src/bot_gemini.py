@@ -143,6 +143,7 @@ async def run_bot(room_url: str, token: str):
     context = LLMContext()
     user_aggregator, assistant_aggregator = LLMContextAggregatorPair(
         context,
+        realtime_service_mode=True,
         user_params=LLMUserAggregatorParams(
             vad_analyzer=SileroVADAnalyzer(),
         ),

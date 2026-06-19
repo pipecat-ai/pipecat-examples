@@ -78,6 +78,7 @@ async def main():
     context = LLMContext()
     user_aggregator, assistant_aggregator = LLMContextAggregatorPair(
         context,
+        realtime_service_mode=True,
         user_params=LLMUserAggregatorParams(
             vad_analyzer=SileroVADAnalyzer(),
         ),
@@ -104,6 +105,12 @@ async def main():
     @worker.rtvi.event_handler("on_client_ready")
     async def on_client_ready(rtvi):
         # Kick off the conversation
+        context.add_message(
+            {
+                "role": "user",
+                "content": "Start by introducing yourself.",
+            }
+        )
         await worker.queue_frames([LLMRunFrame()])
 
     @transport.event_handler("on_client_connected")

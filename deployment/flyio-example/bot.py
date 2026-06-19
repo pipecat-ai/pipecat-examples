@@ -94,7 +94,7 @@ async def main(room_url: str, token: str):
     async def on_first_participant_joined(transport, participant):
         await transport.capture_participant_transcription(participant["id"])
         context.add_message(
-            {"role": "user", "content": "Say hello and briefly introduce yourself."}
+            {"role": "developer", "content": "Say hello and briefly introduce yourself."}
         )
         await worker.queue_frames([LLMRunFrame()])
 

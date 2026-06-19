@@ -163,6 +163,9 @@ IMPORTANT GUIDELINES:
 Start with the exact introduction specified above and give the first word."""
 
 
+INTRO_MESSAGE = """Start with this exact brief introduction: "Welcome to Word Wrangler! I'll give you words to describe, and the A.I. player will try to guess them. Remember, don't say any part of the word itself. Here's your first word: [word]." """
+
+
 class HostResponseTextFilter(BaseTextFilter):
     """Custom text filter for Word Wrangler game.
 
@@ -588,8 +591,6 @@ Important guidelines:
 2. Don't use special characters or formatting that wouldn't be natural in speech.
 3. ONLY use words from the provided list above when giving words to the player."""
 
-    intro_message = """Start with this exact brief introduction: "Welcome to Word Wrangler! I'll give you words to describe, and the A.I. player will try to guess them. Remember, don't say any part of the word itself. Here's your first word: [word]." """
-
     host_llm = GeminiLiveLLMService(
         api_key=os.getenv("GOOGLE_API_KEY"),
         settings=GeminiLiveLLMService.Settings(
@@ -637,20 +638,13 @@ Important guidelines:
         host_stopped_speaking_notifier=bot_speaking_notifier,
     )
 
-    # Set up the initial context for the conversation
-    messages = [
-        {
-            "role": "user",
-            "content": intro_message,
-        },
-    ]
-
     # While there are no context aggregators in the Pipeline, we need to create
     # one here to be able to push the context frame to the PipelineWorker. This is
     # what initiates the conversation.
-    context = LLMContext(messages)
+    context = LLMContext()
     user_aggregator, assistant_aggregator = LLMContextAggregatorPair(
         context,
+        realtime_service_mode=True,
         user_params=LLMUserAggregatorParams(
             user_mute_strategies=[MuteUntilFirstBotCompleteUserMuteStrategy()],
             vad_analyzer=SileroVADAnalyzer(),
@@ -700,6 +694,12 @@ Important guidelines:
         # Kick off the conversation by getting the context frame and pushing it.
         # There is no aggegrator in the Pipeline, so we need to rely on the
         # PipelineWorker to push the frame.
+        context.add_message(
+            {
+                "role": "developer",
+                "content": INTRO_MESSAGE,
+            }
+        )
         await worker.queue_frames([LLMRunFrame()])
         # Start the game timer
         game_timer.start()

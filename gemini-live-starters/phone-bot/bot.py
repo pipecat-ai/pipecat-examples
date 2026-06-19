@@ -123,16 +123,10 @@ Remember: Present the pre-written statements exactly as shown, keep your comment
         ),
     )
 
-    messages = [
-        {
-            "role": "user",
-            "content": "Introduce the game in one sentence, then say 'Ready? Here's round 1:' and present the first three statements from ROUND 1.",
-        },
-    ]
-
-    context = LLMContext(messages, tools=[end_game])
+    context = LLMContext(tools=[end_game])
     user_aggregator, assistant_aggregator = LLMContextAggregatorPair(
         context,
+        realtime_service_mode=True,
         user_params=LLMUserAggregatorParams(
             vad_analyzer=SileroVADAnalyzer(),
         ),
@@ -161,6 +155,12 @@ Remember: Present the pre-written statements exactly as shown, keep your comment
     async def on_client_connected(transport, client):
         logger.info(f"Client connected")
         # Kick off the conversation.
+        context.add_message(
+            {
+                "role": "developer",
+                "content": "Introduce the game in one sentence, then say 'Ready? Here's round 1:' and present the first three statements from ROUND 1.",
+            }
+        )
         await worker.queue_frames([LLMRunFrame()])
 
     @transport.event_handler("on_client_disconnected")

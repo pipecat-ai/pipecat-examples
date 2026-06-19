@@ -100,7 +100,7 @@ async def save_audio(audio: bytes, sample_rate: int, num_channels: int):
         logger.info("No audio data to save")
 
 
-async def run_bot(transport: BaseTransport, handle_sigint: bool, testing: bool):
+async def run_bot(transport: BaseTransport, runner_args: RunnerArguments, testing: bool):
     llm = GoogleLLMService(
         api_key=os.getenv("GOOGLE_API_KEY"),
         settings=GoogleLLMService.Settings(
@@ -151,6 +151,7 @@ async def run_bot(transport: BaseTransport, handle_sigint: bool, testing: bool):
             enable_metrics=True,
             enable_usage_metrics=True,
         ),
+        idle_timeout_secs=runner_args.pipeline_idle_timeout_secs,
     )
 
     @transport.event_handler("on_client_connected")
@@ -158,7 +159,9 @@ async def run_bot(transport: BaseTransport, handle_sigint: bool, testing: bool):
         # Start recording.
         await audiobuffer.start_recording()
         # Kick off the conversation.
-        context.add_message({"role": "user", "content": "Please introduce yourself to the user."})
+        context.add_message(
+            {"role": "developer", "content": "Please introduce yourself to the user."}
+        )
         await worker.queue_frames([LLMRunFrame()])
 
     @transport.event_handler("on_client_disconnected")
@@ -173,7 +176,7 @@ async def run_bot(transport: BaseTransport, handle_sigint: bool, testing: bool):
     # interruptions. We use `force_gc=True` to force garbage collection after
     # the runner finishes running a task which could be useful for long running
     # applications with multiple clients connecting.
-    runner = WorkerRunner(handle_sigint=handle_sigint, force_gc=True)
+    runner = WorkerRunner(handle_sigint=runner_args.handle_sigint, force_gc=True)
 
     await runner.add_workers(worker)
     await runner.run()
@@ -204,7 +207,7 @@ async def bot(runner_args: RunnerArguments, testing: bool | None = False):
             f"Call from: {call_info.from_number} to: {call_info.to_number}"
         ) if call_info else None
 
-    await run_bot(transport, runner_args.handle_sigint, testing)
+    await run_bot(transport, runner_args, testing)
 
 
 if __name__ == "__main__":
