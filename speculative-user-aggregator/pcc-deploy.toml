@@ -1,0 +1,5 @@
+agent_name = "speculative-user-aggregator"
+secret_set = "speculative-user-aggregator-secrets"
+
+[scaling]
+	min_agents = 1
