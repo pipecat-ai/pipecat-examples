@@ -22,7 +22,7 @@
     "react-native-background-timer": "^2.4.1",
     "react-native-gesture-handler": "^2.29.0",
     "react-native-get-random-values": "^1.11.0",
-    "@pipecat-ai/react-native-daily-transport": "file:///Users/filipi/workspaces/workspace_daily/pipecat-ai/rn_repos/pipecat-client-react-native-transports/transports/daily/pipecat-ai-react-native-daily-transport-1.8.0.tgz",
+    "@pipecat-ai/react-native-daily-transport": "^1.8.0",
     "react-native-safe-area-context": "^5.6.2",
     "react-native-toast-message": "^2.3.3"
   },

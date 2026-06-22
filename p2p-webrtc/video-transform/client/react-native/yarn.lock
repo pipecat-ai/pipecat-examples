@@ -1299,13 +1299,15 @@
     typed-emitter "^2.1.0"
     uuid "^11.1.1"
 
-"@pipecat-ai/react-native-daily-media-manager@file:../../../../../pipecat-ai/rn_repos/pipecat-client-react-native-transports/libs/daily-media-manager/pipecat-ai-react-native-daily-media-manager-0.0.2.tgz":
+"@pipecat-ai/react-native-daily-media-manager@^0.0.2":
   version "0.0.2"
-  resolved "file:../../../../../pipecat-ai/rn_repos/pipecat-client-react-native-transports/libs/daily-media-manager/pipecat-ai-react-native-daily-media-manager-0.0.2.tgz#1efd9d3ac56244319079b82bac32ba151c13f489"
+  resolved "https://registry.yarnpkg.com/@pipecat-ai/react-native-daily-media-manager/-/react-native-daily-media-manager-0.0.2.tgz#1efd9d3ac56244319079b82bac32ba151c13f489"
+  integrity sha512-uyPFd0EmQj7zzuTJIpt9z/o0nV7att2D9uUtmWwI2AgW3DwcjwmlbmzW9xdVcHdnFttJ8WsLGlTF8dG0F4xQxw==
 
-"@pipecat-ai/react-native-small-webrtc-transport@file:../../../../../pipecat-ai/rn_repos/pipecat-client-react-native-transports/transports/smallwebrtc/pipecat-ai-react-native-small-webrtc-transport-1.8.0.tgz":
+"@pipecat-ai/react-native-small-webrtc-transport@^1.8.0":
   version "1.8.0"
-  resolved "file:../../../../../pipecat-ai/rn_repos/pipecat-client-react-native-transports/transports/smallwebrtc/pipecat-ai-react-native-small-webrtc-transport-1.8.0.tgz#6e3385feb55172486c8bb1781e63e449eece301d"
+  resolved "https://registry.yarnpkg.com/@pipecat-ai/react-native-small-webrtc-transport/-/react-native-small-webrtc-transport-1.8.0.tgz#6e3385feb55172486c8bb1781e63e449eece301d"
+  integrity sha512-W51OfmjPt9ZL21OoqGVrDl0QIXTvdxxXK8K7syhU5l795pM6KFf876J/fX8rMFqr/Jrfqbia6KWWcknFZYvH+w==
   dependencies:
     "@pipecat-ai/client-js" "^1.12.0"
     lodash "^4.17.21"

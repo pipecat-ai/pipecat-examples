@@ -1299,9 +1299,10 @@
     typed-emitter "^2.1.0"
     uuid "^11.1.1"
 
-"@pipecat-ai/react-native-daily-transport@file:../../../../pipecat-ai/rn_repos/pipecat-client-react-native-transports/transports/daily/pipecat-ai-react-native-daily-transport-1.8.0.tgz":
+"@pipecat-ai/react-native-daily-transport@^1.8.0":
   version "1.8.0"
-  resolved "file:../../../../pipecat-ai/rn_repos/pipecat-client-react-native-transports/transports/daily/pipecat-ai-react-native-daily-transport-1.8.0.tgz#fbf3706763abf075a778655ecd75a544b9e16979"
+  resolved "https://registry.yarnpkg.com/@pipecat-ai/react-native-daily-transport/-/react-native-daily-transport-1.8.0.tgz#fbf3706763abf075a778655ecd75a544b9e16979"
+  integrity sha512-b7bvDux0X+D/POmXbAk0myzQ1qTpfUwFIcVHN/sK74Cwg31PTGwLMAVXzfNg3Le6MXy+NPNwsTPzh5RUWfX8gw==
   dependencies:
     "@pipecat-ai/client-js" "^1.12.0"
 
