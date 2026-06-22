@@ -165,6 +165,7 @@ export const VoiceClientProvider: React.FC<VoiceClientProviderProps> = ({ childr
         requestData: {
           createDailyRoom: false,
           enableDefaultIceServers: true,
+          transport: 'webrtc',
         },
       };
       if (authorizationToken.trim()) {
