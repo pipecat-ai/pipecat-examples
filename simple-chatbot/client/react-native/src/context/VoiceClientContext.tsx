@@ -118,6 +118,7 @@ export const VoiceClientProvider: React.FC<VoiceClientProviderProps> = ({ childr
         endpoint: url + '/start',
         requestData: {
           createDailyRoom: true,
+          transport: 'daily',
         },
       });
       // updating the preferences
