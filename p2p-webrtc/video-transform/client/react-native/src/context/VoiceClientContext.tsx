@@ -61,6 +61,7 @@ export const VoiceClientProvider: React.FC<VoiceClientProviderProps> = ({ childr
   const [remoteVideoTrack, setRemoteVideoTrack] = useState<MediaStreamTrack | undefined>()
   const [localAudioLevel, setLocalAudioLevel] = useState<number>(0)
   const botSpeakingRef = useRef(false)
+  const segmentMessageMap = useRef<Map<number, string>>(new Map())
   // Live messages to the chat
   const [messages, setMessages] = useState<LiveMessage[]>([])
 
@@ -143,10 +144,19 @@ export const VoiceClientProvider: React.FC<VoiceClientProviderProps> = ({ childr
           console.log("Received server message:", data)
         },
         onBotOutput: (output) => {
-          if (!output.spoken && output.aggregated_by === AggregationType.SENTENCE){
-            createLiveMessage("", "bot")
-          } else if (output.spoken) {
-            appendTextToLiveMessage(output.text + " ")
+          const segId = output.segment_id;
+          if (output.spoken_status === "new" && output.will_be_spoken && output.aggregated_by === AggregationType.SENTENCE) {
+            const id = createLiveMessage("", "bot");
+            if (segId !== undefined) segmentMessageMap.current.set(segId, id);
+          } else if (output.spoken_status === "in-progress" && output.spoken_progress && segId !== undefined) {
+            const id = segmentMessageMap.current.get(segId);
+            if (id) updateMessageById(id, output.spoken_progress.accumulated_text);
+          } else if (output.spoken_status === "completed" && segId !== undefined) {
+            const id = segmentMessageMap.current.get(segId);
+            if (id) {
+              updateMessageById(id, output.text);
+              segmentMessageMap.current.delete(segId);
+            }
           }
         },
       },
@@ -215,7 +225,7 @@ export const VoiceClientProvider: React.FC<VoiceClientProviderProps> = ({ childr
     }
   }, [voiceClient, isCamEnabled])
 
-  const createLiveMessage = useCallback((content: string, type: MessageType) => {
+  const createLiveMessage = useCallback((content: string, type: MessageType): string => {
     const uniqueId = Date.now().toString(36) + Math.random().toString(36).substring(2, 9);
     const liveMessage: LiveMessage = {
       content,
@@ -224,23 +234,22 @@ export const VoiceClientProvider: React.FC<VoiceClientProviderProps> = ({ childr
       id: uniqueId
     }
     setMessages(prev => [...prev, liveMessage])
+    return uniqueId;
   }, [])
 
-  const appendTextToLiveMessage = useCallback((content: string) => {
+  const updateMessageById = useCallback((id: string, content: string) => {
     setMessages(prevMessages => {
-      if (prevMessages.length) {
-        const lastBotIndex = [...prevMessages].reverse().findIndex(msg => msg.type === "bot");
-        if (lastBotIndex !== -1) {
-          const realIndex = prevMessages.length - 1 - lastBotIndex;
-          prevMessages[realIndex]!.content = prevMessages[realIndex]!.content + content
-        }
-      }
-      return [...prevMessages]
+      const index = prevMessages.findIndex(msg => msg.id === id);
+      if (index === -1) return prevMessages;
+      const updated = [...prevMessages];
+      updated[index] = { ...updated[index]!, content };
+      return updated;
     });
   }, []);
 
   const resetLiveMessages = useCallback(() => {
     setMessages([])
+    segmentMessageMap.current.clear()
   }, [])
 
   useEffect(() => {
