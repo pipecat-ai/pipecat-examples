@@ -1,0 +1,11 @@
+# NOTE: change these values before deploying to Pipecat Cloud.
+# - agent_name: the agent name in YOUR Pipecat Cloud account
+# - image: YOUR Docker registry repo and tag (this one belongs to the example author)
+# - secret_set: the secret set YOU created with `pipecat cloud secrets set`
+agent_name = "outbound-sales"
+image = "hushdaily/outbound-sales:0.7"
+secret_set = "outbound-sales-secrets"
+agent_profile = "agent-1x"
+
+[scaling]
+	min_agents = 1
