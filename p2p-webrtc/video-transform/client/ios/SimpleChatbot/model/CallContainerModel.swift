@@ -20,7 +20,9 @@ class CallContainerModel: ObservableObject {
     @Published var messages: [LiveMessage] = []
     @Published var liveBotMessage: LiveMessage?
     @Published var liveUserMessage: LiveMessage?
-    
+
+    private var segmentMessages: [Int: LiveMessage] = [:]
+
     var pipecatClientIOS: PipecatClient?
     
     @Published var selectedMic: MediaDeviceId? = nil {
@@ -144,10 +146,10 @@ class CallContainerModel: ObservableObject {
         self.pipecatClientIOS?.updateMic(micId: mic, completion: nil)
     }
     
-    private func createLiveMessage(content:String = "", type:MessageType) {
-        // Creating a new one
+    @discardableResult
+    private func createLiveMessage(content:String = "", type:MessageType) -> LiveMessage {
+        let liveMessage = LiveMessage(content: content, type: type, updatedAt: Date())
         DispatchQueue.main.async {
-            let liveMessage = LiveMessage(content: content, type: type, updatedAt: Date())
             self.messages.append(liveMessage)
             if type == .bot {
                 self.liveBotMessage = liveMessage
@@ -155,6 +157,7 @@ class CallContainerModel: ObservableObject {
                 self.liveUserMessage = liveMessage
             }
         }
+        return liveMessage
     }
     
     private func appendTextToLiveMessage(fromBot: Bool, content:String) {
@@ -172,6 +175,7 @@ class CallContainerModel: ObservableObject {
         DispatchQueue.main.async {
             self.messages = []
         }
+        self.segmentMessages.removeAll()
     }
 }
 
@@ -290,11 +294,30 @@ extension CallContainerModel:PipecatClientDelegate {
     }
     
     func onBotOutput(data: BotOutputData) {
-        if data.aggregatedBy == .sentence {
-            self.createLiveMessage(type: .bot)
-        } else if data.aggregatedBy == .word {
-            self.handleEvent(eventName: "onBotOutput", eventValue: data)
-            self.appendTextToLiveMessage(fromBot: true, content: data.text + " ")
+        self.handleEvent(eventName: "onBotOutput", eventValue: data)
+
+        guard let segmentId = data.segmentId else { return }
+
+        switch data.spokenStatus {
+        case .new:
+            if data.willBeSpoken == true && data.aggregatedBy == .sentence {
+                self.segmentMessages[segmentId] = self.createLiveMessage(type: .bot)
+            }
+        case .inProgress:
+            if let progress = data.spokenProgress, let message = self.segmentMessages[segmentId] {
+                DispatchQueue.main.async {
+                    message.content = progress.accumulatedText
+                }
+            }
+        case .completed:
+            if let message = self.segmentMessages[segmentId] {
+                DispatchQueue.main.async {
+                    message.content = data.text
+                }
+            }
+            self.segmentMessages.removeValue(forKey: segmentId)
+        case .none:
+            break
         }
     }
     
