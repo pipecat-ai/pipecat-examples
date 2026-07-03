@@ -29,7 +29,8 @@
 		90ABB9A82C74EAB1000D9CC7 /* SettingsManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90ABB9A72C74EAB1000D9CC7 /* SettingsManager.swift */; };
 		90C5CDCE2EA18A66000DD785 /* PipecatClientIOSSmallWebrtc in Frameworks */ = {isa = PBXBuildFile; productRef = 90C5CDCD2EA18A66000DD785 /* PipecatClientIOSSmallWebrtc */; };
 		CC48D9BB2F17C1E400256756 /* PipecatClientIOSSmallWebrtc in Frameworks */ = {isa = PBXBuildFile; productRef = CC48D9BA2F17C1E400256756 /* PipecatClientIOSSmallWebrtc */; };
-		CC48D9C12F17C8B600256756 /* PipecatClientIOSSmallWebrtc in Frameworks */ = {isa = PBXBuildFile; productRef = CC48D9C02F17C8B600256756 /* PipecatClientIOSSmallWebrtc */; };
+		CC56BB3B2FF6F26D00E9B510 /* PipecatClientIOSSmallWebrtc in Frameworks */ = {isa = PBXBuildFile; productRef = CC56BB3A2FF6F26D00E9B510 /* PipecatClientIOSSmallWebrtc */; };
+		CC56BB3E2FF70BE000E9B510 /* PipecatClientIOSSmallWebrtc in Frameworks */ = {isa = PBXBuildFile; productRef = CC56BB3D2FF70BE000E9B510 /* PipecatClientIOSSmallWebrtc */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -80,10 +81,11 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				CC56BB3E2FF70BE000E9B510 /* PipecatClientIOSSmallWebrtc in Frameworks */,
 				CC48D9BB2F17C1E400256756 /* PipecatClientIOSSmallWebrtc in Frameworks */,
 				90383A912D9C357F00D0DDA3 /* PipecatClientIOSSmallWebrtc in Frameworks */,
 				90C5CDCE2EA18A66000DD785 /* PipecatClientIOSSmallWebrtc in Frameworks */,
-				CC48D9C12F17C8B600256756 /* PipecatClientIOSSmallWebrtc in Frameworks */,
+				CC56BB3B2FF6F26D00E9B510 /* PipecatClientIOSSmallWebrtc in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -241,7 +243,8 @@
 				90383A902D9C357F00D0DDA3 /* PipecatClientIOSSmallWebrtc */,
 				90C5CDCD2EA18A66000DD785 /* PipecatClientIOSSmallWebrtc */,
 				CC48D9BA2F17C1E400256756 /* PipecatClientIOSSmallWebrtc */,
-				CC48D9C02F17C8B600256756 /* PipecatClientIOSSmallWebrtc */,
+				CC56BB3A2FF6F26D00E9B510 /* PipecatClientIOSSmallWebrtc */,
+				CC56BB3D2FF70BE000E9B510 /* PipecatClientIOSSmallWebrtc */,
 			);
 			productName = SimpleChatbot;
 			productReference = 90031FA32C616EE700408370 /* SimpleChatbot.app */;
@@ -316,7 +319,7 @@
 			);
 			mainGroup = 90031F9A2C616EE700408370;
 			packageReferences = (
-				CC48D9BF2F17C8B600256756 /* XCRemoteSwiftPackageReference "pipecat-client-ios-small-webrtc" */,
+				CC56BB3C2FF70BE000E9B510 /* XCRemoteSwiftPackageReference "pipecat-client-ios-small-webrtc" */,
 			);
 			productRefGroup = 90031FA42C616EE700408370 /* Products */;
 			projectDirPath = "";
@@ -707,12 +710,12 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
-		CC48D9BF2F17C8B600256756 /* XCRemoteSwiftPackageReference "pipecat-client-ios-small-webrtc" */ = {
+		CC56BB3C2FF70BE000E9B510 /* XCRemoteSwiftPackageReference "pipecat-client-ios-small-webrtc" */ = {
 			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/pipecat-ai/pipecat-client-ios-small-webrtc.git";
+			repositoryURL = "https://github.com/pipecat-ai/pipecat-client-ios-small-webrtc";
 			requirement = {
 				kind = upToNextMajorVersion;
-				minimumVersion = 1.2.0;
+				minimumVersion = 1.3.0;
 			};
 		};
 /* End XCRemoteSwiftPackageReference section */
@@ -730,9 +733,13 @@
 			isa = XCSwiftPackageProductDependency;
 			productName = PipecatClientIOSSmallWebrtc;
 		};
-		CC48D9C02F17C8B600256756 /* PipecatClientIOSSmallWebrtc */ = {
+		CC56BB3A2FF6F26D00E9B510 /* PipecatClientIOSSmallWebrtc */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = CC48D9BF2F17C8B600256756 /* XCRemoteSwiftPackageReference "pipecat-client-ios-small-webrtc" */;
+			productName = PipecatClientIOSSmallWebrtc;
+		};
+		CC56BB3D2FF70BE000E9B510 /* PipecatClientIOSSmallWebrtc */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = CC56BB3C2FF70BE000E9B510 /* XCRemoteSwiftPackageReference "pipecat-client-ios-small-webrtc" */;
 			productName = PipecatClientIOSSmallWebrtc;
 		};
 /* End XCSwiftPackageProductDependency section */

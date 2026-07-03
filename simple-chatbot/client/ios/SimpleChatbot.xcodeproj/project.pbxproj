@@ -33,7 +33,8 @@
 		90CC98B02E158093003C2706 /* PipecatClientIOSDaily in Frameworks */ = {isa = PBXBuildFile; productRef = 90CC98AF2E158093003C2706 /* PipecatClientIOSDaily */; };
 		90EB04752E469E6C00560870 /* PipecatClientIOSDaily in Frameworks */ = {isa = PBXBuildFile; productRef = 90EB04742E469E6C00560870 /* PipecatClientIOSDaily */; };
 		CC48D9B52F16739600256756 /* PipecatClientIOSDaily in Frameworks */ = {isa = PBXBuildFile; productRef = CC48D9B42F16739600256756 /* PipecatClientIOSDaily */; };
-		CC48D9B82F16F24100256756 /* PipecatClientIOSDaily in Frameworks */ = {isa = PBXBuildFile; productRef = CC48D9B72F16F24100256756 /* PipecatClientIOSDaily */; };
+		CC56BB412FF70C6800E9B510 /* PipecatClientIOSDaily in Frameworks */ = {isa = PBXBuildFile; productRef = CC56BB402FF70C6800E9B510 /* PipecatClientIOSDaily */; };
+		CC8C05A92FE5DBD100F637E3 /* PipecatClientIOSDaily in Frameworks */ = {isa = PBXBuildFile; productRef = CC8C05A82FE5DBD100F637E3 /* PipecatClientIOSDaily */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -86,11 +87,12 @@
 				902DB31D2E4D45DF00FEF1DE /* PipecatClientIOSDaily in Frameworks */,
 				90EB04752E469E6C00560870 /* PipecatClientIOSDaily in Frameworks */,
 				902DB3172E4BD22200FEF1DE /* PipecatClientIOSDaily in Frameworks */,
+				CC56BB412FF70C6800E9B510 /* PipecatClientIOSDaily in Frameworks */,
 				901377B12E7D8474001DEF4E /* PipecatClientIOSDaily in Frameworks */,
 				90C5CDC82EA13599000DD785 /* PipecatClientIOSDaily in Frameworks */,
 				903E1F732EAFFFF500D75CC7 /* PipecatClientIOSDaily in Frameworks */,
 				CC48D9B52F16739600256756 /* PipecatClientIOSDaily in Frameworks */,
-				CC48D9B82F16F24100256756 /* PipecatClientIOSDaily in Frameworks */,
+				CC8C05A92FE5DBD100F637E3 /* PipecatClientIOSDaily in Frameworks */,
 				90CC98B02E158093003C2706 /* PipecatClientIOSDaily in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -245,7 +247,8 @@
 				903E1F722EAFFFF500D75CC7 /* PipecatClientIOSDaily */,
 				90195EC02EEB62B400129372 /* PipecatClientIOSDaily */,
 				CC48D9B42F16739600256756 /* PipecatClientIOSDaily */,
-				CC48D9B72F16F24100256756 /* PipecatClientIOSDaily */,
+				CC8C05A82FE5DBD100F637E3 /* PipecatClientIOSDaily */,
+				CC56BB402FF70C6800E9B510 /* PipecatClientIOSDaily */,
 			);
 			productName = SimpleChatbot;
 			productReference = 90031FA32C616EE700408370 /* SimpleChatbot.app */;
@@ -320,7 +323,7 @@
 			);
 			mainGroup = 90031F9A2C616EE700408370;
 			packageReferences = (
-				CC48D9B62F16F24100256756 /* XCRemoteSwiftPackageReference "pipecat-client-ios-daily" */,
+				CC56BB3F2FF70C6800E9B510 /* XCRemoteSwiftPackageReference "pipecat-client-ios-daily" */,
 			);
 			productRefGroup = 90031FA42C616EE700408370 /* Products */;
 			projectDirPath = "";
@@ -709,12 +712,12 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
-		CC48D9B62F16F24100256756 /* XCRemoteSwiftPackageReference "pipecat-client-ios-daily" */ = {
+		CC56BB3F2FF70C6800E9B510 /* XCRemoteSwiftPackageReference "pipecat-client-ios-daily" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/pipecat-ai/pipecat-client-ios-daily";
 			requirement = {
 				kind = upToNextMajorVersion;
-				minimumVersion = 1.2.0;
+				minimumVersion = 1.3.0;
 			};
 		};
 /* End XCRemoteSwiftPackageReference section */
@@ -756,9 +759,13 @@
 			isa = XCSwiftPackageProductDependency;
 			productName = PipecatClientIOSDaily;
 		};
-		CC48D9B72F16F24100256756 /* PipecatClientIOSDaily */ = {
+		CC56BB402FF70C6800E9B510 /* PipecatClientIOSDaily */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = CC48D9B62F16F24100256756 /* XCRemoteSwiftPackageReference "pipecat-client-ios-daily" */;
+			package = CC56BB3F2FF70C6800E9B510 /* XCRemoteSwiftPackageReference "pipecat-client-ios-daily" */;
+			productName = PipecatClientIOSDaily;
+		};
+		CC8C05A82FE5DBD100F637E3 /* PipecatClientIOSDaily */ = {
+			isa = XCSwiftPackageProductDependency;
 			productName = PipecatClientIOSDaily;
 		};
 /* End XCSwiftPackageProductDependency section */
