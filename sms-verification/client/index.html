@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Pipecat SMS Verification</title>
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+    <main class="card">
+      <h1>SMS Verification Bot</h1>
+
+      <div class="mode-toggle" role="tablist">
+        <button class="tab active" data-mode="browser" role="tab">Call in browser</button>
+        <button class="tab" data-mode="phone" role="tab">Call by phone</button>
+      </div>
+
+      <!-- WebRTC (browser) mode -->
+      <section id="browser-pane" class="pane">
+        <form id="call-form">
+          <label for="phone-input">Your phone number:</label>
+          <div class="field">
+            <input
+              type="tel"
+              id="phone-input"
+              name="phone"
+              placeholder="+15551234567"
+              autocomplete="tel"
+              required
+            />
+            <p class="hint">
+              The bot will use this^ number to send the SMS.
+            </p>
+          </div>
+          <button type="submit" id="call-btn">Call</button>
+        </form>
+      </section>
+
+      <!-- Phone (PSTN) mode -->
+      <section id="phone-pane" class="pane hidden">
+        <label>Call the bot:</label>
+        <p class="phone-display" id="bot-phone-number">…</p>
+        <p class="hint">
+          The bot will use the number you're calling from to send the SMS.
+        </p>
+      </section>
+
+      <!-- Result -->
+      <section id="result" class="result hidden">
+        <img id="result-gif" alt="result" />
+        <p id="result-text"></p>
+      </section>
+
+      <pre id="log" class="log"></pre>
+    </main>
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>

@@ -1,0 +1,21 @@
+[project]
+name = "sms-verification"
+version = "0.1.0"
+description = "Pipecat SMS verification bot — call by phone or browser, receive an SMS, repeat the code back to verify"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "pipecat-ai[websocket,webrtc,cartesia,google,openai,silero,deepgram,runner]>=1.4.0",
+    "twilio>=9.3.0",
+]
+
+[dependency-groups]
+dev = [
+    "pyright>=1.1.404,<2",
+    "ruff>=0.12.11,<1",
+]
+
+[tool.ruff]
+line-length = 100
+[tool.ruff.lint]
+select = ["I", "UP"]
