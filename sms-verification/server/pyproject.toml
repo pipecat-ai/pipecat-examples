@@ -22,4 +22,4 @@ dev = [
 [tool.ruff]
 line-length = 100
 [tool.ruff.lint]
-select = ["I"]
+select = ["I" , "UP"]
