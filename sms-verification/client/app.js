@@ -8,6 +8,7 @@ const FAILURE_GIF = 'https://media0.giphy.com/media/v1.Y2lkPTc5MGI3NjExNjByYjhkY
 const tabs = document.querySelectorAll('.tab');
 const phonePane = document.getElementById('phone-pane');
 const browserPane = document.getElementById('browser-pane');
+const botNumberEl = document.getElementById('bot-phone-number');
 const form = document.getElementById('call-form');
 const phoneInput = document.getElementById('phone-input');
 const callBtn = document.getElementById('call-btn');
@@ -38,6 +39,24 @@ function setMode(mode) {
 }
 
 tabs.forEach((t) => t.addEventListener('click', () => setMode(t.dataset.mode)));
+
+// --- Config: fetch the Twilio number to display in phone mode -------------
+
+fetch('/api/config')
+  .then((r) => r.json())
+  .then((cfg) => {
+    if (cfg.twilio_phone_number) {
+      botNumberEl.textContent = cfg.twilio_phone_number;
+      botNumberEl.classList.remove('phone-missing');
+    } else {
+      botNumberEl.textContent = 'Set TWILIO_PHONE_NUMBER in server/.env';
+      botNumberEl.classList.add('phone-missing');
+    }
+  })
+  .catch(() => {
+    botNumberEl.textContent = 'unavailable — is the server running?';
+    botNumberEl.classList.add('phone-missing');
+  });
 
 // --- SSE: always listen, both modes ---------------------------------------
 

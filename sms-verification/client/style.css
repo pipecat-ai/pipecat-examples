@@ -86,6 +86,13 @@ h1 {
   margin: 0.5rem 0;
 }
 
+.phone-display.phone-missing {
+  font-size: 0.95rem;
+  font-weight: 500;
+  letter-spacing: normal;
+  color: #fbbf24;
+}
+
 form {
   display: flex;
   flex-direction: column;

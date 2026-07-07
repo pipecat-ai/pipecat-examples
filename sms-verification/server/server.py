@@ -8,12 +8,14 @@
 
 The Pipecat runner (``pipecat.runner.run``) provides the transport plumbing
 (``/ws`` for Twilio, ``/api/offer`` for SmallWebRTC, TwiML XML for
-``-t twilio``, etc.). This file adds the two things unique to the SMS
+``-t twilio``, etc.). This file adds the pieces unique to the SMS
 verification demo:
 
-* ``GET  /``        — serves the demo frontend (overrides the runner's redirect).
-* ``GET  /events``  — Server-Sent Events stream so the Twilio-mode frontend can
-                       learn whether verification succeeded.
+* ``GET  /``           — serves the demo frontend (overrides the runner's redirect).
+* ``GET  /api/config`` — surfaces ``TWILIO_PHONE_NUMBER`` so the phone-mode UI
+                          can show the number the user should dial.
+* ``GET  /events``     — Server-Sent Events stream so the Twilio-mode frontend
+                          can learn whether verification succeeded.
 
 Launch with ``python server.py`` (or ``uv run python server.py``). The runner's
 ``main()`` discovers ``bot()`` from ``bot.py`` automatically.
@@ -21,14 +23,18 @@ Launch with ``python server.py`` (or ``uv run python server.py``). The runner's
 
 import asyncio
 import json
+import os
 from pathlib import Path
 
+from dotenv import load_dotenv
 from fastapi import Request
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pipecat.runner.run import app, main
 
 from events import bus
+
+load_dotenv(override=True)
 
 CLIENT_DIR = Path(__file__).resolve().parent.parent / "client"
 
@@ -40,6 +46,12 @@ async def index():
 
 if CLIENT_DIR.exists():
     app.mount("/static", StaticFiles(directory=CLIENT_DIR), name="static")
+
+
+@app.get("/api/config")
+async def client_config():
+    """Public config the frontend needs to render the demo."""
+    return {"twilio_phone_number": os.getenv("TWILIO_PHONE_NUMBER", "")}
 
 
 @app.get("/events")

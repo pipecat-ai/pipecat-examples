@@ -76,24 +76,40 @@ Once you have a verified A2P Campaign, add the
 `"Linked Messaging Service"` ID as the `TWILIO_MESSAGING_SERVICE_SID` in your `.env`.
 <img src="z_readme_linked_messaging_service.jpg" width="450">
 
-### Configure Twilio (for Phone mode only)
-Optional. In Browser mode, you can call the bot from the browser and 
-pass in the phone number to which you want to receive the SMS verification code
-without additional configuration in Twilio.
+## Run 
 
-1. Start ngrok:
+### Client
+1. In one terminal — start the client dev server:
+
+```sh
+cd sms-verification/client
+npm run dev
+```
+
+### Browser mode (default)
+2. In another terminal — start the bot server:
+
+```sh
+cd sms-verification/server
+uv run python server.py
+```
+
+3. Open `http://localhost:5173`.
+
+Type a phone number that can receive an SMS and click **Call**.
+Talk to the bot in your browser and read SMS from phone.
+
+### Phone mode
+Optional. Requires additional Twilio configuration.
+
+2. Set `TWILIO_PHONE_NUMBER` env var.
+
+3. Start ngrok:
 
    ```sh
    ngrok http 7860
    ```
-
-2. Run the server in Twilio mode so the runner exposes the TwiML webhook:
-
-   ```sh
-   uv run python server.py -t twilio -x <your-ngrok-host>
-   ```
-
-3. In the [Twilio console](https://console.twilio.com/), open your phone
+4. In the [Twilio console](https://console.twilio.com/), open your phone
    number → **Voice configuration** → **A call comes in** → **Webhook**, and
    point it at:
 
@@ -107,29 +123,15 @@ without additional configuration in Twilio.
    Alternatively, skip the webhook and create a TwiML Bin that points the
    `<Stream url>` at your ngrok WSS URL directly.
 
-## Run
+5. Run the server in Twilio mode so the runner exposes the TwiML webhook:
 
-1. In one terminal — start the bot server:
+   ```sh
+   uv run python server.py -t twilio -x <your-ngrok-host>
+   ```
 
-```sh
-cd sms-verification/server
-uv run python server.py
-```
-
-2. In another — start the client dev server:
-
-```sh
-cd sms-verification/client
-npm run dev
-```
-
-3. Open `http://localhost:5173`.
-
-- **Browser mode** (default) — type a phone number that can receive an SMS,
-  click **Call**. Talk to the bot in your browser.
-- **Phone mode** — switch to the "Call by phone" tab, then call the number
-  shown on the page from any phone. The bot picks up, sends an SMS to the
-  caller's number, asks you to read it back.
+The "Call by phone" tab reveals the the number to call
+to reach the bot (`TWILIO_PHONE_NUMBER`). The bot picks up,
+sends an SMS to the caller's number, asks you to read it back.
 
 ### Demo video
 
