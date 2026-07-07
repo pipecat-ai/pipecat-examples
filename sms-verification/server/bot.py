@@ -11,10 +11,10 @@ read the code back. Confirms or rejects the spoken digits and signals the
 frontend with success or failure events. Allows one retry; ends the call on
 success or on the second failed attempt.
 
-Runs against two transports from a single ``run_bot()``:
+A single ``bot(runner_args)`` entry point runs against two transports:
 
 * **Twilio WebSocket** — the frontend just displays a phone number to dial; the
-  caller's number comes from Twilio's call info (caller ID).
+  caller's number comes from Twilio's REST API via ``get_call_info``.
 * **SmallWebRTC** — the frontend captures the user's phone number in a form
   and passes it as ``request_data.phone_number`` on the WebRTC offer.
 
@@ -26,8 +26,8 @@ call (Twilio mode).
 import os
 import re
 
+import aiohttp
 from dotenv import load_dotenv
-from fastapi import WebSocket
 from loguru import logger
 from pipecat.adapters.schemas.function_schema import FunctionSchema
 from pipecat.adapters.schemas.tools_schema import ToolsSchema
@@ -43,8 +43,8 @@ from pipecat.processors.aggregators.llm_response_universal import (
 )
 from pipecat.processors.frame_processor import FrameDirection
 from pipecat.processors.frameworks.rtvi import RTVIServerMessageFrame
-from pipecat.runner.utils import parse_telephony_websocket
-from pipecat.serializers.twilio import TwilioFrameSerializer
+from pipecat.runner.types import RunnerArguments
+from pipecat.runner.utils import create_transport
 from pipecat.services.cartesia.tts import CartesiaTTSService
 from pipecat.services.deepgram.stt import DeepgramSTTService
 from pipecat.services.google.llm import GoogleLLMService
@@ -54,12 +54,8 @@ from pipecat.services.llm_service import FunctionCallParams
 # and the `llm = OpenAILLMService(...)` block in ``run_bot``.
 # from pipecat.services.openai.llm import OpenAILLMService
 from pipecat.transports.base_transport import BaseTransport, TransportParams
-from pipecat.transports.smallwebrtc.connection import SmallWebRTCConnection
-from pipecat.transports.smallwebrtc.transport import SmallWebRTCTransport
-from pipecat.transports.websocket.fastapi import (
-    FastAPIWebsocketParams,
-    FastAPIWebsocketTransport,
-)
+from pipecat.transports.websocket.fastapi import FastAPIWebsocketParams
+from pydantic import BaseModel
 
 from events import bus
 from sms import generate_code, send_verification_sms
@@ -82,6 +78,44 @@ Follow this script exactly:
 5. Use the tool result's `say` field as your spoken reply, then immediately call the `end_call` tool if the result includes `end_call: true`. If a new code was sent for a retry, ask the user to read the new digits when it arrives.
 
 Your output will be converted to audio. Do not include emoji or special characters."""
+
+
+class CallInfo(BaseModel):
+    """Caller details fetched from the Twilio REST API."""
+
+    from_number: str | None = None
+    to_number: str | None = None
+
+
+async def get_call_info(call_sid: str | None) -> CallInfo | None:
+    """Fetch caller/callee numbers from the Twilio REST API.
+
+    The Twilio Media Streams "start" event does not carry the caller ID unless
+    the TwiML explicitly forwards it as a stream ``<Parameter>``. Looking it up
+    via the REST API keeps the demo working with the runner's default TwiML.
+    """
+    if not call_sid:
+        return None
+
+    account_sid = os.getenv("TWILIO_ACCOUNT_SID")
+    auth_token = os.getenv("TWILIO_AUTH_TOKEN")
+    if not account_sid or not auth_token:
+        logger.warning("Missing Twilio credentials, cannot fetch call info")
+        return None
+
+    url = f"https://api.twilio.com/2010-04-01/Accounts/{account_sid}/Calls/{call_sid}.json"
+    try:
+        auth = aiohttp.BasicAuth(account_sid, auth_token)
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url, auth=auth) as response:
+                if response.status != 200:
+                    logger.error(f"Twilio call lookup failed: {response.status}")
+                    return None
+                data = await response.json()
+                return CallInfo(from_number=data.get("from"), to_number=data.get("to"))
+    except Exception as e:
+        logger.error(f"Error fetching call info from Twilio: {e}")
+        return None
 
 
 def normalize_digits(raw: str) -> str:
@@ -284,74 +318,42 @@ async def run_bot(transport: BaseTransport, phone_number: str) -> None:
     await runner.run(task)
 
 
-# ---------------------------------------------------------------------------
-# Transport-specific entry points
-# ---------------------------------------------------------------------------
+async def bot(runner_args: RunnerArguments):
+    """Main bot entry point compatible with Pipecat Cloud."""
 
-
-async def bot_twilio(websocket: WebSocket) -> None:
-    """Entry point for Twilio Media Streams."""
-    _, call_data = await parse_telephony_websocket(websocket)
-
-    call_sid = call_data["call_id"]
-    stream_sid = call_data["stream_id"]
-
-    # Fetch caller ID from Twilio REST. This is the phone number we'll send the SMS to.
-    phone_number = await _fetch_caller_id(call_sid)
-    if not phone_number:
-        logger.error("Could not determine caller ID; aborting")
-        return
-    logger.info(f"Inbound call {call_sid} from {phone_number}")
-
-    serializer = TwilioFrameSerializer(
-        stream_sid=stream_sid,
-        call_sid=call_sid,
-        account_sid=os.getenv("TWILIO_ACCOUNT_SID", ""),
-        auth_token=os.getenv("TWILIO_AUTH_TOKEN", ""),
-    )
-
-    transport = FastAPIWebsocketTransport(
-        websocket=websocket,
-        params=FastAPIWebsocketParams(
-            audio_in_enabled=True,
-            audio_out_enabled=True,
-            add_wav_header=False,
-            serializer=serializer,
-        ),
-    )
-
-    await run_bot(transport, phone_number)
-
-
-async def bot_webrtc(webrtc_connection: SmallWebRTCConnection, phone_number: str) -> None:
-    """Entry point for browser WebRTC sessions."""
-    logger.info(f"WebRTC session for {phone_number}")
-    transport = SmallWebRTCTransport(
-        webrtc_connection=webrtc_connection,
-        params=TransportParams(
+    transport_params = {
+        "webrtc": lambda: TransportParams(
             audio_in_enabled=True,
             audio_out_enabled=True,
             audio_out_10ms_chunks=2,
         ),
-    )
+        # create_transport sets the twilio serializer and add_wav_header automatically.
+        "twilio": lambda: FastAPIWebsocketParams(
+            audio_in_enabled=True,
+            audio_out_enabled=True,
+        ),
+    }
+
+    transport = await create_transport(runner_args, transport_params)
+
+    # WebRTC clients pass the phone number in the offer's request_data (mirrored
+    # to runner_args.body). Twilio calls need a REST lookup because the Media
+    # Streams "start" event does not include the caller ID.
+    phone_number = (runner_args.body or {}).get("phone_number", "").strip()
+    if not phone_number and runner_args.call_data:
+        info = await get_call_info(runner_args.call_data.call_id)
+        if info:
+            phone_number = info.from_number or ""
+
+    if not phone_number:
+        logger.error("Could not determine phone number; aborting")
+        return
+
+    logger.info(f"Running verification for {phone_number}")
     await run_bot(transport, phone_number)
 
 
-async def _fetch_caller_id(call_sid: str) -> str | None:
-    """Look up the caller's phone number via Twilio REST."""
-    import aiohttp
+if __name__ == "__main__":
+    from pipecat.runner.run import main
 
-    account_sid = os.getenv("TWILIO_ACCOUNT_SID")
-    auth_token = os.getenv("TWILIO_AUTH_TOKEN")
-    if not account_sid or not auth_token:
-        return None
-
-    url = f"https://api.twilio.com/2010-04-01/Accounts/{account_sid}/Calls/{call_sid}.json"
-    auth = aiohttp.BasicAuth(account_sid, auth_token)
-    async with aiohttp.ClientSession() as session:
-        async with session.get(url, auth=auth) as response:
-            if response.status != 200:
-                logger.error(f"Twilio call lookup failed: {response.status}")
-                return None
-            data = await response.json()
-            return data.get("from")
+    main()

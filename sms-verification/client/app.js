@@ -8,7 +8,6 @@ const FAILURE_GIF = 'https://media0.giphy.com/media/v1.Y2lkPTc5MGI3NjExNjByYjhkY
 const tabs = document.querySelectorAll('.tab');
 const phonePane = document.getElementById('phone-pane');
 const browserPane = document.getElementById('browser-pane');
-const botNumberEl = document.getElementById('bot-phone-number');
 const form = document.getElementById('call-form');
 const phoneInput = document.getElementById('phone-input');
 const callBtn = document.getElementById('call-btn');
@@ -39,17 +38,6 @@ function setMode(mode) {
 }
 
 tabs.forEach((t) => t.addEventListener('click', () => setMode(t.dataset.mode)));
-
-// --- Config ----------------------------------------------------------------
-
-fetch('/api/config')
-  .then((r) => r.json())
-  .then((cfg) => {
-    botNumberEl.textContent = cfg.twilio_phone_number || 'set TWILIO_PHONE_NUMBER';
-  })
-  .catch(() => {
-    botNumberEl.textContent = 'unavailable';
-  });
 
 // --- SSE: always listen, both modes ---------------------------------------
 
@@ -138,10 +126,16 @@ async function connect(phone) {
   });
 
   try {
-    await pcClient.connect({
-      webrtcRequestParams: {
-        endpoint: '/api/offer',
-        requestData: { phone_number: phone },
+    // Route through the runner's /start endpoint so the phone number lands on
+    // runner_args.body. Posting directly to /api/offer loses it because the
+    // runner's FastAPI dataclass parser only reads request_data (snake_case)
+    // while the SDK sends requestData (camelCase); the /sessions/{id}/api/offer
+    // proxy that /start hands us handles both.
+    await pcClient.startBotAndConnect({
+      endpoint: '/start',
+      requestData: {
+        transport: 'webrtc',
+        body: { phone_number: phone },
       },
     });
   } catch (err) {

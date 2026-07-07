@@ -14,13 +14,13 @@ The demo allows one retry; the second failed attempt ends the call.
 ## How it works
 
 ```
-┌──────────┐    ┌────────────────────────────────┐    ┌──────────┐
-│ Frontend │◄──►│ FastAPI server                 │◄──►│ Twilio   │
-│ (HTML/JS)│SSE │  /api/offer (SmallWebRTC)      │SMS │          │
-│          │WS  │  /ws/twilio  (Twilio Media WS) │    │          │
-└──────────┘    │  /events     (SSE bus)         │    └──────────┘
-                │  bot.py — shared run_bot()     │
-                └────────────────────────────────┘
+┌──────────┐    ┌─────────────────────────────────┐    ┌──────────┐
+│ Frontend │◄──►│ Pipecat runner (FastAPI)        │◄──►│ Twilio   │
+│ (HTML/JS)│SSE │  /api/offer  (SmallWebRTC)      │SMS │          │
+│          │WS  │  /ws         (Twilio Media WS)  │    │          │
+└──────────┘    │  /events     (SSE bus, custom)  │    └──────────┘
+                │  bot.py — single bot() entry    │
+                └─────────────────────────────────┘
 ```
 
 The bot uses three LLM tools:
@@ -78,7 +78,8 @@ Once you have a verified A2P Campaign, add the
 
 ### Configure Twilio (for Phone mode only)
 Optional. In Browser mode, you can call the bot from the browser and 
-pass in the phone number to which you want to receive the SMS verification code.
+pass in the phone number to which you want to receive the SMS verification code
+without additional configuration in Twilio.
 
 1. Start ngrok:
 
@@ -86,19 +87,25 @@ pass in the phone number to which you want to receive the SMS verification code.
    ngrok http 7860
    ```
 
-2. In the [Twilio console](https://console.twilio.com/), open your phone
+2. Run the server in Twilio mode so the runner exposes the TwiML webhook:
+
+   ```sh
+   uv run python server.py -t twilio -x <your-ngrok-host>
+   ```
+
+3. In the [Twilio console](https://console.twilio.com/), open your phone
    number → **Voice configuration** → **A call comes in** → **Webhook**, and
    point it at:
 
    ```
-   https://<your-ngrok-host>/twilio/voice
+   https://<your-ngrok-host>/
    ```
 
-   The server replies with TwiML that connects the call's media stream to
-   `wss://<your-ngrok-host>/ws/twilio`.
+   The runner replies with TwiML that connects the call's media stream to
+   `wss://<your-ngrok-host>/ws`.
 
-   Alternatively, skip the server and create a TwiML Bin directly pointing the
-   `<Stream url>` at your ngrok WSS URL.
+   Alternatively, skip the webhook and create a TwiML Bin that points the
+   `<Stream url>` at your ngrok WSS URL directly.
 
 ## Run
 
@@ -138,8 +145,8 @@ npm run dev
 sms-verification/
 ├── README.md
 ├── server/
-│   ├── bot.py        # transport-aware run_bot + tool handlers
-│   ├── server.py     # FastAPI: Twilio WS + WebRTC offer + SSE
+│   ├── bot.py        # bot(runner_args) entry + tool handlers
+│   ├── server.py     # demo-specific routes (index + SSE) over the runner
 │   ├── sms.py        # Twilio REST SMS helper
 │   ├── events.py     # in-memory pub/sub for SSE
 │   ├── env.example
