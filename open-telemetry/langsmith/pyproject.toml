@@ -1,0 +1,20 @@
+[project]
+name = "pipecat-langsmith-tracing"
+version = "0.1.0"
+description = "A Pipecat example using LangSmith tracing"
+requires-python = ">=3.11"
+dependencies = [
+    "pipecat-ai[daily,webrtc,websocket,silero,cartesia,deepgram,openai,tracing,runner]>=1.4.0",
+    "pipecatcloud>=0.7.1",
+    "langsmith[pipecat]>=0.9.7",
+]
+
+[dependency-groups]
+dev = [
+    "ruff~=0.12.1",
+]
+
+[tool.ruff]
+line-length = 100
+[tool.ruff.lint]
+select = ["I"]
