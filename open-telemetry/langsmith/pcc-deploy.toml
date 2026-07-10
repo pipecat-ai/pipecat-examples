@@ -1,0 +1,5 @@
+agent_name = "langsmith-tracing"
+secret_set = "langsmith-tracing-secrets"
+
+[scaling]
+	min_agents = 1

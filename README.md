@@ -79,7 +79,7 @@ Ready to explore more? These are two of the most useful examples for common use 
 
 ### **Monitoring & Analytics**
 
-- **[open-telemetry](open-telemetry/)** - Observability and tracing examples using Langfuse and Jaeger
+- **[open-telemetry](open-telemetry/)** - Observability and tracing examples using Langfuse, LangSmith, and Jaeger
 
 ### **Testing & Development**
 
