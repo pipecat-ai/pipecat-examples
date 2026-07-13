@@ -31,11 +31,13 @@ from dotenv import load_dotenv
 from loguru import logger
 from pipecat.adapters.schemas.function_schema import FunctionSchema
 from pipecat.adapters.schemas.tools_schema import ToolsSchema
+from pipecat.audio.dtmf.types import KeypadEntry
 from pipecat.audio.vad.silero import SileroVADAnalyzer
 from pipecat.frames.frames import EndTaskFrame, LLMRunFrame
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineParams, PipelineTask
+from pipecat.processors.aggregators.dtmf_aggregator import DTMFAggregator
 from pipecat.processors.aggregators.llm_context import LLMContext
 from pipecat.processors.aggregators.llm_response_universal import (
     LLMContextAggregatorPair,
@@ -43,7 +45,7 @@ from pipecat.processors.aggregators.llm_response_universal import (
 )
 from pipecat.processors.frame_processor import FrameDirection
 from pipecat.processors.frameworks.rtvi import RTVIServerMessageFrame
-from pipecat.runner.types import RunnerArguments
+from pipecat.runner.types import RunnerArguments, WebSocketRunnerArguments
 from pipecat.runner.utils import create_transport
 from pipecat.services.cartesia.tts import CartesiaTTSService
 from pipecat.services.deepgram.stt import DeepgramSTTService
@@ -73,11 +75,23 @@ You have the user's phone number on file: {phone_number}.
 Follow this script exactly:
 1. Greet the user warmly in one short sentence and ask "Can I send a confirmation code to your phone to verify your number? Carrier fees may apply."
 2. If they say yes, call the `send_verification_code` tool with their phone number.
-3. Tell them the code is on its way and to read back the six digits when it arrives.
-4. When they speak the digits, call the `verify_code` tool with the digits joined as a single string (e.g. "123456").
-5. Use the tool result's `say` field as your spoken reply, then immediately call the `end_call` tool if the result includes `end_call: true`. If a new code was sent for a retry, ask the user to read the new digits when it arrives.
+3. After the tool returns, say this line verbatim (do not paraphrase, do not drop the keypad or pound-key options):
+   "{input_line}"
+4. When you receive the digits (spoken or typed), call the `verify_code` tool with the digits joined as a single string (e.g. "123456"). Typed digits may arrive as a single transcription; treat any six-digit sequence you receive as the code.
+5. Use the tool result's `say` field as your spoken reply, then immediately call the `end_call` tool if the result includes `end_call: true`. If a new code was sent for a retry, the tool result's `say` field already covers both input options — use it as-is without paraphrasing.
 
 Your output will be converted to audio. Do not include emoji or special characters."""
+
+
+INPUT_LINE_DTMF = (
+    "Your six digit code is on its way. When it arrives, you have two options: "
+    "you can say the six digits out loud, or you can type them on your phone keypad "
+    "and press the pound key when you are done."
+)
+INPUT_LINE_VOICE_ONLY = (
+    "Your six digit code is on its way. When it arrives, please read the six digits "
+    "back to me."
+)
 
 
 class CallInfo(BaseModel):
@@ -124,7 +138,7 @@ def normalize_digits(raw: str) -> str:
     return re.sub(r"\D", "", raw or "")
 
 
-async def run_bot(transport: BaseTransport, phone_number: str) -> None:
+async def run_bot(transport: BaseTransport, phone_number: str, dtmf_enabled: bool) -> None:
     stt = DeepgramSTTService(api_key=os.getenv("DEEPGRAM_API_KEY"))
 
     tts = CartesiaTTSService(
@@ -134,10 +148,14 @@ async def run_bot(transport: BaseTransport, phone_number: str) -> None:
         ),
     )
 
+    input_line = INPUT_LINE_DTMF if dtmf_enabled else INPUT_LINE_VOICE_ONLY
     llm = GoogleLLMService(
         api_key=os.getenv("GOOGLE_API_KEY"),
         settings=GoogleLLMService.Settings(
-            system_instruction=SYSTEM_PROMPT.format(phone_number=phone_number),
+            system_instruction=SYSTEM_PROMPT.format(
+                phone_number=phone_number,
+                input_line=input_line,
+            ),
         ),
     )
 
@@ -167,7 +185,7 @@ async def run_bot(transport: BaseTransport, phone_number: str) -> None:
             await params.result_callback(
                 {
                     "sent": True,
-                    "say": "I just sent you a six digit code. Read it back to me when it arrives.",
+                    "say": input_line,
                 }
             )
         else:
@@ -213,11 +231,20 @@ async def run_bot(transport: BaseTransport, phone_number: str) -> None:
         if sent:
             state["code"] = new_code
             logger.info(f"Retry code for {phone_number}: {new_code}")
+            retry_options = (
+                "you can say the six digits out loud, or you can type them on your "
+                "phone keypad and press the pound key when you are done"
+                if dtmf_enabled
+                else "please read the six digits back to me"
+            )
             await params.result_callback(
                 {
                     "matched": False,
                     "retry_sent": True,
-                    "say": "Those digits did not match. I just sent a new code. Read back the new six digits when it arrives.",
+                    "say": (
+                        "Those digits did not match. I just sent a new six digit code. "
+                        f"When it arrives, {retry_options}."
+                    ),
                 }
             )
         else:
@@ -279,17 +306,23 @@ async def run_bot(transport: BaseTransport, phone_number: str) -> None:
         ),
     )
 
-    pipeline = Pipeline(
-        [
-            transport.input(),
-            stt,
-            user_aggregator,
-            llm,
-            tts,
-            transport.output(),
-            assistant_aggregator,
-        ]
+    processors = [transport.input(), stt]
+    if dtmf_enabled:
+        # Buffers keypad presses (as InputDTMFFrames from the Twilio serializer)
+        # and flushes them as a TranscriptionFrame when the user presses '#' or
+        # after `timeout` seconds of idle — so the LLM sees typed digits the same
+        # way it sees spoken digits.
+        processors.append(
+            DTMFAggregator(
+                timeout=10.0,
+                termination_digit=KeypadEntry.POUND,
+                prefix="",
+            )
+        )
+    processors.extend(
+        [user_aggregator, llm, tts, transport.output(), assistant_aggregator]
     )
+    pipeline = Pipeline(processors)
 
     task = PipelineTask(
         pipeline,
@@ -349,8 +382,13 @@ async def bot(runner_args: RunnerArguments):
         logger.error("Could not determine phone number; aborting")
         return
 
-    logger.info(f"Running verification for {phone_number}")
-    await run_bot(transport, phone_number)
+    # DTMF (phone keypad) input only makes sense when the caller is on an actual
+    # phone. WebRTC clients are in the browser and have no keypad tied to the
+    # call audio, so we keep that path voice-only.
+    dtmf_enabled = isinstance(runner_args, WebSocketRunnerArguments)
+
+    logger.info(f"Running verification for {phone_number} (dtmf_enabled={dtmf_enabled})")
+    await run_bot(transport, phone_number, dtmf_enabled)
 
 
 if __name__ == "__main__":

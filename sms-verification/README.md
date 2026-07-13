@@ -110,7 +110,7 @@ Optional. Requires additional Twilio configuration.
    ngrok http 7860
    ```
 4. In the [Twilio console](https://console.twilio.com/), open your phone
-   number → **Voice configuration** → **A call comes in** → **Webhook**, and
+   number → **Edit Voice configuration** → **Use Webhooks**, and
    point it at:
 
    ```
