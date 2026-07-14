@@ -45,3 +45,12 @@ fun SnapshotStateList<ChatHistoryElement>.appendOrUpdateUser(text: String) {
 fun SnapshotStateList<ChatHistoryElement>.appendOrUpdateBot(text: String) {
     appendOrUpdate(ChatHistoryElement.Type.Bot, text)
 }
+
+fun SnapshotStateList<ChatHistoryElement>.setOrAddLastBot(text: String) {
+    val last = lastOrNull()
+    if (last != null && last.type == ChatHistoryElement.Type.Bot) {
+        this[lastIndex] = ChatHistoryElement(ChatHistoryElement.Type.Bot, text.trim())
+    } else {
+        add(ChatHistoryElement(ChatHistoryElement.Type.Bot, text.trim()))
+    }
+}

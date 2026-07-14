@@ -59,6 +59,18 @@ class VoiceClientManager(private val context: Context) {
         private const val TAG = "VoiceClientManager"
     }
 
+    /**
+     * One bot-output segment (typically a sentence) in the bot's current
+     * message. [spokenText] tracks how much of it TTS has spoken so far.
+     */
+    private data class BotSegment(
+        val id: Int?,
+        val fullText: String,
+        var spokenText: String = "",
+    )
+
+    private val botSegments = mutableListOf<BotSegment>()
+
     private val client = mutableStateOf<PipecatClient<*, *>?>(null)
 
     val state = mutableStateOf<TransportState?>(null)
@@ -92,6 +104,7 @@ class VoiceClientManager(private val context: Context) {
         }
 
         chatHistory.clear()
+        botSegments.clear()
         this.transportType.value = transportType
 
         state.value = TransportState.Disconnected
@@ -133,10 +146,49 @@ class VoiceClientManager(private val context: Context) {
             }
 
             override fun onBotOutput(data: BotOutputData) {
-                Log.i(TAG, "Bot transcript: ${data}")
-                if (data.aggregatedBy == "word") {
-                    chatHistory.appendOrUpdateBot(data.text)
+                Log.d(TAG, "Bot output: $data")
+
+                when {
+                    // A new segment was announced (or is display-only text). This is
+                    // the only event which carries the segment's text for the first
+                    // time; later events for the same segmentId just track progress.
+                    data.willBeSpoken == false ||
+                        data.spokenStatus == BotOutputData.SpokenStatus.New -> {
+
+                        if (chatHistory.lastOrNull()?.type != ChatHistoryElement.Type.Bot) {
+                            botSegments.clear()
+                        }
+                        botSegments.add(
+                            BotSegment(
+                                id = data.segmentId,
+                                fullText = data.text,
+                                spokenText = if (data.willBeSpoken == false) data.text else ""
+                            )
+                        )
+                    }
+
+                    // TTS is speaking this segment: reveal the spoken prefix
+                    data.spokenStatus == BotOutputData.SpokenStatus.InProgress -> {
+                        botSegments.find { it.id == data.segmentId }?.spokenText =
+                            data.spokenProgress?.accumulatedText ?: ""
+                    }
+
+                    data.spokenStatus == BotOutputData.SpokenStatus.Completed -> {
+                        botSegments.find { it.id == data.segmentId }
+                            ?.let { it.spokenText = it.fullText }
+                    }
+
+                    // Legacy bots (RTVI protocol 1.4.x, no spokenStatus) send
+                    // word-aggregated text as it is spoken
+                    data.aggregatedBy == "word" -> {
+                        chatHistory.appendOrUpdateBot(data.text)
+                        return
+                    }
+
+                    else -> return
                 }
+
+                renderBotMessage()
             }
 
             override fun onBotStartedSpeaking() {
@@ -224,7 +276,18 @@ class VoiceClientManager(private val context: Context) {
         client.startBotAndConnect(
             APIRequest(
                 endpoint = params.backendUrl,
-                requestData = Value.Object(),
+                // Pipecat Cloud uses the /start request body to decide how to run the
+                // bot: without these fields it neither creates a Daily room nor waits
+                // for a WebRTC offer. Self-hosted runners ignore unknown fields.
+                requestData = when (transportType) {
+                    TransportType.Daily -> Value.Object(
+                        "createDailyRoom" to Value.Bool(true),
+                    )
+                    TransportType.SmallWebrtc -> Value.Object(
+                        "transport" to Value.Str("webrtc"),
+                        "enableDefaultIceServers" to Value.Bool(true),
+                    )
+                },
                 headers = listOfNotNull(
                     params.apiKey.trim().takeIf { it.isNotEmpty() }?.let {"Authorization" to "Bearer $it"}
                 ).toMap()
@@ -234,6 +297,17 @@ class VoiceClientManager(private val context: Context) {
         }
 
         this.client.value = client
+    }
+
+    private fun renderBotMessage() {
+        val text = botSegments
+            .map { it.spokenText.trim() }
+            .filter { it.isNotEmpty() }
+            .joinToString(" ")
+
+        if (text.isNotEmpty()) {
+            chatHistory.setOrAddLastBot(text)
+        }
     }
 
     fun enableCamera(enabled: Boolean) {
