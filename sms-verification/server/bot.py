@@ -7,9 +7,10 @@
 """SMS verification bot.
 
 Greets the caller, offers to send a 6-digit code by SMS, then asks the caller to
-read the code back. Confirms or rejects the spoken digits and signals the
-frontend with success or failure events. Allows one retry; ends the call on
-success or on the second failed attempt.
+read the code back — or, on a phone call, type it on the keypad (DTMF) and press
+'#'. Confirms or rejects the digits and signals the frontend with success or
+failure events. Allows one retry; ends the call on success or on the second
+failed attempt.
 
 A single ``bot(runner_args)`` entry point runs against two transports:
 
@@ -35,8 +36,7 @@ from pipecat.audio.dtmf.types import KeypadEntry
 from pipecat.audio.vad.silero import SileroVADAnalyzer
 from pipecat.frames.frames import EndTaskFrame, LLMRunFrame
 from pipecat.pipeline.pipeline import Pipeline
-from pipecat.pipeline.runner import PipelineRunner
-from pipecat.pipeline.task import PipelineParams, PipelineTask
+from pipecat.pipeline.worker import PipelineParams, PipelineWorker
 from pipecat.processors.aggregators.dtmf_aggregator import DTMFAggregator
 from pipecat.processors.aggregators.llm_context import LLMContext
 from pipecat.processors.aggregators.llm_response_universal import (
@@ -57,6 +57,7 @@ from pipecat.services.llm_service import FunctionCallParams
 # from pipecat.services.openai.llm import OpenAILLMService
 from pipecat.transports.base_transport import BaseTransport, TransportParams
 from pipecat.transports.websocket.fastapi import FastAPIWebsocketParams
+from pipecat.workers.runner import WorkerRunner
 from pydantic import BaseModel
 
 from events import bus
@@ -77,7 +78,7 @@ Follow this script exactly:
 2. If they say yes, call the `send_verification_code` tool with their phone number.
 3. After the tool returns, say this line verbatim (do not paraphrase, do not drop the keypad or pound-key options):
    "{input_line}"
-4. When you receive the digits (spoken or typed), call the `verify_code` tool with the digits joined as a single string (e.g. "123456"). Typed digits may arrive as a single transcription; treat any six-digit sequence you receive as the code.
+4. When you receive the digits, call the `verify_code` tool with the digits joined as a single string (e.g. "123456"). The digits may arrive as spelled-out words or as a numeric string; treat any six-digit sequence you receive as the code.
 5. Use the tool result's `say` field as your spoken reply, then immediately call the `end_call` tool if the result includes `end_call: true`. If a new code was sent for a retry, the tool result's `say` field already covers both input options — use it as-is without paraphrasing.
 
 Your output will be converted to audio. Do not include emoji or special characters."""
@@ -89,8 +90,7 @@ INPUT_LINE_DTMF = (
     "and press the pound key when you are done."
 )
 INPUT_LINE_VOICE_ONLY = (
-    "Your six digit code is on its way. When it arrives, please read the six digits "
-    "back to me."
+    "Your six digit code is on its way. When it arrives, please read the six digits back to me."
 )
 
 
@@ -107,26 +107,40 @@ async def get_call_info(call_sid: str | None) -> CallInfo | None:
     The Twilio Media Streams "start" event does not carry the caller ID unless
     the TwiML explicitly forwards it as a stream ``<Parameter>``. Looking it up
     via the REST API keeps the demo working with the runner's default TwiML.
+
+    Args:
+        call_sid: The Twilio call SID (e.g. call_data.call_id), or None.
+
+    Returns:
+        A CallInfo with the caller's numbers, or None if it couldn't be fetched.
     """
     if not call_sid:
         return None
 
     account_sid = os.getenv("TWILIO_ACCOUNT_SID")
     auth_token = os.getenv("TWILIO_AUTH_TOKEN")
+
     if not account_sid or not auth_token:
         logger.warning("Missing Twilio credentials, cannot fetch call info")
         return None
 
     url = f"https://api.twilio.com/2010-04-01/Accounts/{account_sid}/Calls/{call_sid}.json"
+
     try:
+        # Use HTTP Basic Auth with aiohttp
         auth = aiohttp.BasicAuth(account_sid, auth_token)
+
         async with aiohttp.ClientSession() as session:
             async with session.get(url, auth=auth) as response:
                 if response.status != 200:
-                    logger.error(f"Twilio call lookup failed: {response.status}")
+                    error_text = await response.text()
+                    logger.error(f"Twilio API error ({response.status}): {error_text}")
                     return None
+
                 data = await response.json()
+
                 return CallInfo(from_number=data.get("from"), to_number=data.get("to"))
+
     except Exception as e:
         logger.error(f"Error fetching call info from Twilio: {e}")
         return None
@@ -138,7 +152,17 @@ def normalize_digits(raw: str) -> str:
     return re.sub(r"\D", "", raw or "")
 
 
-async def run_bot(transport: BaseTransport, phone_number: str, dtmf_enabled: bool) -> None:
+async def run_bot(
+    transport: BaseTransport, phone_number: str, dtmf_enabled: bool, runner_args: RunnerArguments
+) -> None:
+    """Run the bot.
+
+    Args:
+        transport: The transport to use.
+        phone_number: The phone number to verify.
+        dtmf_enabled: Whether DTMF is enabled.
+        runner_args: The runner arguments.
+    """
     stt = DeepgramSTTService(api_key=os.getenv("DEEPGRAM_API_KEY"))
 
     tts = CartesiaTTSService(
@@ -158,12 +182,6 @@ async def run_bot(transport: BaseTransport, phone_number: str, dtmf_enabled: boo
             ),
         ),
     )
-
-    # To use OpenAI instead, comment out the GoogleLLMService block above and
-    # uncomment the two lines below (and the import at the top of the file):
-    # llm = OpenAILLMService(api_key=os.getenv("OPENAI_API_KEY"))
-    # # When using OpenAI, pass the system prompt via context messages instead
-    # # of `system_instruction`.
 
     state = {"code": None, "attempts": 0, "resolved": False}
 
@@ -198,10 +216,10 @@ async def run_bot(transport: BaseTransport, phone_number: str, dtmf_enabled: boo
             )
 
     async def handle_verify_code(params: FunctionCallParams) -> None:
-        spoken = normalize_digits(params.arguments.get("digits", ""))
+        received = normalize_digits(params.arguments.get("digits", ""))
         expected = state["code"]
 
-        if expected and spoken == expected:
+        if expected and received == expected:
             await emit({"type": "verification_result", "success": True}, llm_service=params.llm)
             await params.result_callback(
                 {
@@ -280,11 +298,11 @@ async def run_bot(transport: BaseTransport, phone_number: str, dtmf_enabled: boo
             ),
             FunctionSchema(
                 name="verify_code",
-                description="Verify the six digits the user spoke back. Returns match status and the next spoken line.",
+                description="Verify the six digits the user provided. Returns match status and the next spoken line.",
                 properties={
                     "digits": {
                         "type": "string",
-                        "description": "The six digits the user spoke, joined as a single numeric string (e.g. '482915').",
+                        "description": "The six digits the user provided, joined as a single numeric string (e.g. '482915').",
                     },
                 },
                 required=["digits"],
@@ -306,30 +324,35 @@ async def run_bot(transport: BaseTransport, phone_number: str, dtmf_enabled: boo
         ),
     )
 
-    processors = [transport.input(), stt]
-    if dtmf_enabled:
-        # Buffers keypad presses (as InputDTMFFrames from the Twilio serializer)
-        # and flushes them as a TranscriptionFrame when the user presses '#' or
-        # after `timeout` seconds of idle — so the LLM sees typed digits the same
-        # way it sees spoken digits.
-        processors.append(
+    pipeline = Pipeline(
+        [
+            transport.input(),
+            stt,
+            # Buffers keypad presses (as InputDTMFFrames from the Twilio serializer)
+            # and flushes them as a TranscriptionFrame when the user presses '#' or
+            # after `timeout` seconds of idle — so the LLM sees typed digits the same
+            # way it sees spoken digits. In WebRTC mode no DTMF frames arrive, so
+            # this is a pass-through.
             DTMFAggregator(
                 timeout=10.0,
                 termination_digit=KeypadEntry.POUND,
                 prefix="",
-            )
-        )
-    processors.extend(
-        [user_aggregator, llm, tts, transport.output(), assistant_aggregator]
+            ),
+            user_aggregator,
+            llm,
+            tts,
+            transport.output(),
+            assistant_aggregator,
+        ]
     )
-    pipeline = Pipeline(processors)
 
-    task = PipelineTask(
+    worker = PipelineWorker(
         pipeline,
         params=PipelineParams(
             enable_metrics=True,
             enable_usage_metrics=True,
         ),
+        idle_timeout_secs=runner_args.pipeline_idle_timeout_secs,
     )
 
     @transport.event_handler("on_client_connected")
@@ -338,17 +361,23 @@ async def run_bot(transport: BaseTransport, phone_number: str, dtmf_enabled: boo
         context.add_message(
             {"role": "user", "content": "Please greet the user and start the verification flow."}
         )
-        await task.queue_frames([LLMRunFrame()])
+        await worker.queue_frames([LLMRunFrame()])
 
     @transport.event_handler("on_client_disconnected")
     async def on_client_disconnected(transport, client):
         logger.info("Client disconnected; cancelling task")
         if not state["resolved"]:
             await bus.publish({"type": "verification_result", "success": False})
-        await task.cancel()
+        await worker.cancel()
 
-    runner = PipelineRunner(handle_sigint=False, force_gc=True)
-    await runner.run(task)
+    # We use `handle_sigint=False` because `uvicorn` is controlling keyboard
+    # interruptions. We use `force_gc=True` to force garbage collection after
+    # the runner finishes running a task which could be useful for long running
+    # applications with multiple clients connecting.
+    runner = WorkerRunner(handle_sigint=runner_args.handle_sigint, force_gc=True)
+
+    await runner.add_workers(worker)
+    await runner.run()
 
 
 async def bot(runner_args: RunnerArguments):
@@ -360,7 +389,6 @@ async def bot(runner_args: RunnerArguments):
             audio_out_enabled=True,
             audio_out_10ms_chunks=2,
         ),
-        # create_transport sets the twilio serializer and add_wav_header automatically.
         "twilio": lambda: FastAPIWebsocketParams(
             audio_in_enabled=True,
             audio_out_enabled=True,
@@ -370,13 +398,14 @@ async def bot(runner_args: RunnerArguments):
     transport = await create_transport(runner_args, transport_params)
 
     # WebRTC clients pass the phone number in the offer's request_data (mirrored
-    # to runner_args.body). Twilio calls need a REST lookup because the Media
-    # Streams "start" event does not include the caller ID.
-    phone_number = (runner_args.body or {}).get("phone_number", "").strip()
-    if not phone_number and runner_args.call_data:
-        info = await get_call_info(runner_args.call_data.call_id)
-        if info:
-            phone_number = info.from_number or ""
+    # to runner_args.body). Twilio calls need a REST lookup because the runner's
+    # default TwiML does not forward the caller ID as a stream parameter, so
+    # call_data.from_number is empty.
+    call_data = runner_args.call_data
+    call_info = await get_call_info(call_data.call_id) if call_data else None
+    phone_number = (runner_args.body or {}).get("phone_number", "").strip() or (
+        call_info.from_number if call_info else None
+    )
 
     if not phone_number:
         logger.error("Could not determine phone number; aborting")
@@ -388,7 +417,7 @@ async def bot(runner_args: RunnerArguments):
     dtmf_enabled = isinstance(runner_args, WebSocketRunnerArguments)
 
     logger.info(f"Running verification for {phone_number} (dtmf_enabled={dtmf_enabled})")
-    await run_bot(transport, phone_number, dtmf_enabled)
+    await run_bot(transport, phone_number, dtmf_enabled, runner_args)
 
 
 if __name__ == "__main__":

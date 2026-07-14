@@ -1,13 +1,14 @@
 # SMS Verification Bot
 
 A Pipecat voice agent that sends a 6-digit SMS verification code, asks the
-caller to read the digits back, and confirms or rejects the match. Runs in two
-modes from a single bot file:
+caller to read the digits back, and confirms or rejects the match. On a phone
+call the caller can also type the code on the keypad (DTMF) and press `#`
+instead of speaking it. Runs in two modes from a single bot file:
 
-| Mode      | Transport          | How the user calls          | Where the SMS goes                |
-| --------- | ------------------ | --------------------------- | --------------------------------- |
-| Browser   | SmallWebRTC        | Clicks **Call** in browser  | The number typed in the form     |
-| Phone     | Twilio Media Stream | Dials your Twilio number    | The caller's number (caller ID)  |
+| Mode      | Transport           | How the user calls          | Where the SMS goes                |
+| --------- | ------------------  | --------------------------- | --------------------------------- |
+| Browser   | SmallWebRTC         | Clicks **Call** in browser  | The number typed in the form      |
+| Phone     | Twilio Media Stream | Dials your Twilio number    | The caller's number (caller ID)   |
 
 The demo allows one retry; the second failed attempt ends the call.
 
@@ -129,16 +130,13 @@ Optional. Requires additional Twilio configuration.
    uv run python server.py -t twilio -x <your-ngrok-host>
    ```
 
-The "Call by phone" tab reveals the the number to call
+The "Call by phone" tab reveals the number to call
 to reach the bot (`TWILIO_PHONE_NUMBER`). The bot picks up,
-sends an SMS to the caller's number, asks you to read it back.
+sends an SMS to the caller's number, and asks you to read the code
+back — or type it on the keypad and press `#`.
 
 ### Demo video
 
-- branch version for PR
-[Browser mode demo video](https://raw.githubusercontent.com/pipecat-ai/pipecat-examples/vp-sms-example/sms-verification/z_readme_demo_video.mp4)
-
-- use this link when merged to main
 [Browser mode demo video](https://raw.githubusercontent.com/pipecat-ai/pipecat-examples/main/sms-verification/z_readme_demo_video.mp4)
 
 ## File layout
