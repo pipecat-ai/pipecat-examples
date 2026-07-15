@@ -5,6 +5,7 @@
 #
 
 import os
+import uuid
 
 from dotenv import load_dotenv
 from loguru import logger
@@ -23,7 +24,10 @@ from pipecat.runner.utils import create_transport
 from pipecat.services.cartesia.tts import CartesiaTTSService
 from pipecat.services.deepgram.stt import DeepgramSTTService
 from pipecat.services.llm_service import FunctionCallParams
-from pipecat.services.openai.llm import OpenAILLMService
+from pipecat.services.openai.responses.llm import (
+    OpenAIResponsesLLMService,
+    OpenAIResponsesReasoningConfig,
+)
 from pipecat.transports.base_transport import BaseTransport, TransportParams
 from pipecat.transports.daily.transport import DailyParams
 from pipecat.transports.websocket.fastapi import FastAPIWebsocketParams
@@ -89,11 +93,12 @@ async def run_bot(transport: BaseTransport):
         ),
     )
 
-    llm = OpenAILLMService(
+    llm = OpenAIResponsesLLMService(
         api_key=os.getenv("OPENAI_API_KEY"),
-        settings=OpenAILLMService.Settings(
-            temperature=0.5,
-            system_instruction="You are a helpful LLM in a WebRTC call. Your goal is to demonstrate your capabilities in a succinct way. Your output will be converted to audio so don't include special characters in your answers. Respond to what the user said in a creative and helpful way.",
+        settings=OpenAIResponsesLLMService.Settings(
+            model="gpt-5.4",
+            reasoning=OpenAIResponsesReasoningConfig(effort="low"),
+            system_instruction="You are a helpful assistant in a voice conversation. Your responses will be spoken aloud, so avoid emojis, bullet points, or other formatting that can't be spoken. Respond to what the user said in a creative, helpful, and brief way.",
         ),
     )
 
@@ -109,6 +114,8 @@ async def run_bot(transport: BaseTransport):
             vad_analyzer=SileroVADAnalyzer(),
         ),
     )
+
+    conversation_id = str(uuid.uuid4())
 
     pipeline = Pipeline(
         [
@@ -129,10 +136,10 @@ async def run_bot(transport: BaseTransport):
             enable_usage_metrics=True,
         ),
         enable_tracing=IS_TRACING_ENABLED,
-        # Optionally, add a conversation ID to track the conversation
-        # conversation_id="8df26cc1-6db0-4a7a-9930-1e037c8f1fa2",
-        # Optionally, add a Langfuse session ID to the span attributes
-        # additional_span_attributes={"langfuse.session.id": "8df26cc1-6db0-4a7a-9930-1e037c8f1fa2"},
+        # Use the conversation ID as the Langfuse session ID so traces are
+        # grouped in the Sessions view and correlate with conversation.id
+        conversation_id=conversation_id,
+        additional_span_attributes={"langfuse.session.id": conversation_id},
     )
 
     @transport.event_handler("on_client_connected")
