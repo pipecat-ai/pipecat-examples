@@ -45,6 +45,7 @@ Ready to explore more? These are two of the most useful examples for common use 
 - **[simple-chatbot](simple-chatbot/)** - Client/server examples with React, JavaScript, Swift, Kotlin, and React Native
 - **[push-to-talk](push-to-talk/)** - Client/server example showing how to build a Push-to-Talk app using Voice UI Kit and Pipecat's JS and React SDKs
 - **[websocket](websocket/)** - WebSocket-based real-time communication
+- **[moq/agent-server](moq/agent-server/)** - Announcement-driven, multi-session voice-agent server over MoQ (Media over QUIC)
 - **[instant-voice](instant-voice/)** - Enable instant voice communication as soon as a user connects
 - **[p2p-webrtc](p2p-webrtc/)** - Simple peer-to-peer WebRTC voice bot
 
