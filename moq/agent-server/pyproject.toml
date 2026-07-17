@@ -1,0 +1,20 @@
+[project]
+name = "moq-agent-server-example"
+version = "0.1.0"
+description = "Announcement-driven, multi-session MoQ voice-agent server example for Pipecat"
+requires-python = ">=3.11"
+dependencies = [
+    "python-dotenv",
+    "pipecat-ai[moq,silero,deepgram,cartesia,openai]>=1.4.0",
+]
+
+[dependency-groups]
+dev = [
+    "pyright>=1.1.404,<2",
+    "ruff>=0.12.11,<1",
+]
+
+[tool.ruff]
+line-length = 100
+[tool.ruff.lint]
+select = ["I"]
