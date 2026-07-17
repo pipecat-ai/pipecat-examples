@@ -281,6 +281,7 @@ class VoiceClientManager(private val context: Context) {
                 // for a WebRTC offer. Self-hosted runners ignore unknown fields.
                 requestData = when (transportType) {
                     TransportType.Daily -> Value.Object(
+                        "transport" to Value.Str("daily"),
                         "createDailyRoom" to Value.Bool(true),
                     )
                     TransportType.SmallWebrtc -> Value.Object(
