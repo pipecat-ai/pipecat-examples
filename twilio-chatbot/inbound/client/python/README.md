@@ -14,7 +14,6 @@ Edit the `templates/streams.xml` file to point to your server’s WebSocket endp
   <Connect>
     <Stream url="ws://localhost:7860/ws" />
   </Connect>
-  <Pause length="40"/>
 </Response>
 ```
 

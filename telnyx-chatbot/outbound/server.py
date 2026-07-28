@@ -243,7 +243,6 @@ async def get_answer_xml(request: Request) -> HTMLResponse:
     <Connect>
         <Stream url="{ws_url}" bidirectionalMode="rtp"></Stream>
     </Connect>
-    <Pause length="40"/>
 </Response>'''
 
         return HTMLResponse(content=texml_content, media_type="application/xml")
