@@ -83,7 +83,13 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments) -> Non
         user_params=LLMUserAggregatorParams(vad_analyzer=SileroVADAnalyzer()),
     )
 
-    rtvi = RTVIProcessor(uploads_folder=runner_args.cli_args.uploads_folder)
+    # cli_args is only populated when running via the development runner (not on
+    # Pipecat Cloud, where there is no uploads endpoint and large-file upload is
+    # unavailable).
+    uploads_folder = (
+        getattr(runner_args.cli_args, "uploads_folder", None) if runner_args.cli_args else None
+    )
+    rtvi = RTVIProcessor(uploads_folder=uploads_folder)
 
     # Pipeline - assembled from reusable components
     pipeline = Pipeline(
