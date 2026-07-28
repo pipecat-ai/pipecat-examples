@@ -20,4 +20,4 @@ line-length = 100
 select = ["I", "UP"]
 
 [tool.uv.sources]
-pipecat-ai = { path = "/Users/mattieruth/src/pipecat/pipecat", editable=true }
+pipecat-ai = { path = "../../../pipecat", editable=true }
