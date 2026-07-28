@@ -52,10 +52,11 @@ Concepts this example is meant to demonstrate:
 4. **Run the bot**:
 
    ```bash
-   uv run bot.py -u /tmp/uploads
+   uv run bot.py
    ```
 
-   The `-u` flag sets the folder where uploaded files are temporarily saved.
+   Uploaded files are saved to a temporary directory created automatically in
+   your system's temp folder. Pass `-u <path>` to choose a specific location.
    The runner serves every transport; the caller selects which one (a web/mobile
    client picks its transport when it connects; a telephony provider connects to
    `/ws`).

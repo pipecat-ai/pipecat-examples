@@ -21,6 +21,7 @@ Run the bot using::
 """
 
 import os
+import tempfile
 
 from dotenv import load_dotenv
 from loguru import logger
@@ -36,11 +37,13 @@ from pipecat.processors.aggregators.llm_response_universal import (
 from pipecat.processors.frameworks.rtvi import RTVIProcessor
 from pipecat.runner.types import RunnerArguments
 from pipecat.runner.utils import create_transport
+from pipecat.serializers.protobuf import ProtobufFrameSerializer
 from pipecat.services.anthropic.llm import AnthropicLLMService
 from pipecat.services.cartesia.tts import CartesiaTTSService
 from pipecat.services.deepgram.stt import DeepgramSTTService
 from pipecat.transports.base_transport import BaseTransport, TransportParams
 from pipecat.transports.daily.transport import DailyParams
+from pipecat.transports.websocket.fastapi import FastAPIWebsocketParams
 from pipecat.workers.runner import WorkerRunner
 
 load_dotenv(override=True)
@@ -83,12 +86,14 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments) -> Non
         user_params=LLMUserAggregatorParams(vad_analyzer=SileroVADAnalyzer()),
     )
 
-    # cli_args is only populated when running via the development runner (not on
-    # Pipecat Cloud, where there is no uploads endpoint and large-file upload is
-    # unavailable).
-    uploads_folder = (
-        getattr(runner_args.cli_args, "uploads_folder", None) if runner_args.cli_args else None
-    )
+    # cli_args is only populated when running via the development runner.
+    # On Pipecat Cloud cli_args is None, so uploads_folder stays None and the
+    # upload endpoint is disabled (Cloud has no POST /files endpoint).
+    uploads_folder = None
+    if runner_args.cli_args:
+        uploads_folder = getattr(runner_args.cli_args, "uploads_folder", None) or tempfile.mkdtemp(
+            prefix="pipecat-uploads-"
+        )
     rtvi = RTVIProcessor(uploads_folder=uploads_folder)
 
     # Pipeline - assembled from reusable components
@@ -146,6 +151,12 @@ async def bot(runner_args: RunnerArguments):
         "daily": lambda: DailyParams(
             audio_in_enabled=True,
             audio_out_enabled=True,
+        ),
+        "websocket": lambda: FastAPIWebsocketParams(
+            audio_in_enabled=True,
+            audio_out_enabled=True,
+            add_wav_header=False,
+            serializer=ProtobufFrameSerializer(),
         ),
         "webrtc": lambda: TransportParams(
             audio_in_enabled=True,
