@@ -45,7 +45,7 @@ Concepts this example is meant to demonstrate:
 3. **Configure environment variables**:
 
    ```bash
-   cp .env.example .env
+   cp env.example .env
    # Edit .env and add your API keys
    ```
 
@@ -113,6 +113,12 @@ file-upload/
 ```
 
 ## Deploying to Pipecat Cloud
+
+Note that the `POST /files` upload endpoint is a development-runner feature, so
+files larger than the transport's message size limit can't be uploaded when the
+bot is deployed to Pipecat Cloud — production deployments need their own upload
+endpoint (see `PipecatClient.uploadFile(file, uploadFileParams)`). Sending
+small files, and referencing files by URL, work in both environments.
 
 This project is configured for deployment to Pipecat Cloud. You can learn how to deploy to Pipecat Cloud in the [Pipecat Quickstart Guide](https://docs.pipecat.ai/getting-started/quickstart#step-2-deploy-to-production).
 
