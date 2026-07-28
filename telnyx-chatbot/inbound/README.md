@@ -85,7 +85,6 @@ To run the twilio-chatbot for inbound calling locally, we'll first set up an ngr
          <Connect>
             <Stream url="wss://your-url.ngrok.io/ws" bidirectionalMode="rtp"></Stream>
          </Connect>
-         <Pause length="40"/>
       </Response>
      ```
 
@@ -138,7 +137,6 @@ To run on Pipecat Cloud, the one change you'll have to make is to your TeXML Bin
    <Connect>
       <Stream url="wss://api.pipecat.daily.co/ws/telnyx?serviceHost=AGENT_NAME.ORGANIZATION_NAME" bidirectionalMode="rtp"></Stream>
    </Connect>
-   <Pause length="40"/>
 </Response>
 ```
 
