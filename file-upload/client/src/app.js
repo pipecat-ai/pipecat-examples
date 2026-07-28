@@ -133,22 +133,30 @@ class VoiceChatClient {
       return;
     }
 
+    let pathname;
+    try {
+      pathname = new URL(url).pathname;
+    } catch {
+      alert('Please enter a valid URL.');
+      return;
+    }
+
     const rtvi_file = {
-      format: url.split('.').pop(),
+      format: pathname.split('.').pop(),
       source: { type: 'url', url },
     };
 
     if (this.client && this.isConnected) {
       this.client
         .sendFile(rtvi_file, prompt)
-        .catch((error) => console.error('URL upload error:', error))
         .then(() => {
           this.addConversationMessage(
             `Referencing URL: ${url}` +
               (prompt ? ` with prompt: ${prompt}` : ''),
             'user',
           );
-        });
+        })
+        .catch((error) => console.error('URL upload error:', error));
     }
 
     this.urlInput.value = '';
@@ -166,14 +174,14 @@ class VoiceChatClient {
     if (this.client && this.isConnected) {
       this.client
         .sendFile(file, prompt)
-        .catch((error) => console.error('File upload error:', error))
         .then(() => {
           this.addConversationMessage(
             `Uploaded file: ${file.name}` +
               (prompt ? ` with prompt: ${prompt}` : ''),
             'user',
           );
-        });
+        })
+        .catch((error) => console.error('File upload error:', error));
     }
 
     this.fileInput.value = '';
@@ -294,17 +302,24 @@ class VoiceChatClient {
     this.micBtn.style.backgroundColor = enabled ? '#10b981' : '#1f2937';
   }
 
+  // Escape text before building innerHTML so model output can't inject markup
+  escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+  }
+
+  formatBotText(text) {
+    return this.escapeHtml(text).replace(/\n/g, ' <br> ');
+  }
+
   highlightSpokenText(data) {
     const curSpan = this.botSpans[data.segment_id];
     if (!curSpan) return;
-    const accumulatedText = data.spoken_progress.accumulated_text.replace(
-      /\n/g,
-      ' <br> ',
+    const accumulatedText = this.formatBotText(
+      data.spoken_progress.accumulated_text,
     );
-    const remainingText = data.spoken_progress.remaining_text.replace(
-      /\n/g,
-      ' <br> ',
-    );
+    const remainingText = this.formatBotText(data.spoken_progress.remaining_text);
     curSpan.innerHTML = `<strong>${accumulatedText}</strong>${remainingText}`;
     this.conversationLog.scrollTop = this.conversationLog.scrollHeight;
   }
@@ -322,7 +337,7 @@ class VoiceChatClient {
     // Append bot segments to the current bubble; start a new bubble on role change
     if (this.lastConversationBubble?.role === role && role === 'bot') {
       const textSpan = document.createElement('span');
-      textSpan.innerHTML = text.replace(/\n/g, ' <br> ');
+      textSpan.innerHTML = this.formatBotText(text);
       if (segmentId) this.botSpans[segmentId] = textSpan;
       this.lastConversationBubble.appendChild(document.createTextNode(' '));
       this.lastConversationBubble.appendChild(textSpan);
@@ -342,7 +357,7 @@ class VoiceChatClient {
 
     if (role === 'bot') {
       const textSpan = document.createElement('span');
-      textSpan.innerHTML = text.replace(/\n/g, ' <br> ');
+      textSpan.innerHTML = this.formatBotText(text);
       if (segmentId) this.botSpans[segmentId] = textSpan;
       messageDiv.appendChild(textSpan);
     } else {
