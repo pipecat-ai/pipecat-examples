@@ -128,6 +128,11 @@
     "skip": false
   },
   {
+    "path": "outbound-sales/server",
+    "runCommand": "uv run bot.py -t daily",
+    "skip": false
+  },
+  {
     "path": "p2p-webrtc/daily-interop-bridge",
     "runCommand": "uv run server.py",
     "skip": false

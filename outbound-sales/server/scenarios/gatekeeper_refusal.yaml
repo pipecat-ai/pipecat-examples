@@ -1,0 +1,25 @@
+# Refusal: the person is not interested and asks to be removed from the list.
+# Hailey must apologize once, never argue, and end the call with reason
+# "refused".
+name: gatekeeper_refusal
+
+judge:
+  modality: text
+  eval:
+    service: openai
+    model: gpt-4o-mini
+
+turns:
+  - user: "Hello?"
+    expect:
+      - event: response
+        eval: "introduces herself as Hailey and asks if she is speaking with Beau"
+
+  - user: "We don't take sales calls. Take us off your list, please."
+    expect:
+      - event: response
+        eval: "apologizes once, does not argue or push back, thanks them, and says goodbye"
+      - event: function_call
+        calls:
+          - name: end_call
+            args: { reason: refused }
