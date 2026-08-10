@@ -19,6 +19,7 @@ from pipecat.processors.aggregators.llm_response_universal import (
     LLMContextAggregatorPair,
     LLMUserAggregatorParams,
 )
+from pipecat.processors.audio.audio_buffer_processor import AudioBufferProcessor
 from pipecat.runner.types import RunnerArguments
 from pipecat.runner.utils import create_transport
 from pipecat.services.cartesia.tts import CartesiaTTSService
@@ -33,6 +34,8 @@ from pipecat.transports.daily.transport import DailyParams
 from pipecat.transports.websocket.fastapi import FastAPIWebsocketParams
 from pipecat.utils.tracing.setup import setup_tracing
 from pipecat.workers.runner import WorkerRunner
+
+from langfuse_media import uploader_from_env
 
 load_dotenv(override=True)
 
@@ -62,6 +65,17 @@ async def get_current_weather(params: FunctionCallParams, location: str, format:
     await params.result_callback({"conditions": "nice", "temperature": "75"})
 
 
+def _eval_transport_params():
+    """Params for the eval transport, imported lazily.
+
+    The eval harness ships as an optional extra (``pipecat-ai[evals]``), so importing it
+    at module scope would make the demo unrunnable without it.
+    """
+    from pipecat.evals.transport import EvalTransportParams
+
+    return EvalTransportParams(audio_in_enabled=True, audio_out_enabled=True)
+
+
 # We store functions so objects (e.g. SileroVADAnalyzer) don't get
 # instantiated. The function will be called when the desired transport gets
 # selected.
@@ -78,7 +92,24 @@ transport_params = {
         audio_in_enabled=True,
         audio_out_enabled=True,
     ),
+    # Lets `pipecat eval run` drive this bot. See the README for the command.
+    "eval": lambda: _eval_transport_params(),
 }
+
+
+def _conversation_span(worker: PipelineWorker):
+    """Get the open OpenTelemetry ``conversation`` span, or None.
+
+    Prefers the public ``conversation_span`` property. Older Pipecat releases only have the
+    private attribute, so fall back to that. Both lookups are guarded, so a release that
+    changes either one degrades to "no audio on the trace" rather than failing the call.
+    """
+    observer = worker.turn_trace_observer
+    if observer is None:
+        return None
+    return getattr(observer, "conversation_span", None) or getattr(
+        observer, "_conversation_span", None
+    )
 
 
 async def run_bot(transport: BaseTransport):
@@ -117,6 +148,16 @@ async def run_bot(transport: BaseTransport):
 
     conversation_id = str(uuid.uuid4())
 
+    # Records the call so it can be played back from the Langfuse trace. Stereo keeps the
+    # user on the left and the bot on the right, so an interruption reads as overlap.
+    # buffer_size=0 means the whole recording arrives in a single on_audio_data event when
+    # recording stops, which is all we need since we upload before the trace is exported.
+    audiobuffer = AudioBufferProcessor(num_channels=2, buffer_size=0)
+
+    uploader = uploader_from_env() if IS_TRACING_ENABLED else None
+    if uploader:
+        uploader.attach(audiobuffer)
+
     pipeline = Pipeline(
         [
             transport.input(),
@@ -125,6 +166,9 @@ async def run_bot(transport: BaseTransport):
             llm,
             tts,
             transport.output(),
+            # After transport.output() so we capture what was actually played, including
+            # bot speech cut short by an interruption.
+            audiobuffer,
             assistant_aggregator,
         ]
     )
@@ -145,12 +189,22 @@ async def run_bot(transport: BaseTransport):
     @transport.event_handler("on_client_connected")
     async def on_client_connected(transport, client):
         logger.info(f"Client connected")
+        await audiobuffer.start_recording()
         # Kick off the conversation.
         await worker.queue_frames([LLMRunFrame()])
 
     @transport.event_handler("on_client_disconnected")
     async def on_client_disconnected(transport, client):
         logger.info(f"Client disconnected")
+
+        if uploader:
+            # Upload here, before worker.cancel(). Langfuse treats a persisted trace as
+            # immutable, so the media token has to land on the conversation span while
+            # that span is still open, and PipelineWorker ends it during cleanup.
+            await uploader.finalize(_conversation_span(worker))
+        else:
+            await audiobuffer.stop_recording()
+
         await worker.cancel()
 
     runner = WorkerRunner(handle_sigint=False)
