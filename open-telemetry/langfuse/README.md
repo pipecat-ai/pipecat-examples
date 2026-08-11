@@ -94,7 +94,9 @@ You get audio at two levels:
 
 Two credentials for one service looks odd, so here is why. Spans travel over OTLP, which
 only needs the pre-encoded `OTEL_EXPORTER_OTLP_HEADERS`. Langfuse media does not travel
-over OTLP: audio is uploaded through the REST API, and that call needs the keys unencoded.
+over OTLP: audio is uploaded through the media API using the
+[`langfuse`](https://pypi.org/project/langfuse/) package's API client, and that client
+needs the keys unencoded.
 
 The audio is captured by Pipecat's
 [`AudioBufferProcessor`](https://docs.pipecat.ai/pipecat/fundamentals/recording-audio):
@@ -131,7 +133,11 @@ Four details in `langfuse_media.py` are worth knowing if you adapt this:
 - **Per-turn uploads are capped** at `max_turn_clips` turns (40 by default). Each clip costs
   two calls against Langfuse's general API rate limit, which is 30/min on Hobby and 100/min
   on Core, so a very long call degrades to "the first N turns have audio" instead of a wall
-  of 429s. A 429 is retried once using `Retry-After`.
+  of 429s. The API client retries 429s with backoff, honoring `Retry-After`.
+- **The upload uses `AsyncLangfuseAPI`, not the full `Langfuse()` client.** The v3 client
+  starts its own OpenTelemetry tracer provider, which would fight with Pipecat's
+  `setup_tracing()`. The SDK's `LangfuseMedia` class does not apply either: it only uploads
+  media embedded in spans the Langfuse SDK itself created, and these spans come from Pipecat.
 - **The recording is capped** at 100MB of audio and truncated with a warning past that.
   Stereo 24kHz 16-bit is roughly 350MB per hour, so a long-running agent would otherwise
   grow without bound.
