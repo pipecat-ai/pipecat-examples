@@ -94,14 +94,17 @@ You get audio at two levels:
 
 Two credentials for one service looks odd, so here is why. Spans travel over OTLP, which
 only needs the pre-encoded `OTEL_EXPORTER_OTLP_HEADERS`. Langfuse media does not travel
-over OTLP: audio is uploaded through the media API using the
-[`langfuse`](https://pypi.org/project/langfuse/) package's API client, and that client
-needs the keys unencoded.
+over OTLP: audio is uploaded through the media REST API, and that call needs the keys
+unencoded.
 
-The audio is captured by Pipecat's
-[`AudioBufferProcessor`](https://docs.pipecat.ai/pipecat/fundamentals/recording-audio):
+The heavy lifting is Pipecat's `LangfuseRecordingUploader`
+(`pipecat.utils.tracing.langfuse`), fed by an
+[`AudioBufferProcessor`](https://docs.pipecat.ai/pipecat/fundamentals/recording-audio).
+This is the whole integration:
 
 ```python
+from pipecat.utils.tracing.langfuse import LangfuseRecordingUploader
+
 # Stereo whole-call recording, plus a clip per speaker per turn.
 audiobuffer = AudioBufferProcessor(
     num_channels=2,
@@ -109,23 +112,35 @@ audiobuffer = AudioBufferProcessor(
     enable_turn_audio=True,
 )
 
-uploader = uploader_from_env() if IS_TRACING_ENABLED else None
+uploader = LangfuseRecordingUploader.from_env() if IS_TRACING_ENABLED else None
 if uploader:
     # The turn tracker numbers the turns, which is how each clip finds its span.
     uploader.attach(audiobuffer, turn_tracker=worker.turn_tracking_observer)
 
-# ...placed after transport.output() in the pipeline...
+# ...the processor goes after transport.output() in the pipeline, so it records what
+# was actually played, including bot speech cut short by an interruption...
 
 @transport.event_handler("on_client_connected")
 async def on_client_connected(transport, client):
     await audiobuffer.start_recording()
+
+@transport.event_handler("on_client_disconnected")
+async def on_client_disconnected(transport, client):
+    # Collect the audio while the pipeline is still up; upload after it shuts down.
+    await uploader.stop_and_collect(audiobuffer, worker)
+    await worker.cancel()
+
+# After the runner returns:
+await uploader.upload(worker)
 ```
 
-Four details in `langfuse_media.py` are worth knowing if you adapt this:
+> `LangfuseRecordingUploader` is not in a pipecat release yet
+> ([pipecat-ai/pipecat#5285](https://github.com/pipecat-ai/pipecat/pull/5285)), so this
+> example's `pyproject.toml` installs pipecat from that PR's branch. It will move back to
+> a version pin once the PR ships.
 
-- **The processor sits after `transport.output()`**, so it records what was actually
-  played. Bot speech cut short by an interruption is captured as truncated, matching what
-  the user heard.
+Three behaviors of the uploader worth knowing:
+
 - **Nothing is written into the span payload.** Langfuse renders a player from the media
   link alone, so a clip only needs the trace id, and for per-turn audio the turn's span id.
   Those ids outlive the spans, which is why all uploading happens after the pipeline has
@@ -133,11 +148,7 @@ Four details in `langfuse_media.py` are worth knowing if you adapt this:
 - **Per-turn uploads are capped** at `max_turn_clips` turns (40 by default). Each clip costs
   two calls against Langfuse's general API rate limit, which is 30/min on Hobby and 100/min
   on Core, so a very long call degrades to "the first N turns have audio" instead of a wall
-  of 429s. The API client retries 429s with backoff, honoring `Retry-After`.
-- **The upload uses `AsyncLangfuseAPI`, not the full `Langfuse()` client.** The v3 client
-  starts its own OpenTelemetry tracer provider, which would fight with Pipecat's
-  `setup_tracing()`. The SDK's `LangfuseMedia` class does not apply either: it only uploads
-  media embedded in spans the Langfuse SDK itself created, and these spans come from Pipecat.
+  of 429s. A 429 is retried once using `Retry-After`.
 - **The recording is capped** at 100MB of audio and truncated with a warning past that.
   Stereo 24kHz 16-bit is roughly 350MB per hour, so a long-running agent would otherwise
   grow without bound.

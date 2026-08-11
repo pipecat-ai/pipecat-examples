@@ -4,10 +4,12 @@ version = "0.1.0"
 description = "A Pipecat example using Langfuse tracing"
 requires-python = ">=3.11"
 dependencies = [
-    "pipecat-ai[daily,webrtc,websocket,silero,cartesia,deepgram,openai,tracing,runner]>=1.4.0",
+    # LangfuseRecordingUploader (pipecat.utils.tracing.langfuse) is not released yet, so
+    # install pipecat from the PR branch (pipecat-ai/pipecat#5285). Switch back to a
+    # version pin once it ships.
+    "pipecat-ai[daily,webrtc,websocket,silero,cartesia,deepgram,openai,tracing,runner] @ git+https://github.com/pipecat-ai/pipecat.git@jh/turn-audio-turn-number",
     "pipecatcloud>=0.7.1",
     "opentelemetry-exporter-otlp-proto-http",
-    "langfuse>=3.0.0",
 ]
 
 [dependency-groups]

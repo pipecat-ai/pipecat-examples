@@ -32,10 +32,9 @@ from pipecat.services.openai.responses.llm import (
 from pipecat.transports.base_transport import BaseTransport, TransportParams
 from pipecat.transports.daily.transport import DailyParams
 from pipecat.transports.websocket.fastapi import FastAPIWebsocketParams
+from pipecat.utils.tracing.langfuse import LangfuseRecordingUploader
 from pipecat.utils.tracing.setup import setup_tracing
 from pipecat.workers.runner import WorkerRunner
-
-from langfuse_media import uploader_from_env
 
 load_dotenv(override=True)
 
@@ -144,7 +143,7 @@ async def run_bot(transport: BaseTransport):
         enable_turn_audio=True,
     )
 
-    uploader = uploader_from_env() if IS_TRACING_ENABLED else None
+    uploader = LangfuseRecordingUploader.from_env() if IS_TRACING_ENABLED else None
 
     pipeline = Pipeline(
         [
