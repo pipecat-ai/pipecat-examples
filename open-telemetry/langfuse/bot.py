@@ -97,21 +97,6 @@ transport_params = {
 }
 
 
-def _conversation_span(worker: PipelineWorker):
-    """Get the open OpenTelemetry ``conversation`` span, or None.
-
-    Prefers the public ``conversation_span`` property. Older Pipecat releases only have the
-    private attribute, so fall back to that. Both lookups are guarded, so a release that
-    changes either one degrades to "no audio on the trace" rather than failing the call.
-    """
-    observer = worker.turn_trace_observer
-    if observer is None:
-        return None
-    return getattr(observer, "conversation_span", None) or getattr(
-        observer, "_conversation_span", None
-    )
-
-
 async def run_bot(transport: BaseTransport):
     logger.info(f"Starting bot")
 
@@ -151,12 +136,15 @@ async def run_bot(transport: BaseTransport):
     # Records the call so it can be played back from the Langfuse trace. Stereo keeps the
     # user on the left and the bot on the right, so an interruption reads as overlap.
     # buffer_size=0 means the whole recording arrives in a single on_audio_data event when
-    # recording stops, which is all we need since we upload before the trace is exported.
-    audiobuffer = AudioBufferProcessor(num_channels=2, buffer_size=0)
+    # recording stops. enable_turn_audio also emits a clip per speaker per turn, which is
+    # what gets attached to the individual turn spans.
+    audiobuffer = AudioBufferProcessor(
+        num_channels=2,
+        buffer_size=0,
+        enable_turn_audio=True,
+    )
 
     uploader = uploader_from_env() if IS_TRACING_ENABLED else None
-    if uploader:
-        uploader.attach(audiobuffer)
 
     pipeline = Pipeline(
         [
@@ -186,6 +174,10 @@ async def run_bot(transport: BaseTransport):
         additional_span_attributes={"langfuse.session.id": conversation_id},
     )
 
+    if uploader:
+        # The turn tracker numbers the turns, which is how each clip finds its turn span.
+        uploader.attach(audiobuffer, turn_tracker=worker.turn_tracking_observer)
+
     @transport.event_handler("on_client_connected")
     async def on_client_connected(transport, client):
         logger.info(f"Client connected")
@@ -197,11 +189,10 @@ async def run_bot(transport: BaseTransport):
     async def on_client_disconnected(transport, client):
         logger.info(f"Client disconnected")
 
+        # Collect the audio while the pipeline is still up. Uploading it can wait: Langfuse
+        # links media by trace and observation id, so no span needs to be open for it.
         if uploader:
-            # Upload here, before worker.cancel(). Langfuse treats a persisted trace as
-            # immutable, so the media token has to land on the conversation span while
-            # that span is still open, and PipelineWorker ends it during cleanup.
-            await uploader.finalize(_conversation_span(worker))
+            await uploader.stop_and_collect(audiobuffer, worker)
         else:
             await audiobuffer.stop_recording()
 
@@ -211,6 +202,11 @@ async def run_bot(transport: BaseTransport):
 
     await runner.add_workers(worker)
     await runner.run()
+
+    # Upload after the pipeline has shut down, so a slow upload never delays teardown or
+    # holds the call open. The trace and turn span ids outlive the spans themselves.
+    if uploader:
+        await uploader.upload(worker)
 
 
 async def bot(runner_args: RunnerArguments):

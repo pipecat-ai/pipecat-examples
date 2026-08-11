@@ -81,24 +81,36 @@ setup_tracing(
 ### Recording the conversation audio
 
 Set `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, and `LANGFUSE_HOST` and the demo also
-attaches the call recording to the trace, so you can listen to the conversation while
-reading its spans. Leave them unset and you get traces without audio.
+attaches the call audio to the trace, so you can listen while reading the spans. Leave them
+unset and you get traces without audio.
+
+You get audio at two levels:
+
+- **The whole call**, on the trace root. Stereo, user on the left channel and bot on the
+  right, so an interruption reads as overlap.
+- **Each turn**, on that turn's `turn` span. The user's speech is filed as the span's
+  **input** and the bot's reply as its **output**, so clicking a turn plays just that turn
+  and you can hear each side separately.
 
 Two credentials for one service looks odd, so here is why. Spans travel over OTLP, which
 only needs the pre-encoded `OTEL_EXPORTER_OTLP_HEADERS`. Langfuse media does not travel
-over OTLP: the audio is uploaded through the REST API and referenced from the trace by a
-token, and that REST call needs the keys unencoded.
+over OTLP: audio is uploaded through the REST API, and that call needs the keys unencoded.
 
-The recording is captured by Pipecat's
+The audio is captured by Pipecat's
 [`AudioBufferProcessor`](https://docs.pipecat.ai/pipecat/fundamentals/recording-audio):
 
 ```python
-# Stereo: user on the left channel, bot on the right.
-audiobuffer = AudioBufferProcessor(num_channels=2, buffer_size=0)
+# Stereo whole-call recording, plus a clip per speaker per turn.
+audiobuffer = AudioBufferProcessor(
+    num_channels=2,
+    buffer_size=0,
+    enable_turn_audio=True,
+)
 
 uploader = uploader_from_env() if IS_TRACING_ENABLED else None
 if uploader:
-    uploader.attach(audiobuffer)
+    # The turn tracker numbers the turns, which is how each clip finds its span.
+    uploader.attach(audiobuffer, turn_tracker=worker.turn_tracking_observer)
 
 # ...placed after transport.output() in the pipeline...
 
@@ -107,16 +119,19 @@ async def on_client_connected(transport, client):
     await audiobuffer.start_recording()
 ```
 
-Three details in `langfuse_media.py` are worth knowing if you adapt this:
+Four details in `langfuse_media.py` are worth knowing if you adapt this:
 
 - **The processor sits after `transport.output()`**, so it records what was actually
   played. Bot speech cut short by an interruption is captured as truncated, matching what
   the user heard.
-- **The upload runs before `worker.cancel()`**, not after. Langfuse treats a persisted
-  trace as immutable, with no update by id, so the media token has to be set on the
-  `conversation` span while that span is still open. Pipecat ends that span during worker
-  cleanup. A hard kill therefore loses the recording, which is the tradeoff for not
-  needing any external storage.
+- **Nothing is written into the span payload.** Langfuse renders a player from the media
+  link alone, so a clip only needs the trace id, and for per-turn audio the turn's span id.
+  Those ids outlive the spans, which is why all uploading happens after the pipeline has
+  shut down and a slow upload never delays teardown.
+- **Per-turn uploads are capped** at `max_turn_clips` turns (40 by default). Each clip costs
+  two calls against Langfuse's general API rate limit, which is 30/min on Hobby and 100/min
+  on Core, so a very long call degrades to "the first N turns have audio" instead of a wall
+  of 429s. A 429 is retried once using `Retry-After`.
 - **The recording is capped** at 100MB of audio and truncated with a warning past that.
   Stereo 24kHz 16-bit is roughly 350MB per hour, so a long-running agent would otherwise
   grow without bound.
@@ -159,6 +174,11 @@ is the interesting scenario because it barges in on the bot. Requires
 - **Traces and an upload log, but still no player**: make sure `LANGFUSE_HOST` and
   `OTEL_EXPORTER_OTLP_ENDPOINT` name the same region. Mixing EU and US puts the audio in one
   project and the trace in another. The bot warns about this at startup.
+- **Whole-call audio but no per-turn audio**: the processor needs `enable_turn_audio=True`
+  and the uploader needs the turn tracker, otherwise there is no way to match a clip to its
+  span. The bot logs `no turn tracker, per-turn audio disabled` in that case.
+- **A just-finished trace 404s in the UI**: give it a minute. The API returns the trace
+  immediately, but the trace view can lag behind ingestion.
 
 ## References
 
