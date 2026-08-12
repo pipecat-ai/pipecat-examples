@@ -27,7 +27,8 @@ export function useClientTools() {
           timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         };
       } catch (error) {
-        return { error: `Could not read browser info: ${error}` };
+        const message = error instanceof Error ? error.message : String(error);
+        return { error: `Could not read browser info: ${message}` };
       }
     });
 
