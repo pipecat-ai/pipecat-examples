@@ -14,14 +14,22 @@ export function useClientTools() {
   useEffect(() => {
     if (!client) return;
 
-    // Data only the browser has. Always return something truthy: an empty
-    // result stops the bot from speaking a follow-up.
-    client.registerFunctionCallHandler('get_browser_info', async () => ({
-      userAgent: navigator.userAgent,
-      language: navigator.language,
-      screen: `${window.screen.width}x${window.screen.height}`,
-      timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-    }));
+    // Data only the browser has. Always return a value, and never let the
+    // handler throw. Throwing, or returning null/undefined, sends nothing
+    // back, and the bot then waits on this call for the rest of the session.
+    // Telling the LLM it failed is always better than going silent.
+    client.registerFunctionCallHandler('get_browser_info', async () => {
+      try {
+        return {
+          userAgent: navigator.userAgent,
+          language: navigator.language,
+          screen: `${window.screen.width}x${window.screen.height}`,
+          timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        };
+      } catch (error) {
+        return { error: `Could not read browser info: ${error}` };
+      }
+    });
 
     return () => {
       client.unregisterFunctionCallHandler('get_browser_info');
