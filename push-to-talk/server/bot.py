@@ -69,7 +69,7 @@ tools = ToolsSchema(
             description=(
                 "Get information about the user's browser and screen. Takes no "
                 "arguments. The browser returns userAgent, language, screen, and "
-                "timeZone. See `useClientTools.ts` on the client for the values."
+                "timeZone."
             ),
             # No input arguments: everything this tool reports comes back from
             # the browser in the result, not from the LLM.
