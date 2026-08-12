@@ -9,6 +9,8 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@pipecat-ai/client-js": "^1.10.0",
+    "@pipecat-ai/client-react": "^1.6.0",
     "@pipecat-ai/daily-transport": "^1.6.5",
     "@pipecat-ai/voice-ui-kit": "^0.11.0",
     "lucide-react": "^0.511.0",

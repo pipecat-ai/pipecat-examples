@@ -12,6 +12,7 @@ import { PlasmaVisualizer } from '@pipecat-ai/voice-ui-kit/webgl';
 import { LogOutIcon, XIcon, MicIcon } from 'lucide-react';
 import { usePipecatClient } from '@pipecat-ai/client-react';
 import { useCallback, useState } from 'react';
+import { useClientTools } from '../hooks/useClientTools';
 
 export interface AppProps {
   handleConnect?: () => void | Promise<void>;
@@ -64,6 +65,9 @@ const PushToTalkButton = () => {
 
 export const App = ({ handleConnect, handleDisconnect, error }: AppProps) => {
   const { isConnected } = usePipecatConnectionState();
+
+  // Tools the LLM calls that run here in the browser, not on the server.
+  useClientTools();
 
   if (error) {
     return (
