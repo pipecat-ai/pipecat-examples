@@ -5,7 +5,9 @@ description = "Announcement-driven, multi-session MoQ voice-agent server example
 requires-python = ">=3.11"
 dependencies = [
     "python-dotenv",
-    "pipecat-ai[moq,silero,deepgram,cartesia,openai]>=1.4.0",
+    # response_path / request_path and the split client-mode origins landed
+    # in 1.8.0; this example needs both.
+    "pipecat-ai[moq,silero,deepgram,cartesia,openai]>=1.8.0",
 ]
 
 [dependency-groups]

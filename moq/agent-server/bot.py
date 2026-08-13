@@ -4,29 +4,25 @@
 # SPDX-License-Identifier: BSD 2-Clause License
 #
 
-"""MoQ voice-agent server: one process, many sessions, discovered by announcement.
+"""The voice bot one MoQ call runs.
 
-Unlike a single ``-t moq`` pipecat bot (one bot, browser kicked off via ``/start``),
-this is a long-lived server that dials a relay once and spawns a fresh STT->LLM->TTS
-pipeline for every client that announces itself -- the ``moq-boy`` pattern, no
-control plane. See ``agent.py`` in this folder.
+``run_bot`` builds an STT -> LLM -> TTS pipeline over a transport the host
+already created and returns when the client hangs up. It knows nothing about
+relays or discovery — see ``direct_host.py`` for that, and ``server.py`` for
+the process that ties the two together.
 
-Usage:
-    # Local dev: run a moq relay (e.g. `just relay` in the moq repo on :4443),
-    # then point the agent at it. Clients announce under request/*.
-    uv run bot.py --relay-url http://localhost:4443 --no-verify-ssl
+The pipeline is configured from the environment so the same built image
+serves every deployment:
 
-    # Production: dial a deployed relay with authenticated/namespaced prefixes.
-    uv run bot.py \\
-        --relay-url https://relay.example.com \\
-        --request-prefix demo/pipecat/request --response-prefix demo/pipecat/response
+    DEEPGRAM_API_KEY / OPENAI_API_KEY / CARTESIA_API_KEY  (required)
+    MOQ_VOICE_LLM_MODEL      (default: gpt-4o)
+    MOQ_VOICE_TTS_VOICE      (default: British Reading Lady)
+    MOQ_VOICE_SYSTEM_PROMPT  (default: a short real-time-voice instruction)
+    MOQ_SESSION_IDLE_SECS    (default: 300; 0 disables)
 """
 
-import argparse
-import asyncio
 import os
 
-from dotenv import load_dotenv
 from loguru import logger
 from pipecat.audio.vad.silero import SileroVADAnalyzer
 from pipecat.frames.frames import LLMRunFrame
@@ -40,44 +36,47 @@ from pipecat.processors.aggregators.llm_response_universal import (
 from pipecat.services.cartesia.tts import CartesiaTTSService
 from pipecat.services.deepgram.stt import DeepgramSTTService
 from pipecat.services.openai.llm import OpenAILLMService
-from pipecat.transports.moq.transport import MOQParams
+from pipecat.transports.moq.transport import MOQTransport
 from pipecat.workers.runner import WorkerRunner
 
-from agent import (
-    DEFAULT_RELAY_URL,
-    DEFAULT_REQUEST_PREFIX,
-    DEFAULT_RESPONSE_PREFIX,
-    MOQAgentServer,
-    MOQAgentSession,
+DEFAULT_SYSTEM_PROMPT = (
+    "You are a helpful assistant in a real-time voice call. "
+    "Your goal is to demonstrate your capabilities in a succinct way. "
+    "Your output will be spoken aloud, so avoid special characters that can't easily "
+    "be spoken, such as emojis or bullet points. Respond to what the user said in a "
+    "creative and helpful way."
 )
+# Cartesia "British Reading Lady".
+DEFAULT_TTS_VOICE = "71a7ad14-091c-4e8e-a314-022ece01c121"
 
-load_dotenv(override=True)
+# End a call after this long with no speech in either direction. Idle counts
+# speech frames rather than media, so an abandoned open tab publishing silent
+# mic audio still ages out.
+DEFAULT_SESSION_IDLE_SECS = 300.0
 
 
-async def run_session_bot(transport: MOQAgentSession, client_id: str):
-    """Build and run one client's voice pipeline until they disconnect."""
-    logger.info(f"Starting bot for client {client_id!r}")
+async def run_bot(transport: MOQTransport, session_id: str):
+    """Build and run one client's voice pipeline until they disconnect.
+
+    Args:
+        transport: The call's MOQ transport, already pointed at this
+            client's broadcast paths.
+        session_id: The id the client minted, used for logging.
+    """
+    logger.info(f"Starting bot for client {session_id!r}")
 
     stt = DeepgramSTTService(api_key=os.environ["DEEPGRAM_API_KEY"])
-
     tts = CartesiaTTSService(
-        api_key=os.getenv("CARTESIA_API_KEY"),
+        api_key=os.environ["CARTESIA_API_KEY"],
         settings=CartesiaTTSService.Settings(
-            voice="71a7ad14-091c-4e8e-a314-022ece01c121",  # British Reading Lady
+            voice=os.getenv("MOQ_VOICE_TTS_VOICE", DEFAULT_TTS_VOICE),
         ),
     )
-
     llm = OpenAILLMService(
-        api_key=os.getenv("OPENAI_API_KEY"),
+        api_key=os.environ["OPENAI_API_KEY"],
         settings=OpenAILLMService.Settings(
-            model="gpt-4o",
-            system_instruction=(
-                "You are a helpful assistant in a real-time voice call. "
-                "Your goal is to demonstrate your capabilities in a succinct way. "
-                "Your output will be spoken aloud, so avoid special characters that can't easily "
-                "be spoken, such as emojis or bullet points. Respond to what the user said in a "
-                "creative and helpful way."
-            ),
+            model=os.getenv("MOQ_VOICE_LLM_MODEL", "gpt-4o"),
+            system_instruction=os.getenv("MOQ_VOICE_SYSTEM_PROMPT", DEFAULT_SYSTEM_PROMPT),
         ),
     )
 
@@ -89,27 +88,25 @@ async def run_session_bot(transport: MOQAgentSession, client_id: str):
 
     pipeline = Pipeline(
         [
-            transport.input(),  # Transport user input
+            transport.input(),
             stt,
-            user_aggregator,  # User responses
-            llm,  # LLM
-            tts,  # TTS
-            transport.output(),  # Transport bot output
-            assistant_aggregator,  # Assistant spoken responses
+            user_aggregator,
+            llm,
+            tts,
+            transport.output(),
+            assistant_aggregator,
         ]
     )
-
     worker = PipelineWorker(
         pipeline,
-        params=PipelineParams(
-            enable_metrics=True,
-            enable_usage_metrics=True,
-        ),
+        params=PipelineParams(enable_metrics=True, enable_usage_metrics=True),
+        idle_timeout_secs=float(os.getenv("MOQ_SESSION_IDLE_SECS", str(DEFAULT_SESSION_IDLE_SECS)))
+        or None,
     )
 
     @transport.event_handler("on_client_connected")
     async def on_client_connected(transport):
-        logger.info(f"Client {client_id!r} subscribed — starting conversation")
+        logger.info(f"Client {session_id!r} subscribed — starting conversation")
         context.add_message(
             {"role": "developer", "content": "Please introduce yourself to the user."}
         )
@@ -117,54 +114,15 @@ async def run_session_bot(transport: MOQAgentSession, client_id: str):
 
     @transport.event_handler("on_disconnected")
     async def on_disconnected(transport):
-        logger.info(f"Client {client_id!r} disconnected")
+        logger.info(f"Client {session_id!r} disconnected")
         await worker.cancel()
 
     @transport.event_handler("on_error")
     async def on_error(transport, message, exception):
-        logger.error(f"MOQ error for {client_id!r}: {message}")
+        logger.error(f"MOQ error for {session_id!r}: {message}")
 
-    # The server owns SIGINT; each session just runs its worker until the
-    # client's mic track ends (which fires on_disconnected -> worker.cancel()).
+    # The host owns SIGINT and the transport's teardown; this just runs the
+    # worker until the client's mic track ends.
     runner = WorkerRunner(handle_sigint=False)
-    try:
-        await runner.add_workers(worker)
-        await runner.run()
-    finally:
-        await transport.disconnect()
-
-
-async def main():
-    parser = argparse.ArgumentParser(description="MoQ voice-agent server")
-    parser.add_argument("--relay-url", default=os.getenv("MOQ_RELAY_URL", DEFAULT_RELAY_URL))
-    parser.add_argument("--request-prefix", default=DEFAULT_REQUEST_PREFIX)
-    parser.add_argument("--response-prefix", default=DEFAULT_RESPONSE_PREFIX)
-    parser.add_argument("--max-sessions", type=int, default=8)
-    parser.add_argument(
-        "--no-verify-ssl",
-        action="store_true",
-        help="Skip TLS verification (for self-signed local relays).",
-    )
-    args = parser.parse_args()
-
-    params = MOQParams(
-        audio_in_enabled=True,
-        audio_out_enabled=True,
-    )
-
-    server = MOQAgentServer(
-        params,
-        run_session_bot,
-        relay_url=args.relay_url,
-        request_prefix=args.request_prefix,
-        response_prefix=args.response_prefix,
-        verify_ssl=not args.no_verify_ssl,
-        max_sessions=args.max_sessions,
-    )
-
-    logger.info("MoQ voice-agent server ready; waiting for clients to announce")
-    await server.run()
-
-
-if __name__ == "__main__":
-    asyncio.run(main())
+    await runner.add_workers(worker)
+    await runner.run()

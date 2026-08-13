@@ -4,154 +4,94 @@
 # SPDX-License-Identifier: BSD 2-Clause License
 #
 
-"""Deployable MoQ voice-agent server, configured entirely from the environment.
+"""Run a MoQ direct-mode host: one process, many calls, no ``/start``.
 
-A packaged, long-lived :class:`MOQAgentServer` that discovers clients by MoQ
-announcement and runs an STT->LLM->TTS turn per client. Unlike ``bot.py`` in
-this folder (hackable, CLI-flag defaults baked into the code), this variant
-reads its pipeline configuration from the environment so the same image can
-serve every deployment — e.g. built with uv/uv2nix or an OCI image and run as
-a systemd service co-located on a relay, dialing the relay's internal Unix
-socket (``--relay-url unix:///run/moq/internal.sock``).
+Wires the bot in ``bot.py`` to the :class:`MOQDirectHost` in
+``direct_host.py`` and runs it. Unlike a single ``-t moq`` pipecat bot (one
+bot per ``/start`` request), this is a long-lived process that dials a relay
+once and runs a fresh pipeline for every client that announces itself.
 
-The default pipeline is Deepgram (STT) + OpenAI (LLM) + Cartesia (TTS), all
-configured from the environment so the same image serves every deployment:
+Usage:
+    # Local dev: run a moq relay (e.g. `just relay` in the moq repo on
+    # :4443), then point the host at it. Clients announce under request/*.
+    uv run server.py --relay-url http://localhost:4443 --no-verify-ssl
 
-    DEEPGRAM_API_KEY / OPENAI_API_KEY / CARTESIA_API_KEY  (required)
-    MOQ_VOICE_LLM_MODEL      (default: gpt-4o)
-    MOQ_VOICE_TTS_VOICE      (default: British Reading Lady)
-    MOQ_VOICE_SYSTEM_PROMPT  (default: a short real-time-voice instruction)
+    # Deployed: dial a relay with authenticated, namespaced prefixes.
+    uv run server.py \\
+        --relay-url https://relay.example.com \\
+        --request-prefix demo/pipecat/request \\
+        --response-prefix demo/pipecat/response
 
-Run ``uv run server.py --help`` for the transport flags.
+    # Platforms that start the process without arguments.
+    uv run server.py --from-env
 """
 
 import argparse
 import asyncio
 import os
 
+from dotenv import load_dotenv
 from loguru import logger
-from pipecat.audio.vad.silero import SileroVADAnalyzer
-from pipecat.frames.frames import LLMRunFrame
-from pipecat.pipeline.pipeline import Pipeline
-from pipecat.pipeline.worker import PipelineParams, PipelineWorker
-from pipecat.processors.aggregators.llm_context import LLMContext
-from pipecat.processors.aggregators.llm_response_universal import (
-    LLMContextAggregatorPair,
-    LLMUserAggregatorParams,
-)
-from pipecat.services.cartesia.tts import CartesiaTTSService
-from pipecat.services.deepgram.stt import DeepgramSTTService
-from pipecat.services.openai.llm import OpenAILLMService
 from pipecat.transports.moq.transport import MOQParams
-from pipecat.workers.runner import WorkerRunner
 
-from agent import (
+from bot import run_bot
+from direct_host import (
+    DEFAULT_PEER_WAIT_SECS,
     DEFAULT_RELAY_URL,
     DEFAULT_REQUEST_PREFIX,
     DEFAULT_RESPONSE_PREFIX,
-    MOQAgentServer,
-    MOQAgentSession,
+    MOQDirectHost,
 )
 
-DEFAULT_SYSTEM_PROMPT = (
-    "You are a helpful assistant in a real-time voice call. "
-    "Your goal is to demonstrate your capabilities in a succinct way. "
-    "Your output will be spoken aloud, so avoid special characters that can't easily "
-    "be spoken, such as emojis or bullet points. Respond to what the user said in a "
-    "creative and helpful way."
-)
-# Cartesia "British Reading Lady".
-DEFAULT_TTS_VOICE = "71a7ad14-091c-4e8e-a314-022ece01c121"
-
-
-async def run_session_bot(transport: MOQAgentSession, client_id: str):
-    """Build and run one client's voice pipeline until they disconnect."""
-    logger.info(f"Starting bot for client {client_id!r}")
-
-    stt = DeepgramSTTService(api_key=os.environ["DEEPGRAM_API_KEY"])
-    tts = CartesiaTTSService(
-        api_key=os.environ["CARTESIA_API_KEY"],
-        settings=CartesiaTTSService.Settings(
-            voice=os.getenv("MOQ_VOICE_TTS_VOICE", DEFAULT_TTS_VOICE),
-        ),
-    )
-    llm = OpenAILLMService(
-        api_key=os.environ["OPENAI_API_KEY"],
-        settings=OpenAILLMService.Settings(
-            model=os.getenv("MOQ_VOICE_LLM_MODEL", "gpt-4o"),
-            system_instruction=os.getenv("MOQ_VOICE_SYSTEM_PROMPT", DEFAULT_SYSTEM_PROMPT),
-        ),
-    )
-
-    context = LLMContext()
-    user_aggregator, assistant_aggregator = LLMContextAggregatorPair(
-        context,
-        user_params=LLMUserAggregatorParams(vad_analyzer=SileroVADAnalyzer()),
-    )
-
-    pipeline = Pipeline(
-        [
-            transport.input(),
-            stt,
-            user_aggregator,
-            llm,
-            tts,
-            transport.output(),
-            assistant_aggregator,
-        ]
-    )
-    worker = PipelineWorker(
-        pipeline,
-        params=PipelineParams(enable_metrics=True, enable_usage_metrics=True),
-    )
-
-    @transport.event_handler("on_client_connected")
-    async def on_client_connected(transport):
-        logger.info(f"Client {client_id!r} subscribed -- starting conversation")
-        context.add_message(
-            {"role": "developer", "content": "Please introduce yourself to the user."}
-        )
-        await worker.queue_frames([LLMRunFrame()])
-
-    @transport.event_handler("on_disconnected")
-    async def on_disconnected(transport):
-        logger.info(f"Client {client_id!r} disconnected")
-        await worker.cancel()
-
-    @transport.event_handler("on_error")
-    async def on_error(transport, message, exception):
-        logger.error(f"MOQ error for {client_id!r}: {message}")
-
-    runner = WorkerRunner(handle_sigint=False)
-    try:
-        await runner.add_workers(worker)
-        await runner.run()
-    finally:
-        await transport.disconnect()
+load_dotenv(override=True)
 
 
 async def _run(args: argparse.Namespace) -> None:
     params = MOQParams(audio_in_enabled=True, audio_out_enabled=True)
-    server = MOQAgentServer(
-        params,
-        run_session_bot,
-        relay_url=args.relay_url,
-        request_prefix=args.request_prefix,
-        response_prefix=args.response_prefix,
-        verify_ssl=not args.no_verify_ssl,
-        max_sessions=args.max_sessions,
-    )
-    logger.info("MoQ voice-agent server ready; waiting for clients to announce")
-    await server.run()
+
+    if args.from_env:
+        host = MOQDirectHost.from_env(params, run_bot)
+    else:
+        host = MOQDirectHost(
+            params,
+            run_bot,
+            relay_url=args.relay_url,
+            request_prefix=args.request_prefix,
+            response_prefix=args.response_prefix,
+            verify_ssl=not args.no_verify_ssl,
+            max_sessions=args.max_sessions,
+            peer_wait_secs=args.peer_wait_secs,
+            host_idle_secs=args.host_idle_secs or None,
+        )
+
+    logger.info("MoQ direct host ready; waiting for clients to announce")
+    await host.run()
 
 
 def main() -> None:
     """Entry point — run with ``uv run server.py``."""
-    parser = argparse.ArgumentParser(description="MoQ voice-agent server")
+    parser = argparse.ArgumentParser(description="MoQ direct-mode voice-agent host")
+    parser.add_argument(
+        "--from-env",
+        action="store_true",
+        help="Take all transport settings from MOQ_* variables (see direct_host.py).",
+    )
     parser.add_argument("--relay-url", default=os.getenv("MOQ_RELAY_URL", DEFAULT_RELAY_URL))
     parser.add_argument("--request-prefix", default=DEFAULT_REQUEST_PREFIX)
     parser.add_argument("--response-prefix", default=DEFAULT_RESPONSE_PREFIX)
     parser.add_argument("--max-sessions", type=int, default=8)
+    parser.add_argument(
+        "--peer-wait-secs",
+        type=float,
+        default=DEFAULT_PEER_WAIT_SECS,
+        help="Per-session wait for the announcing client's media.",
+    )
+    parser.add_argument(
+        "--host-idle-secs",
+        type=float,
+        default=0,
+        help="Exit after this long with no live calls; 0 runs until Ctrl-C.",
+    )
     parser.add_argument(
         "--no-verify-ssl",
         action="store_true",
