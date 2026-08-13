@@ -43,6 +43,8 @@ internals are touched.
   Knows nothing about relays or discovery.
 - **`server.py`** — the process you run. Wires the two together and takes
   configuration from CLI flags or the environment.
+- **`client/`** — a browser client that dials the same relay. No server side,
+  since there is no `/start` to serve.
 
 ## Prerequisites
 
@@ -54,17 +56,32 @@ internals are touched.
 
 ## Running locally
 
+Start the host:
+
 ```bash
 uv sync
 cp env.example .env      # then fill in the three API keys
 uv run server.py --relay-url http://localhost:4443 --no-verify-ssl
 ```
 
-The host logs `MoQ direct host ready; waiting for clients to announce` and then
-starts a pipeline every time a client announces under `request/*`.
+It logs `MoQ direct host ready; waiting for clients to announce` and then starts
+a pipeline every time a client announces under `request/*`.
 
-To connect, point a MoQ client at the same relay and publish your mic under
-`request/<some-id>`; the bot replies under `response/<some-id>`.
+Then start the browser client:
+
+```bash
+cd client
+npm install
+npm run dev
+```
+
+Open <http://localhost:5173/> and press Connect. The client reads
+`MOQ_RELAY_URL` from the same `.env` the host uses, so it already knows where to
+meet — see the [client README](client/README.md) for pointing it somewhere else
+via the URL.
+
+Open the same URL in a second tab to get a second, independent call: each tab
+mints its own session id, so the host starts a separate bot for each.
 
 ## Lifecycle guards
 
