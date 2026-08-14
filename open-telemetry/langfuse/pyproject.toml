@@ -7,6 +7,7 @@ dependencies = [
     "pipecat-ai[daily,webrtc,websocket,silero,cartesia,deepgram,openai,tracing,runner]>=1.4.0",
     "pipecatcloud>=0.7.1",
     "opentelemetry-exporter-otlp-proto-http",
+    "aiohttp",
 ]
 
 [dependency-groups]
