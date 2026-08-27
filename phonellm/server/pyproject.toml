@@ -1,0 +1,17 @@
+[project]
+name = "phonellm-example"
+version = "0.1.0"
+description = "PhoneLLM voice bot built with Pipecat"
+requires-python = ">=3.11"
+dependencies = [
+    "pipecat-ai[daily,deepgram,evals,openai,runner,silero,webrtc]>=1.8.1",
+    "pipecatcloud",
+]
+
+[dependency-groups]
+dev = ["pyright>=1.1.404,<2", "ruff>=0.12.11,<1"]
+
+[tool.ruff]
+line-length = 100
+[tool.ruff.lint]
+select = ["I", "UP"]

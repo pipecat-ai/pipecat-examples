@@ -1,0 +1,28 @@
+name: phonellm_smoke
+
+# Deterministic smoke test for the PhoneLLM pipeline — text mode, no judge LLM needed.
+#
+# Text mode bypasses VAD, STT, and TTS: each `user:` turn is sent as text and the
+# assertions run against the LLM's text output, so this exercises the bot's
+# pipeline and the PhoneLLM endpoint on Modal end to end.
+#
+# Run it (two terminals, both in server/):
+#
+#   uv run bot.py -t eval                                   # 1: the bot, headless
+#   uv run pipecat eval run evals/phonellm_smoke.yaml -v    # 2: this scenario
+
+turns:
+  # The bot speaks first on connect; wait for the greeting so we don't barge in.
+  - expect:
+      - event: response
+
+  - user: "What is the capital of Germany? Answer in one short sentence."
+    expect:
+      - event: response
+        text_contains: "Berlin"
+
+  # Multi-turn context: this only passes if the previous turn carried over.
+  - user: "And what about France?"
+    expect:
+      - event: response
+        text_contains: "Paris"

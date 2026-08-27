@@ -1,0 +1,8 @@
+agent_name = "phonellm-example"
+secret_set = "phonellm-example-secrets"
+agent_profile = "agent-1x"
+[krisp_viva]
+	audio_filter = "tel"
+
+[scaling]
+	min_agents = 1
