@@ -65,18 +65,20 @@ async def run_bot(transport: MOQTransport, session_id: str):
     """
     logger.info(f"Starting bot for client {session_id!r}")
 
+    # `or` rather than a getenv default: a variable that is set but empty
+    # (a blank `KEY=` line) should mean the default, not "" or a ValueError.
     stt = DeepgramSTTService(api_key=os.environ["DEEPGRAM_API_KEY"])
     tts = CartesiaTTSService(
         api_key=os.environ["CARTESIA_API_KEY"],
         settings=CartesiaTTSService.Settings(
-            voice=os.getenv("MOQ_VOICE_TTS_VOICE", DEFAULT_TTS_VOICE),
+            voice=os.getenv("MOQ_VOICE_TTS_VOICE") or DEFAULT_TTS_VOICE,
         ),
     )
     llm = OpenAILLMService(
         api_key=os.environ["OPENAI_API_KEY"],
         settings=OpenAILLMService.Settings(
-            model=os.getenv("MOQ_VOICE_LLM_MODEL", "gpt-4o"),
-            system_instruction=os.getenv("MOQ_VOICE_SYSTEM_PROMPT", DEFAULT_SYSTEM_PROMPT),
+            model=os.getenv("MOQ_VOICE_LLM_MODEL") or "gpt-4o",
+            system_instruction=os.getenv("MOQ_VOICE_SYSTEM_PROMPT") or DEFAULT_SYSTEM_PROMPT,
         ),
     )
 
@@ -100,7 +102,7 @@ async def run_bot(transport: MOQTransport, session_id: str):
     worker = PipelineWorker(
         pipeline,
         params=PipelineParams(enable_metrics=True, enable_usage_metrics=True),
-        idle_timeout_secs=float(os.getenv("MOQ_SESSION_IDLE_SECS", str(DEFAULT_SESSION_IDLE_SECS)))
+        idle_timeout_secs=float(os.getenv("MOQ_SESSION_IDLE_SECS") or DEFAULT_SESSION_IDLE_SECS)
         or None,
     )
 

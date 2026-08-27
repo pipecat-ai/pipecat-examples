@@ -49,11 +49,27 @@ from direct_host import (
 load_dotenv()
 
 
+REQUIRED_API_KEYS = ("DEEPGRAM_API_KEY", "OPENAI_API_KEY", "CARTESIA_API_KEY")
+
+
+def _env(name: str, default: str) -> str:
+    """Read a variable, treating one that is set but empty as unset.
+
+    ``KEY=`` is what a blank .env line or a platform's env UI produces, and
+    ``float("")`` would otherwise crash the host.
+    """
+    return os.getenv(name) or default
+
+
 def _env_flag(name: str) -> bool:
-    return os.getenv(name, "").strip().lower() in ("1", "true", "yes", "on")
+    return _env(name, "").strip().lower() in ("1", "true", "yes", "on")
 
 
 async def _run(args: argparse.Namespace) -> None:
+    missing = [name for name in REQUIRED_API_KEYS if not os.getenv(name)]
+    if missing:
+        raise SystemExit(f"Missing required environment variables: {', '.join(missing)}")
+
     params = MOQParams(audio_in_enabled=True, audio_out_enabled=True)
 
     host = MOQDirectHost(
@@ -80,35 +96,35 @@ def main() -> None:
     )
     parser.add_argument(
         "--relay-url",
-        default=os.getenv("MOQ_RELAY_URL", DEFAULT_RELAY_URL),
+        default=_env("MOQ_RELAY_URL", DEFAULT_RELAY_URL),
         help="The MoQ relay to dial (MOQ_RELAY_URL).",
     )
     parser.add_argument(
         "--request-prefix",
-        default=os.getenv("MOQ_REQUEST_PREFIX", DEFAULT_REQUEST_PREFIX),
+        default=_env("MOQ_REQUEST_PREFIX", DEFAULT_REQUEST_PREFIX),
         help="Prefix clients announce their microphones under (MOQ_REQUEST_PREFIX).",
     )
     parser.add_argument(
         "--response-prefix",
-        default=os.getenv("MOQ_RESPONSE_PREFIX", DEFAULT_RESPONSE_PREFIX),
+        default=_env("MOQ_RESPONSE_PREFIX", DEFAULT_RESPONSE_PREFIX),
         help="Prefix the bot publishes its replies under (MOQ_RESPONSE_PREFIX).",
     )
     parser.add_argument(
         "--max-sessions",
         type=int,
-        default=int(os.getenv("MOQ_MAX_SESSIONS", "8")),
+        default=int(_env("MOQ_MAX_SESSIONS", "8")),
         help="Concurrent pipelines; further clients wait (MOQ_MAX_SESSIONS).",
     )
     parser.add_argument(
         "--peer-wait-secs",
         type=float,
-        default=float(os.getenv("MOQ_PEER_WAIT_SECS", str(DEFAULT_PEER_WAIT_SECS))),
+        default=float(_env("MOQ_PEER_WAIT_SECS", str(DEFAULT_PEER_WAIT_SECS))),
         help="Per-session wait for the announcing client's media (MOQ_PEER_WAIT_SECS).",
     )
     parser.add_argument(
         "--host-idle-secs",
         type=float,
-        default=float(os.getenv("MOQ_HOST_IDLE_SECS", "0")),
+        default=float(_env("MOQ_HOST_IDLE_SECS", "0")),
         help="Exit after this long with no live calls; 0 runs until Ctrl-C (MOQ_HOST_IDLE_SECS).",
     )
     parser.add_argument(
