@@ -19,6 +19,7 @@ from pipecat.processors.aggregators.llm_response_universal import (
     LLMContextAggregatorPair,
     LLMUserAggregatorParams,
 )
+from pipecat.processors.audio.audio_buffer_processor import AudioBufferProcessor
 from pipecat.runner.types import RunnerArguments
 from pipecat.runner.utils import create_transport
 from pipecat.services.cartesia.tts import CartesiaTTSService
@@ -33,6 +34,8 @@ from pipecat.transports.daily.transport import DailyParams
 from pipecat.transports.websocket.fastapi import FastAPIWebsocketParams
 from pipecat.utils.tracing.setup import setup_tracing
 from pipecat.workers.runner import WorkerRunner
+
+from langfuse_recording import LangfuseRecorder
 
 load_dotenv(override=True)
 
@@ -117,6 +120,15 @@ async def run_bot(transport: BaseTransport):
 
     conversation_id = str(uuid.uuid4())
 
+    # Stereo keeps the user on the left channel and the bot on the right, so
+    # barge-in stays audible in the recording. Turn audio adds one clip per
+    # speaker per turn, which is what the per-turn players in Langfuse play.
+    audiobuffer = AudioBufferProcessor(
+        num_channels=2,
+        enable_turn_audio=True,
+        auto_start_recording=True,
+    )
+
     pipeline = Pipeline(
         [
             transport.input(),
@@ -125,6 +137,9 @@ async def run_bot(transport: BaseTransport):
             llm,
             tts,
             transport.output(),
+            # After the output transport, so both the user's audio and the bot's
+            # pass through it.
+            audiobuffer,
             assistant_aggregator,
         ]
     )
@@ -142,6 +157,10 @@ async def run_bot(transport: BaseTransport):
         additional_span_attributes={"langfuse.session.id": conversation_id},
     )
 
+    recorder = LangfuseRecorder.from_env()
+    if recorder:
+        recorder.attach(audiobuffer, worker)
+
     @transport.event_handler("on_client_connected")
     async def on_client_connected(transport, client):
         logger.info(f"Client connected")
@@ -151,12 +170,20 @@ async def run_bot(transport: BaseTransport):
     @transport.event_handler("on_client_disconnected")
     async def on_client_disconnected(transport, client):
         logger.info(f"Client disconnected")
+        # Collect the audio before cancelling: the recording lives in the
+        # pipeline, which stops existing right after.
+        if recorder:
+            await recorder.stop_and_collect()
         await worker.cancel()
 
     runner = WorkerRunner(handle_sigint=False)
 
     await runner.add_workers(worker)
     await runner.run()
+
+    # Media is linked to the trace by id, so the spans no longer have to be open.
+    if recorder:
+        await recorder.upload()
 
 
 async def bot(runner_args: RunnerArguments):
