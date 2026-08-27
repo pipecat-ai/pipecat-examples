@@ -158,6 +158,10 @@ class MOQDirectHost:
         self._host_idle_secs = host_idle_secs
         self._should_serve = should_serve
         self._sem = asyncio.Semaphore(max_sessions)
+        # When a call last started, ended, or was seen live. Bumped on the
+        # events themselves, not just when the poll in run() happens to
+        # catch a live task, so a call shorter than the poll still counts.
+        self._last_active = time.monotonic()
 
     def session_id(self, announced_path: str) -> str:
         """Return the session id an announced path names.
@@ -220,7 +224,7 @@ class MOQDirectHost:
                 raise RuntimeError("MOQ direct host: relay client has no session")
             watch_task = asyncio.create_task(self._watch(client, sessions))
             closed_task = asyncio.create_task(session.closed())
-            last_active = time.monotonic()
+            self._last_active = time.monotonic()
             try:
                 while True:
                     await asyncio.wait(
@@ -235,10 +239,10 @@ class MOQDirectHost:
                         watch_task.result()
                         raise RuntimeError("MOQ direct host: announcement stream ended")
                     if any(not task.done() for task in sessions.values()):
-                        last_active = time.monotonic()
+                        self._last_active = time.monotonic()
                     elif (
                         self._host_idle_secs is not None
-                        and time.monotonic() - last_active > self._host_idle_secs
+                        and time.monotonic() - self._last_active > self._host_idle_secs
                     ):
                         logger.info(
                             f"MOQ direct host: no calls for {self._host_idle_secs:.0f}s — exiting"
@@ -267,6 +271,7 @@ class MOQDirectHost:
                 continue
 
             logger.info(f"MOQ direct host: client {session_id!r} announced")
+            self._last_active = time.monotonic()
             sessions[session_id] = asyncio.create_task(self._session(session_id))
 
     def _admit(self, announcement: "moq.Announcement", session_id: str) -> bool:
@@ -298,6 +303,7 @@ class MOQDirectHost:
                 logger.opt(exception=e).error(f"MOQ direct host: session {session_id!r} failed")
             finally:
                 await transport.disconnect()
+                self._last_active = time.monotonic()
                 logger.info(f"MOQ direct host: session {session_id!r} ended")
 
     async def _drain(self, sessions: dict[str, asyncio.Task]):
