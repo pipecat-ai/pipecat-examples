@@ -1,11 +1,11 @@
-# PhoneLLM Example
+# Pipecat PhoneLLM Example
 
-[PhoneLLM](https://huggingface.co/pipecat-ai/phonellm-alpha-1) is an open-weights 30B language model from the Pipecat team, fine-tuned for voice agents that handle phone calls — faster and cheaper than larger general-purpose models.
+[Pipecat PhoneLLM](https://huggingface.co/pipecat-ai/phonellm-alpha-1) is an open-weights 30B language model from the Pipecat team, fine-tuned for voice agents that handle phone calls. It's accurate at tool calling, fast, and low cost — making it ideal for phone use cases such as customer service agents.
 
 > [!TIP]
 > **Quickstart:** using [Claude Code](https://claude.com/claude-code)? Run `/setup` in this repo — a committed skill (`.claude/skills/setup/`) that steps through everything below, health-checking along the way and asking for input only where needed. The rest of this README is the manual path.
 
-This repo is a [Pipecat](https://github.com/pipecat-ai/pipecat) voice agent that runs PhoneLLM on [Modal](https://modal.com), with Deepgram Flux for speech-to-text and Deepgram Aura for text-to-speech.
+This repo is a [Pipecat](https://github.com/pipecat-ai/pipecat) voice agent that runs Pipecat PhoneLLM on [Modal](https://modal.com), with Deepgram Flux for speech-to-text and Deepgram Aura for text-to-speech.
 
 ```
 Deepgram Flux (STT) → Pipecat PhoneLLM Alpha 1 on Modal (LLM) → Deepgram Aura (TTS)
