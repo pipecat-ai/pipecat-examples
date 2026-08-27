@@ -100,7 +100,10 @@ async def update_reservation(params: FunctionCallParams):
     if not reservation:
         logger.info(f"update_reservation({args}) -> not found")
         await params.result_callback(
-            {"success": False, "message": "No reservation matches that confirmation number or name."}
+            {
+                "success": False,
+                "message": "No reservation matches that confirmation number or name.",
+            }
         )
         return
     for field in ("name", "party_size", "date", "time"):
