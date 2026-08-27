@@ -5,10 +5,10 @@
 > [!TIP]
 > **Quickstart:** using [Claude Code](https://claude.com/claude-code)? Run `/setup` in this repo — a committed skill (`.claude/skills/setup/`) that steps through everything below, health-checking along the way and asking for input only where needed. The rest of this README is the manual path.
 
-This repo is a [Pipecat](https://github.com/pipecat-ai/pipecat) voice agent that runs Pipecat PhoneLLM on [Modal](https://modal.com), with Deepgram Flux for speech-to-text and Deepgram Aura for text-to-speech.
+This repo is a [Pipecat](https://github.com/pipecat-ai/pipecat) voice agent that runs Pipecat PhoneLLM on [Modal](https://modal.com), with Deepgram Flux for both speech-to-text and text-to-speech.
 
 ```
-Deepgram Flux (STT) → Pipecat PhoneLLM Alpha 1 on Modal (LLM) → Deepgram Aura (TTS)
+Deepgram Flux (STT) → Pipecat PhoneLLM Alpha 1 on Modal (LLM) → Deepgram Flux (TTS)
 ```
 
 ## Install the CLIs
