@@ -11,6 +11,10 @@ Wires the bot in ``bot.py`` to the :class:`MOQDirectHost` in
 bot per ``/start`` request), this is a long-lived process that dials a relay
 once and runs a fresh pipeline for every client that announces itself.
 
+Every flag defaults from the matching ``MOQ_*`` variable (see
+``env.example``), so a platform that starts the process without arguments
+can configure it entirely from the environment.
+
 Usage:
     # Local dev: run a moq relay (e.g. `just relay` in the moq repo on
     # :4443), then point the host at it. Clients announce under request/*.
@@ -21,9 +25,6 @@ Usage:
         --relay-url https://relay.example.com \\
         --request-prefix demo/pipecat/request \\
         --response-prefix demo/pipecat/response
-
-    # Platforms that start the process without arguments.
-    uv run server.py --from-env
 """
 
 import argparse
@@ -43,26 +44,29 @@ from direct_host import (
     MOQDirectHost,
 )
 
-load_dotenv(override=True)
+# Exported variables win over .env, so a deploy recipe that exports
+# MOQ_RELAY_URL isn't clobbered by a dev .env left in the checkout.
+load_dotenv()
+
+
+def _env_flag(name: str) -> bool:
+    return os.getenv(name, "").strip().lower() in ("1", "true", "yes", "on")
 
 
 async def _run(args: argparse.Namespace) -> None:
     params = MOQParams(audio_in_enabled=True, audio_out_enabled=True)
 
-    if args.from_env:
-        host = MOQDirectHost.from_env(params, run_bot)
-    else:
-        host = MOQDirectHost(
-            params,
-            run_bot,
-            relay_url=args.relay_url,
-            request_prefix=args.request_prefix,
-            response_prefix=args.response_prefix,
-            verify_ssl=not args.no_verify_ssl,
-            max_sessions=args.max_sessions,
-            peer_wait_secs=args.peer_wait_secs,
-            host_idle_secs=args.host_idle_secs or None,
-        )
+    host = MOQDirectHost(
+        params,
+        run_bot,
+        relay_url=args.relay_url,
+        request_prefix=args.request_prefix,
+        response_prefix=args.response_prefix,
+        verify_ssl=not args.no_verify_ssl,
+        max_sessions=args.max_sessions,
+        peer_wait_secs=args.peer_wait_secs,
+        host_idle_secs=args.host_idle_secs or None,
+    )
 
     logger.info("MoQ direct host ready; waiting for clients to announce")
     await host.run()
@@ -70,32 +74,48 @@ async def _run(args: argparse.Namespace) -> None:
 
 def main() -> None:
     """Entry point — run with ``uv run server.py``."""
-    parser = argparse.ArgumentParser(description="MoQ direct-mode voice-agent host")
-    parser.add_argument(
-        "--from-env",
-        action="store_true",
-        help="Take all transport settings from MOQ_* variables (see direct_host.py).",
+    parser = argparse.ArgumentParser(
+        description="MoQ direct-mode voice-agent host",
+        epilog="Each flag defaults from the MOQ_* variable named in its help.",
     )
-    parser.add_argument("--relay-url", default=os.getenv("MOQ_RELAY_URL", DEFAULT_RELAY_URL))
-    parser.add_argument("--request-prefix", default=DEFAULT_REQUEST_PREFIX)
-    parser.add_argument("--response-prefix", default=DEFAULT_RESPONSE_PREFIX)
-    parser.add_argument("--max-sessions", type=int, default=8)
+    parser.add_argument(
+        "--relay-url",
+        default=os.getenv("MOQ_RELAY_URL", DEFAULT_RELAY_URL),
+        help="The MoQ relay to dial (MOQ_RELAY_URL).",
+    )
+    parser.add_argument(
+        "--request-prefix",
+        default=os.getenv("MOQ_REQUEST_PREFIX", DEFAULT_REQUEST_PREFIX),
+        help="Prefix clients announce their microphones under (MOQ_REQUEST_PREFIX).",
+    )
+    parser.add_argument(
+        "--response-prefix",
+        default=os.getenv("MOQ_RESPONSE_PREFIX", DEFAULT_RESPONSE_PREFIX),
+        help="Prefix the bot publishes its replies under (MOQ_RESPONSE_PREFIX).",
+    )
+    parser.add_argument(
+        "--max-sessions",
+        type=int,
+        default=int(os.getenv("MOQ_MAX_SESSIONS", "8")),
+        help="Concurrent pipelines; further clients wait (MOQ_MAX_SESSIONS).",
+    )
     parser.add_argument(
         "--peer-wait-secs",
         type=float,
-        default=DEFAULT_PEER_WAIT_SECS,
-        help="Per-session wait for the announcing client's media.",
+        default=float(os.getenv("MOQ_PEER_WAIT_SECS", str(DEFAULT_PEER_WAIT_SECS))),
+        help="Per-session wait for the announcing client's media (MOQ_PEER_WAIT_SECS).",
     )
     parser.add_argument(
         "--host-idle-secs",
         type=float,
-        default=0,
-        help="Exit after this long with no live calls; 0 runs until Ctrl-C.",
+        default=float(os.getenv("MOQ_HOST_IDLE_SECS", "0")),
+        help="Exit after this long with no live calls; 0 runs until Ctrl-C (MOQ_HOST_IDLE_SECS).",
     )
     parser.add_argument(
         "--no-verify-ssl",
         action="store_true",
-        help="Skip TLS verification (self-signed relays; moot over a Unix socket).",
+        default=_env_flag("MOQ_TLS_INSECURE"),
+        help="Skip TLS verification for self-signed relays (MOQ_TLS_INSECURE=1).",
     )
     asyncio.run(_run(parser.parse_args()))
 

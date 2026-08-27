@@ -101,19 +101,20 @@ bounded by the guards above.
 
 ## Deploying
 
-`--from-env` takes every host setting from `MOQ_*` variables, so the same built
-image serves every deployment — e.g. as a systemd unit co-located with a relay,
-dialing its internal Unix socket:
+Every flag defaults from the matching `MOQ_*` variable, so the same built
+image serves every deployment with no arguments — e.g. as a systemd unit
+co-located with a relay, dialing its internal Unix socket:
 
 ```bash
 export DEEPGRAM_API_KEY=... OPENAI_API_KEY=... CARTESIA_API_KEY=...
 export MOQ_RELAY_URL=unix:///run/moq/internal.sock
 export MOQ_REQUEST_PREFIX=demo/pipecat/request
 export MOQ_RESPONSE_PREFIX=demo/pipecat/response
-uv run server.py --from-env
+uv run server.py
 ```
 
-See `env.example` for every variable, and `uv run server.py --help` for the
+Exported variables win over `.env`, and a flag wins over both. See
+`env.example` for every variable, and `uv run server.py --help` for the
 equivalent flags.
 
 ## Customizing

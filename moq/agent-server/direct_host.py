@@ -34,7 +34,6 @@ host on supported API -- no transport internals are touched.
 from __future__ import annotations
 
 import asyncio
-import os
 import time
 from collections.abc import Awaitable, Callable
 
@@ -70,11 +69,6 @@ SessionBot = Callable[[MOQTransport, str], Awaitable[None]]
 # the raw announcement (``.path``, ``.broadcast``, ``.hops``) and returns
 # True to serve it. ``None`` answers every client.
 ServeFilter = Callable[["moq.Announcement"], bool]
-
-
-def _env_secs(name: str, default: float) -> float | None:
-    """Read a duration from the environment, treating 0 as "disabled"."""
-    return float(os.getenv(name, str(default))) or None
 
 
 class MOQDirectHost:
@@ -160,40 +154,6 @@ class MOQDirectHost:
         self._host_idle_secs = host_idle_secs
         self._should_serve = should_serve
         self._sem = asyncio.Semaphore(max_sessions)
-
-    @classmethod
-    def from_env(cls, params: MOQParams, run_bot: SessionBot) -> "MOQDirectHost":
-        """Build a host from ``MOQ_*`` environment variables.
-
-        For platforms that start processes without CLI arguments. Reads:
-
-        - ``MOQ_RELAY_URL`` (default ``http://localhost:4443``)
-        - ``MOQ_REQUEST_PREFIX`` / ``MOQ_RESPONSE_PREFIX`` (default
-          ``request`` / ``response``)
-        - ``MOQ_TLS_INSECURE`` -- set to 1 to skip relay cert verification
-        - ``MOQ_MAX_SESSIONS`` (default 8)
-        - ``MOQ_PEER_WAIT_SECS`` (default 60)
-        - ``MOQ_HOST_IDLE_SECS`` -- 0 disables (default 0, i.e. run forever)
-
-        Args:
-            params: Per-session MOQ media parameters.
-            run_bot: Builds and runs one session's pipeline to completion.
-
-        Returns:
-            A host configured from the environment.
-        """
-        insecure = os.getenv("MOQ_TLS_INSECURE", "").strip().lower() in ("1", "true", "yes", "on")
-        return cls(
-            params,
-            run_bot,
-            relay_url=os.getenv("MOQ_RELAY_URL", DEFAULT_RELAY_URL),
-            request_prefix=os.getenv("MOQ_REQUEST_PREFIX", DEFAULT_REQUEST_PREFIX),
-            response_prefix=os.getenv("MOQ_RESPONSE_PREFIX", DEFAULT_RESPONSE_PREFIX),
-            verify_ssl=not insecure,
-            max_sessions=int(os.getenv("MOQ_MAX_SESSIONS", "8")),
-            peer_wait_secs=float(os.getenv("MOQ_PEER_WAIT_SECS", str(DEFAULT_PEER_WAIT_SECS))),
-            host_idle_secs=_env_secs("MOQ_HOST_IDLE_SECS", 0),
-        )
 
     def session_id(self, announced_path: str) -> str:
         """Return the session id an announced path names.
