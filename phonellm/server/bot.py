@@ -41,6 +41,8 @@ from pipecat.transports.base_transport import BaseTransport, TransportParams
 from pipecat.transports.daily.transport import DailyParams
 from pipecat.workers.runner import WorkerRunner
 
+from tools import TOOLS, ReservationStore
+
 load_dotenv(override=True)
 
 
@@ -85,11 +87,18 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments) -> Non
             model=os.getenv("PHONELLM_MODEL", "pipecat-ai/phonellm-alpha-1"),
             # PhoneLLM is trained for temperature 0
             temperature=0,
-            system_instruction="You are a helpful assistant in a voice conversation. You are powered by PhoneLLM. Respond to what the user said in a creative, helpful, and brief way.",
+            system_instruction=(
+                "You are a restaurant reservation assistant on a phone call. You are powered by PhoneLLM. "
+                "Your job is to take reservations: use your tools to look up, create, and update reservations. "
+                "Before creating a reservation, collect the caller's name, party size, date, and time. "
+                "Confirm the details back to the caller, and share the confirmation number after booking. "
+                "Keep responses brief. Your responses will be spoken aloud, so avoid emojis, bullet "
+                "points, or other formatting that can't be spoken."
+            ),
         ),
     )
 
-    context = LLMContext()
+    context = LLMContext(tools=TOOLS)
     user_aggregator, assistant_aggregator = LLMContextAggregatorPair(
         context,
         user_params=LLMUserAggregatorParams(
@@ -118,13 +127,18 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments) -> Non
             enable_usage_metrics=True,
         ),
         observers=[],
+        # Shared with the tool handlers via params.app_resources
+        app_resources=ReservationStore(),
     )
 
     @worker.rtvi.event_handler("on_client_ready")
     async def on_client_ready(rtvi):
         # Kick off the conversation
         context.add_message(
-            {"role": "developer", "content": "Start by concisely introducing yourself."}
+            {
+                "role": "developer",
+                "content": "Concisely greet the caller and ask how you can help with their reservation.",
+            }
         )
         await worker.queue_frames([LLMRunFrame()])
 
