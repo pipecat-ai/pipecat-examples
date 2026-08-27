@@ -45,14 +45,15 @@ this client is built and served somewhere other than the host's checkout.
 | Parameter | Falls back to | Meaning |
 | --- | --- | --- |
 | `relay` | `MOQ_RELAY_URL` | The relay to dial, e.g. `http://localhost:4443`. **Required** — with neither source set, the page reports that it isn't configured rather than guessing. |
-| `ns` | *(empty)* | Namespace prepended to both prefixes. Not needed when the host's prefixes already carry a room (`demo/pipecat/request`), which is why it has no `.env` fallback. |
+| `ns` | *(empty)* | Namespace prepended to both prefixes when they come from the URL or the defaults. Ignored when the host's `.env` supplies prefixes, since those are already full paths (`demo/pipecat/request`) and would otherwise carry the room twice. |
 | `botId` | `MOQ_RESPONSE_PREFIX`, then `response` | The prefix the host publishes replies under — its `--response-prefix`. |
 | `clientId` | `MOQ_REQUEST_PREFIX`, then `request` | The prefix this client publishes its mic under — the host's `--request-prefix`. |
 
 The client appends its own session id to both, so a call runs on
 `<ns>/<clientId>/<session>` and `<ns>/<botId>/<session>`. A host started with
 `--request-prefix demo/pipecat/request --response-prefix demo/pipecat/response`
-is reached with `?relay=…&ns=demo/pipecat`.
+is reached with `?relay=…&ns=demo/pipecat` — or, when those same prefixes are
+in the host's `.env`, with no parameters at all.
 
 ## Notes
 

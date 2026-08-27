@@ -41,19 +41,27 @@ export function readMoqSession(): MoqTransportOptions | null {
   const relayUrl = params.get("relay") ?? env.relayUrl;
   if (!relayUrl) return null;
 
-  // Empty rather than the transport's built-in default, so an unscoped URL
-  // puts the call at the relay root instead of silently joining the shared
-  // `pipecat` namespace. `Path.from` drops empty components, so the paths
-  // below come out as `request/<session>` with no leading slash.
-  // No env fallback: the host's prefixes are already full paths, so a room
-  // name lives inside them rather than in a separate namespace.
-  const namespace = params.get("ns") ?? "";
-
   // The bot publishes its own broadcast as the response and reads the peer's
   // as the request, so we take the opposite pair. Worth naming explicitly:
   // the transport still defaults to the older bot0/client0.
   const botId = params.get("botId") ?? env.botId ?? DEFAULT_BOT_ID;
   const clientId = params.get("clientId") ?? env.clientId ?? DEFAULT_CLIENT_ID;
+
+  // `ns` is a room for prefixes that came from the URL or the defaults. The
+  // host's env prefixes are already full paths (`demo/pipecat/request`), so
+  // prepending a namespace to them would double the room; they win over `ns`.
+  // Empty rather than the transport's built-in default, so an unscoped URL
+  // puts the call at the relay root instead of silently joining the shared
+  // `pipecat` namespace. `Path.from` drops empty components, so the paths
+  // below come out as `request/<session>` with no leading slash.
+  const envPrefixed = env.botId != null || env.clientId != null;
+  const ns = params.get("ns");
+  if (ns && envPrefixed) {
+    console.warn(
+      `Ignoring ?ns=${ns}: the host's .env supplies prefixes that already carry their room.`,
+    );
+  }
+  const namespace = envPrefixed ? "" : (ns ?? "");
 
   // Everyone opening this URL shares a namespace, so the session id is what
   // keeps one caller's broadcasts off another's. The host watches the request
