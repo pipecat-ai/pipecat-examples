@@ -17,6 +17,21 @@ const DEFAULT_BOT_ID = "response";
 const DEFAULT_CLIENT_ID = "request";
 
 /**
+ * A random UUID v4. `crypto.randomUUID` exists only in secure contexts, and
+ * this runs at module load, so on a non-localhost http:// origin it would
+ * throw before React mounts and the page would be blank instead of showing
+ * the transport's own error. `getRandomValues` works everywhere.
+ */
+function mintSessionId(): string {
+  if (typeof crypto.randomUUID === "function") return crypto.randomUUID();
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  bytes[6] = (bytes[6] & 0x0f) | 0x40;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
+/**
  * Read a MoQ direct-mode session from the page URL, falling back to the
  * host's `.env`.
  *
@@ -67,7 +82,7 @@ export function readMoqSession(): MoqTransportOptions | null {
   // keeps one caller's broadcasts off another's. The host watches the request
   // prefix and starts a bot per id it sees, which is why we mint it here
   // rather than being told one.
-  const session = crypto.randomUUID();
+  const session = mintSessionId();
 
   return {
     relayUrl,
