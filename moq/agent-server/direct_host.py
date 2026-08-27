@@ -66,8 +66,9 @@ _IDLE_POLL_SECS = 15.0
 SessionBot = Callable[[MOQTransport, str], Awaitable[None]]
 
 # Admission policy: decides whether to answer an announced client. Receives
-# the raw announcement (``.path``, ``.broadcast``, ``.hops``) and returns
-# True to serve it. ``None`` answers every client.
+# the raw announcement (``.path`` and ``.broadcast``; the relay hops it took
+# are at ``.broadcast.route.hops``) and returns True to serve it. ``None``
+# answers every client. A policy that raises declines that one client.
 ServeFilter = Callable[["moq.Announcement"], bool]
 
 
@@ -126,7 +127,10 @@ class MOQDirectHost:
             runs until cancelled.
         should_serve: Optional admission policy ``(announcement) -> bool``.
             Return False to decline a client, e.g. self-electing one relay
-            edge per client across a fleet. Default answers every client.
+            edge per client across a fleet using
+            ``announcement.broadcast.route.hops``. Default answers every
+            client. A policy that raises declines that client and is
+            logged; it never takes the host down.
     """
 
     def __init__(
@@ -259,12 +263,25 @@ class MOQDirectHost:
             if session_id in sessions:
                 continue
 
-            if self._should_serve is not None and not self._should_serve(announcement):
-                logger.debug(f"MOQ direct host: declined client {session_id!r}")
+            if self._should_serve is not None and not self._admit(announcement, session_id):
                 continue
 
             logger.info(f"MOQ direct host: client {session_id!r} announced")
             sessions[session_id] = asyncio.create_task(self._session(session_id))
+
+    def _admit(self, announcement: "moq.Announcement", session_id: str) -> bool:
+        """Apply ``should_serve``, declining the client if the policy raises."""
+        assert self._should_serve is not None
+        try:
+            serve = self._should_serve(announcement)
+        except Exception as e:
+            logger.opt(exception=e).error(
+                f"MOQ direct host: should_serve failed for client {session_id!r}; declining"
+            )
+            return False
+        if not serve:
+            logger.debug(f"MOQ direct host: declined client {session_id!r}")
+        return serve
 
     async def _session(self, session_id: str):
         """Run one call, holding a concurrency slot for its duration."""
