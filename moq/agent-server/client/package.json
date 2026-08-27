@@ -12,7 +12,6 @@
     "@daily-co/daily-js": "^0.84.0",
     "@pipecat-ai/client-js": "^1.13.0",
     "@pipecat-ai/client-react": "^1.8.0",
-    "@pipecat-ai/daily-transport": "^1.6.0",
     "@pipecat-ai/moq-transport": "^0.1.1",
     "@pipecat-ai/voice-ui-kit": "^0.13.0",
     "react": "^19.1.0",
