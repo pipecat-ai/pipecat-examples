@@ -21,6 +21,7 @@ serves every deployment:
     MOQ_SESSION_IDLE_SECS    (default: 300; 0 disables)
 """
 
+import asyncio
 import os
 
 from loguru import logger
@@ -82,10 +83,15 @@ async def run_bot(transport: MOQTransport, session_id: str):
         ),
     )
 
+    # Silero loads its ONNX model in __init__. This host runs many calls on
+    # one loop, so build it off-loop rather than stalling every live
+    # pipeline each time a new client arrives.
+    vad = await asyncio.to_thread(SileroVADAnalyzer)
+
     context = LLMContext()
     user_aggregator, assistant_aggregator = LLMContextAggregatorPair(
         context,
-        user_params=LLMUserAggregatorParams(vad_analyzer=SileroVADAnalyzer()),
+        user_params=LLMUserAggregatorParams(vad_analyzer=vad),
     )
 
     pipeline = Pipeline(
