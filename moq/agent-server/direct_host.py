@@ -224,8 +224,9 @@ class MOQDirectHost:
     async def run(self):
         """Watch the relay and serve a bot per announced session id.
 
-        Returns when ``host_idle_secs`` elapses with no live calls, or
-        raises if the relay watch itself fails.
+        Returns when ``host_idle_secs`` elapses with no live calls. Raises
+        if the relay connection closes or the announcement stream ends,
+        since either leaves the host unable to see new clients.
         """
         sessions: dict[str, asyncio.Task] = {}
 
@@ -247,14 +248,28 @@ class MOQDirectHost:
         async with moq.Client(
             self._relay_url, tls_verify=self._verify_ssl, subscribe=origin
         ) as client:
+            # announced() stops yielding rather than raising when the relay
+            # goes away, so the session's closed() -- which moq.Client does
+            # not expose publicly -- is the only signal that it did.
+            session = client._session
+            if session is None:
+                raise RuntimeError("MOQ direct host: relay client has no session")
             watch_task = asyncio.create_task(self._watch(client, sessions))
+            closed_task = asyncio.create_task(session.closed())
             last_active = time.monotonic()
             try:
                 while True:
-                    await asyncio.wait({watch_task}, timeout=_IDLE_POLL_SECS)
+                    await asyncio.wait(
+                        {watch_task, closed_task},
+                        timeout=_IDLE_POLL_SECS,
+                        return_when=asyncio.FIRST_COMPLETED,
+                    )
+                    if closed_task.done():
+                        closed_task.result()  # raises MoqError with the close reason
+                        raise RuntimeError("MOQ direct host: relay session closed")
                     if watch_task.done():
-                        await watch_task  # surface a relay/watch failure
-                        break
+                        watch_task.result()
+                        raise RuntimeError("MOQ direct host: announcement stream ended")
                     if any(not task.done() for task in sessions.values()):
                         last_active = time.monotonic()
                     elif (
@@ -267,6 +282,7 @@ class MOQDirectHost:
                         break
             finally:
                 watch_task.cancel()
+                closed_task.cancel()
                 await self._drain(sessions)
 
     async def _watch(self, client: "moq.Client", sessions: dict[str, asyncio.Task]):
