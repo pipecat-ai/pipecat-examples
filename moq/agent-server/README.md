@@ -97,7 +97,10 @@ exit holds an agent slot forever.
 
 Client departures aren't announced by the relay (moq-ffi exposes no deactivation
 event), so a call ends when its transport sees the client's streams close,
-bounded by the guards above.
+bounded by the guards above. A client that re-announces an id whose call is
+still up (the browser auto-reconnects after a network blip) gets its old call
+cancelled and a fresh one in its place, rather than waiting for the relay to
+time the dead session out.
 
 ## Deploying
 

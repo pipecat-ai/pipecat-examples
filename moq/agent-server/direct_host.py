@@ -262,17 +262,33 @@ class MOQDirectHost:
 
             for finished in [sid for sid, task in sessions.items() if task.done()]:
                 del sessions[finished]
-            # A client that drops and re-announces the same id would
-            # otherwise get a second bot publishing to the same reply path.
-            if session_id in sessions:
-                continue
 
             if self._should_serve is not None and not self._admit(announcement, session_id):
                 continue
 
-            logger.info(f"MOQ direct host: client {session_id!r} announced")
             self._last_active = time.monotonic()
-            sessions[session_id] = asyncio.create_task(self._session(session_id))
+            old = sessions.get(session_id)
+            if old is None:
+                logger.info(f"MOQ direct host: client {session_id!r} announced")
+                sessions[session_id] = asyncio.create_task(self._session(session_id))
+            else:
+                # The client re-announced an id whose call is still up: it
+                # auto-reconnected after a network blip, and the relay keeps
+                # its dead session until the QUIC idle timeout. Announcements
+                # are edge-triggered, so waiting for the old call to end
+                # would strand the caller. Replace it.
+                logger.info(f"MOQ direct host: client {session_id!r} re-announced — replacing")
+                sessions[session_id] = asyncio.create_task(self._replace(old, session_id))
+
+    async def _replace(self, old: asyncio.Task, session_id: str):
+        """Cancel a session and run a new one for the same id in its place.
+
+        The old transport must disconnect before the new one dials, or both
+        would publish on the same reply path.
+        """
+        old.cancel()
+        await asyncio.gather(old, return_exceptions=True)
+        await self._session(session_id)
 
     def _admit(self, announcement: "moq.Announcement", session_id: str) -> bool:
         """Apply ``should_serve``, declining the client if the policy raises."""
