@@ -79,14 +79,14 @@ class MOQDirectHost:
     paths -- so one host handles any number of calls, concurrently or back
     to back.
 
-    Lifecycle guards, which matter wherever instances are billed or capped
-    (a deployed host with no exit holds an agent slot forever):
+    Lifecycle guards, which matter wherever a running host costs something
+    (a host with no exit condition runs forever):
 
     - ``peer_wait_secs`` bounds how long a session waits for the announcing
       client's media before giving up.
     - ``host_idle_secs`` exits the host after that long with no live calls.
       ``None`` runs until cancelled -- right for a long-lived service, wrong
-      for a capped per-instance deployment.
+      for a host you want to shut down when nobody is calling.
     - ``max_sessions`` caps concurrent pipelines; further clients wait.
 
     How long a *call* may sit idle is the bot's own business, since its

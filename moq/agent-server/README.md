@@ -13,6 +13,8 @@ The runner is still the right default for most MoQ use cases — see
 `examples/transports/transports-moq.py` in the main
 [pipecat](https://github.com/pipecat-ai/pipecat) repo. Reach for the pattern
 here when you want one process serving many concurrent calls behind a relay.
+This is an academic example, not something to deploy to Pipecat Cloud as is —
+see [Deploying](#deploying).
 
 ## How it works
 
@@ -85,12 +87,12 @@ mints its own session id, so the host starts a separate bot for each.
 
 ## Lifecycle guards
 
-These matter wherever instances are billed or capped — a deployed host with no
-exit holds an agent slot forever.
+These matter wherever a running host costs something — a host with no exit
+condition runs, and is paid for, forever.
 
 | Setting | Default | What it bounds |
 | --- | --- | --- |
-| `--host-idle-secs` | 0 | Exits the host after this long with no live calls. `0` runs until stopped — right for a long-lived service, wrong for a capped per-instance deployment. |
+| `--host-idle-secs` | 0 | Exits the host after this long with no live calls. `0` runs until stopped — right for a long-lived service, wrong for a host you want to shut down when nobody is calling. |
 | `--peer-wait-secs` | 60 | How long a session waits for the announcing client's media. |
 | `--max-sessions` | 8 | Concurrent pipelines; further clients wait for a slot. |
 | `MOQ_SESSION_IDLE_SECS` | 300 | A call with no speech in either direction. This one belongs to the bot, since its `PipelineWorker` enforces it. Idle counts *speech* frames, not media, so an abandoned open tab publishing silent mic audio still ages out. `0` disables. |
@@ -104,9 +106,17 @@ time the dead session out.
 
 ## Deploying
 
+> **Not a Pipecat Cloud example.** This is an academic example of the
+> direct-mode pattern, and it is not currently intended to be deployable to
+> Pipecat Cloud as is: Pipecat Cloud starts one bot per session through its
+> own control plane, whereas this host is one long-lived process that serves
+> many sessions and needs a MoQ relay it can dial. Deploying it is a
+> roll-your-own situation — you provide the relay, the process supervisor,
+> and the auth.
+
 Every flag defaults from the matching `MOQ_*` variable, so the same built
-image serves every deployment with no arguments — e.g. as a systemd unit
-co-located with a relay, dialing its internal Unix socket:
+image can be configured entirely from the environment — e.g. as a systemd
+unit co-located with a relay, dialing its internal Unix socket:
 
 ```bash
 export DEEPGRAM_API_KEY=... OPENAI_API_KEY=... CARTESIA_API_KEY=...

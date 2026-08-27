@@ -12,8 +12,9 @@ bot per ``/start`` request), this is a long-lived process that dials a relay
 once and runs a fresh pipeline for every client that announces itself.
 
 Every flag defaults from the matching ``MOQ_*`` variable (see
-``env.example``), so a platform that starts the process without arguments
-can configure it entirely from the environment.
+``env.example``), so the host can be configured entirely from the
+environment. This is an academic example: it is not intended to deploy to
+Pipecat Cloud as is (see the README's Deploying section).
 
 Usage:
     # Local dev: run a moq relay (e.g. `just relay` in the moq repo on
@@ -55,8 +56,8 @@ REQUIRED_API_KEYS = ("DEEPGRAM_API_KEY", "OPENAI_API_KEY", "CARTESIA_API_KEY")
 def _env(name: str, default: str) -> str:
     """Read a variable, treating one that is set but empty as unset.
 
-    ``KEY=`` is what a blank .env line or a platform's env UI produces, and
-    ``float("")`` would otherwise crash the host.
+    ``KEY=`` is what a blank .env line or an environment editor produces,
+    and ``float("")`` would otherwise crash the host.
     """
     return os.getenv(name) or default
 
