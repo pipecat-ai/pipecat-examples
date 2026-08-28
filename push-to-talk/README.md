@@ -80,6 +80,10 @@ The push-to-talk functionality is encapsulated in custom [user turn strategies](
 
 The strategies react to the `push_to_talk` message directly, so no separate frame-handling processor is needed. (For an app that mixes push-to-talk with live VAD-driven turns, you'd instead translate the message into custom frames in an `on_client_message` handler — see [pipecat-ai/ptt-and-conversation](https://github.com/kwindla/ptt-and-conversation).)
 
+## Client-side Tool Calling
+
+This example also shows how to run an LLM tool call **in the browser** instead of on the server. Reach for this when the tool needs something only the client has: the DOM, geolocation, a local file, or a logged-in session. Here the tool is `get_browser_info`. Ask the bot "what browser am I using?" and it reads back your real user agent, screen size, language, and time zone, none of which the server ever saw.
+
 ## Deploy your Bot to Pipecat Cloud
 
 Follow the [quickstart instructions](https://docs.pipecat.ai/getting-started/quickstart#step-2%3A-deploy-to-production) to deploy your bot to Pipecat Cloud.

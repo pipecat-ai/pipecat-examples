@@ -8,6 +8,8 @@ import os
 
 from dotenv import load_dotenv
 from loguru import logger
+from pipecat.adapters.schemas.function_schema import FunctionSchema
+from pipecat.adapters.schemas.tools_schema import ToolsSchema
 from pipecat.frames.frames import (
     Frame,
     LLMRunFrame,
@@ -21,11 +23,16 @@ from pipecat.processors.aggregators.llm_response_universal import (
     LLMContextAggregatorPair,
     LLMUserAggregatorParams,
 )
-from pipecat.processors.frameworks.rtvi import RTVIClientMessageFrame
+from pipecat.processors.frameworks.rtvi import (
+    RTVIClientMessageFrame,
+    RTVIFunctionCallReportLevel,
+    RTVIObserverParams,
+)
 from pipecat.runner.types import RunnerArguments
 from pipecat.runner.utils import create_transport
 from pipecat.services.cartesia.tts import CartesiaTTSService
 from pipecat.services.deepgram.stt import DeepgramSTTService
+from pipecat.services.llm_service import FunctionCallParams
 from pipecat.services.openai.llm import OpenAILLMService
 from pipecat.transports.base_transport import BaseTransport, TransportParams
 from pipecat.transports.daily.transport import DailyParams
@@ -50,6 +57,39 @@ transport_params = {
         audio_out_enabled=True,
     ),
 }
+
+# This tool runs in the browser, not here. See `run_on_client` below and
+# `client/src/app/hooks/useClientTools.ts` for the other half.
+CLIENT_TOOL = "get_browser_info"
+
+tools = ToolsSchema(
+    standard_tools=[
+        FunctionSchema(
+            name=CLIENT_TOOL,
+            description=(
+                "Get information about the user's browser and screen. Takes no "
+                "arguments. The browser returns userAgent, language, screen, and "
+                "timeZone."
+            ),
+            # No input arguments: everything this tool reports comes back from
+            # the browser in the result, not from the LLM.
+            properties={},
+            required=[],
+        ),
+    ]
+)
+
+
+async def run_on_client(params: FunctionCallParams):
+    """Hand this tool to the client.
+
+    We deliberately return without calling params.result_callback. That leaves
+    the function call open. The RTVI observer has already told the client the
+    call is in progress, the client runs it, and the client's
+    llm-function-call-result message becomes the FunctionCallResultFrame that
+    completes the call and lets the LLM continue.
+    """
+    logger.debug(f"Delegating {params.function_name} to the client")
 
 
 class PushToTalkUserTurnStartStrategy(BaseUserTurnStartStrategy):
@@ -127,11 +167,22 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     llm = OpenAILLMService(
         api_key=os.getenv("OPENAI_API_KEY"),
         settings=OpenAILLMService.Settings(
-            system_instruction="You are a helpful assistant. Your output will be converted to audio so don't include special characters in your answers. Respond to what the user said in a creative and helpful way.",
+            system_instruction=(
+                "You are a helpful assistant. Your output will be converted to audio so don't "
+                "include special characters in your answers. Respond to what the user said in a "
+                "creative and helpful way. You have a get_browser_info tool that runs in the "
+                "user's own browser, so use it whenever they ask about their browser, screen, "
+                "language, or time zone, and read the answer back to them."
+            ),
         ),
     )
 
-    context = LLMContext()
+    context = LLMContext(tools=tools)
+
+    # The tool is advertised to the LLM here, but the browser is what actually
+    # runs it.
+    llm.register_function(CLIENT_TOOL, run_on_client)
+
     # The push-to-talk button is the sole authority over user turns. The custom
     # strategies react to the client's `push_to_talk` message: the aggregator
     # only collects transcription between a button press and release, then pushes
@@ -160,6 +211,15 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
         params=PipelineParams(
             enable_metrics=True,
             enable_usage_metrics=True,
+        ),
+        # The client can only dispatch a tool call if it knows the function
+        # name and arguments. The default report level is NONE, which sends
+        # only the tool_call_id, so client-run tools must opt in to FULL.
+        rtvi_observer_params=RTVIObserverParams(
+            function_call_report_level={
+                "*": RTVIFunctionCallReportLevel.NONE,
+                CLIENT_TOOL: RTVIFunctionCallReportLevel.FULL,
+            }
         ),
     )
 
