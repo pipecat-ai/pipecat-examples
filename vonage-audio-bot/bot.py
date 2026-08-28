@@ -100,6 +100,9 @@ async def run_bot(transport: BaseTransport, handle_sigint: bool, sample_rate: in
         ),
     )
 
+    runner = WorkerRunner(handle_sigint=handle_sigint)
+    await runner.add_workers(worker)
+
     @transport.event_handler("on_client_connected")
     async def on_client_connected(_transport, _client):
         logger.info("Vonage Audio Connector connected. Waiting for user audio...")
@@ -108,10 +111,8 @@ async def run_bot(transport: BaseTransport, handle_sigint: bool, sample_rate: in
     @transport.event_handler("on_client_disconnected")
     async def on_client_disconnected(_transport, _client):
         logger.info("Vonage Audio Connector disconnected. Ending call.")
-        await worker.cancel()
+        await runner.cancel()
 
-    runner = WorkerRunner(handle_sigint=handle_sigint)
-    await runner.add_workers(worker)
     await runner.run()
 
 

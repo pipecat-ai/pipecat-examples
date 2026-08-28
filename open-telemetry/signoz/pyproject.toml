@@ -4,8 +4,8 @@ version = "0.1.0"
 description = "Quickstart example for building voice AI bots with Pipecat"
 requires-python = ">=3.11"
 dependencies = [
-    "pipecat-ai[daily,webrtc,websocket,silero,cartesia,deepgram,openai,tracing,runner,cli]",
-    "pipecatcloud>=0.7.1",
+    "pipecat-ai[daily,webrtc,websocket,silero,cartesia,deepgram,openai,tracing,runner,cli]>=1.8.0",
+    "pipecatcloud>=1.2.0",
     "opentelemetry-distro",
     "opentelemetry-exporter-otlp"
 ]

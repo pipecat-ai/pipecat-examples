@@ -688,6 +688,9 @@ Important guidelines:
     # Create the game timer
     game_timer = GameTimer(worker, game_state_tracker, game_duration_seconds=GAME_DURATION_SECONDS)
 
+    runner = WorkerRunner(handle_sigint=runner_args.handle_sigint)
+    await runner.add_workers(worker)
+
     @transport.event_handler("on_client_connected")
     async def on_client_connected(transport, client):
         logger.info(f"Client connected: {client}")
@@ -710,11 +713,8 @@ Important guidelines:
         # Stop the timer
         game_timer.stop()
         # Cancel the pipeline task
-        await worker.cancel()
+        await runner.cancel()
 
-    runner = WorkerRunner(handle_sigint=runner_args.handle_sigint)
-
-    await runner.add_workers(worker)
     await runner.run()
 
 

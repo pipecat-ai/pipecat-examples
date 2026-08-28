@@ -97,6 +97,9 @@ async def run_bot(transport: BaseTransport, handle_sigint: bool) -> None:
         ),
     )
 
+    runner = WorkerRunner(handle_sigint=handle_sigint)
+    await runner.add_workers(worker)
+
     @transport.event_handler("on_first_participant_joined")
     async def on_first_participant_joined(transport, participant):
         logger.debug(f"First participant joined: {participant['id']}")
@@ -104,8 +107,8 @@ async def run_bot(transport: BaseTransport, handle_sigint: bool) -> None:
 
     @transport.event_handler("on_client_disconnected")
     async def on_client_disconnected(transport, client):
-        logger.info(f"Client disconnected")
-        await worker.cancel()
+        logger.info("Client disconnected")
+        await runner.cancel()
 
     @transport.event_handler("on_dialin_ready")
     async def on_dialin_ready(transport, sip_endpoint):
@@ -118,7 +121,7 @@ async def run_bot(transport: BaseTransport, handle_sigint: bool) -> None:
     @transport.event_handler("on_dialin_stopped")
     async def on_dialin_stopped(transport, data):
         logger.info(f"Dial-in stopped: {data}")
-        await worker.cancel()
+        await runner.cancel()
 
     @transport.event_handler("on_dialin_warning")
     async def on_dialin_warning(transport, data):
@@ -127,14 +130,12 @@ async def run_bot(transport: BaseTransport, handle_sigint: bool) -> None:
     @transport.event_handler("on_dialin_error")
     async def on_dialin_error(transport, data):
         logger.error(f"Dial-in error: {data}")
-        await worker.cancel()
+        await runner.cancel()
 
     @transport.event_handler("on_dtmf_event")
     async def on_dtmf_event(transport, data):
         logger.info(f"DTMF event: {data}")
 
-    runner = WorkerRunner(handle_sigint=handle_sigint)
-    await runner.add_workers(worker)
     await runner.run()
 
 

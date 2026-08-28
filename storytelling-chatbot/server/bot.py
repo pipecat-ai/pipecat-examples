@@ -98,8 +98,6 @@ async def main(room_url, token=None):
 
         # -------------- Story Loop ------------- #
 
-        runner = WorkerRunner()
-
         logger.debug("Waiting for participant...")
         main_pipeline = Pipeline(
             [
@@ -122,6 +120,10 @@ async def main(room_url, token=None):
             ),
         )
 
+        runner = WorkerRunner()
+
+        await runner.add_workers(worker)
+
         @transport.event_handler("on_first_participant_joined")
         async def on_first_participant_joined(transport, participant):
             logger.debug("Participant joined, storytime commence!")
@@ -138,7 +140,7 @@ async def main(room_url, token=None):
 
         @transport.event_handler("on_participant_left")
         async def on_participant_left(transport, participant, reason):
-            await worker.cancel()
+            await runner.cancel()
 
         @transport.event_handler("on_call_state_updated")
         async def on_call_state_updated(transport, state):
@@ -147,7 +149,6 @@ async def main(room_url, token=None):
                 # whatever is queued, so we use an EndFrame().
                 await worker.queue_frame(EndFrame())
 
-        await runner.add_workers(worker)
         await runner.run()
 
 

@@ -131,7 +131,7 @@ def wire_dialout(transport: DailyTransport, worker: PipelineWorker, runner: Work
             await attempt_dialout(dialout_params)
         else:
             logger.error(f"All {max_retries} dialout attempts failed. Stopping bot.")
-            await worker.cancel()
+            await runner.cancel()
 
     @transport.event_handler("on_first_participant_joined")
     async def on_first_participant_joined(transport, participant):

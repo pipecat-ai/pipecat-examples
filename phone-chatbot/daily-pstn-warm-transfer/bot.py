@@ -423,6 +423,9 @@ async def run_bot(
         ),
     )
 
+    runner = WorkerRunner(handle_sigint=handle_sigint)
+    await runner.add_workers(worker)
+
     # ------------ EVENT HANDLERS ------------
 
     @transport.event_handler("on_first_participant_joined")
@@ -490,8 +493,6 @@ async def run_bot(
         logger.info(f"Participant left: {participant.get('id')}, reason: {reason}")
         await worker.queue_frame(ParticipantLeftFrame())
 
-    runner = WorkerRunner(handle_sigint=handle_sigint)
-    await runner.add_workers(worker)
     await runner.run()
 
 

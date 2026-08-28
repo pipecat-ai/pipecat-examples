@@ -7,8 +7,8 @@ requires-python = ">=3.11"
 
 dependencies = [
     "boto3==1.40.27",
-    "pipecat-ai[cartesia,daily,deepgram,google,runner,silero,webrtc]>=1.4.0",
-    "pipecatcloud>=0.7.1",
+    "pipecat-ai[cartesia,daily,deepgram,google,runner,silero,webrtc]>=1.8.0",
+    "pipecatcloud>=1.2.0",
 ]
 
 [dependency-groups]

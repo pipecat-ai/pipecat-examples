@@ -4,8 +4,8 @@ version = "0.1.0"
 description = "Example for building voice AI bots with Pipecat built using SmallWebRTC"
 requires-python = ">=3.11"
 dependencies = [
-    "pipecat-ai[cartesia,daily,deepgram,openai,runner,silero,webrtc]>=1.4.0",
-    "pipecatcloud>=0.7.1",
+    "pipecat-ai[cartesia,daily,deepgram,openai,runner,silero,webrtc]>=1.8.0",
+    "pipecatcloud>=1.2.0",
 ]
 
 [dependency-groups]

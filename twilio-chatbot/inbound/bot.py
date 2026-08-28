@@ -154,6 +154,13 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments, testin
         idle_timeout_secs=runner_args.pipeline_idle_timeout_secs,
     )
 
+    # We use `handle_sigint=False` because `uvicorn` is controlling keyboard
+    # interruptions. We use `force_gc=True` to force garbage collection after
+    # the runner finishes running a task which could be useful for long running
+    # applications with multiple clients connecting.
+    runner = WorkerRunner(handle_sigint=runner_args.handle_sigint, force_gc=True)
+    await runner.add_workers(worker)
+
     @transport.event_handler("on_client_connected")
     async def on_client_connected(transport, client):
         # Start recording.
@@ -166,19 +173,12 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments, testin
 
     @transport.event_handler("on_client_disconnected")
     async def on_client_disconnected(transport, client):
-        await worker.cancel()
+        await runner.cancel()
 
     @audiobuffer.event_handler("on_audio_data")
     async def on_audio_data(buffer, audio, sample_rate, num_channels):
         await save_audio(audio, sample_rate, num_channels)
 
-    # We use `handle_sigint=False` because `uvicorn` is controlling keyboard
-    # interruptions. We use `force_gc=True` to force garbage collection after
-    # the runner finishes running a task which could be useful for long running
-    # applications with multiple clients connecting.
-    runner = WorkerRunner(handle_sigint=runner_args.handle_sigint, force_gc=True)
-
-    await runner.add_workers(worker)
     await runner.run()
 
 

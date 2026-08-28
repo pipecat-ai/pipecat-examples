@@ -6,8 +6,8 @@ requires-python = ">=3.11"
 dependencies = [
     "python-dotenv",
     "uvicorn",
-    "pipecat-ai[silero,websocket,google,runner]>=1.4.0",
-    "pipecatcloud>=0.7.1",
+    "pipecat-ai[silero,websocket,google,runner]>=1.8.0",
+    "pipecatcloud>=1.2.0",
 ]
 
 [dependency-groups]

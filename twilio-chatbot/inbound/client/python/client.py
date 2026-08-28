@@ -151,6 +151,9 @@ async def run_client(client_name: str, server_url: str, duration_secs: int):
         ),
     )
 
+    runner = WorkerRunner()
+    await runner.add_workers(worker)
+
     @transport.event_handler("on_connected")
     async def on_connected(transport: WebsocketClientTransport, client):
         # Start recording.
@@ -179,10 +182,6 @@ async def run_client(client_name: str, server_url: str, duration_secs: int):
         await asyncio.sleep(duration_secs)
         logger.info(f"Client {client_name} finished after {duration_secs} seconds.")
         await worker.queue_frame(EndFrame())
-
-    runner = WorkerRunner()
-
-    await runner.add_workers(worker)
 
     await asyncio.gather(runner.run(), end_call())
 
