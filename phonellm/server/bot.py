@@ -19,15 +19,20 @@ Run the bot using::
 """
 
 import os
+from datetime import datetime
 
 from dotenv import load_dotenv
 from loguru import logger
+from pipecat.audio.vad.silero import SileroVADAnalyzer
 from pipecat.evals.transport import EvalTransportParams
 from pipecat.frames.frames import LLMRunFrame
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.worker import PipelineParams, PipelineWorker
 from pipecat.processors.aggregators.llm_context import LLMContext
-from pipecat.processors.aggregators.llm_response_universal import LLMContextAggregatorPair
+from pipecat.processors.aggregators.llm_response_universal import (
+    LLMContextAggregatorPair,
+    LLMUserAggregatorParams,
+)
 from pipecat.processors.frameworks.rtvi import (
     RTVIFunctionCallReportLevel,
     RTVIObserverParams,
@@ -38,6 +43,7 @@ from pipecat.services.cartesia.tts import CartesiaTTSService
 from pipecat.services.deepgram.flux.stt import DeepgramFluxSTTService
 from pipecat.services.deepgram.flux.tts import DeepgramFluxTTSService
 from pipecat.services.openai.llm import OpenAILLMService
+from pipecat.services.tts_service import TextAggregationMode
 from pipecat.transports.base_transport import BaseTransport, TransportParams
 from pipecat.transports.daily.transport import DailyParams
 from pipecat.workers.runner import WorkerRunner
@@ -53,11 +59,56 @@ DEFAULT_CARTESIA_VOICE = "86e30c1d-714b-4074-a1f2-1cb6b552fb49"
 
 SYSTEM_INSTRUCTION = (
     "You are a restaurant reservation assistant on a phone call.{powered_by} "
+    "Today is {today_spoken} ({today_iso}). "
     "Your job is to take reservations: use your tools to look up, create, and update reservations. "
-    "Before creating a reservation, collect the caller's name, party size, date, and time. "
+    "Before creating a reservation you need the caller's name, party size, date, and time. "
+    "The name is required as much as the rest: ask for it alongside the day and time, never "
+    "as an afterthought once the time is settled. "
+    "Once the caller has said what they want, ask for everything still missing in one sentence, "
+    "and don't ask for any of it before they've said what they're after. Ask only for what "
+    "they haven't given you: never ask again for a detail they already stated, and if they "
+    "gave you all four, book it without asking anything. "
+    "Whenever you ask for missing details, the name has to be one of them unless they've "
+    "already told you it — a question about the day and time alone is never enough. "
+    "Every time a caller asks for is available: you have no way to check availability and no "
+    "tool for it, so never offer to check and never say you are checking. "
+    "Don't announce what you are about to do, and don't narrate your own tool use — no "
+    '"let me check", no "one moment", no "booking that for you now". Either answer, or '
+    "call the tool and then say what it did. "
+    'Resolve relative dates like "tomorrow" or "next Friday" against today\'s date, and pass '
+    "dates to your tools in YYYY-MM-DD format. "
+    'Say dates the short way a person would on the phone: "tomorrow", "Saturday", or "the 29th". '
+    "Never say the year, and never read a YYYY-MM-DD date aloud — that format is for tool "
+    "arguments only. "
     "Confirm the details back to the caller, and share the confirmation number after booking. "
-    "Keep responses brief. Your responses will be spoken aloud."
+    "When the caller says goodbye, or their reservation is settled and they need nothing else, "
+    "say a short goodbye and then call end_call in that same turn. The line stays open until "
+    "you do — saying goodbye on its own leaves the caller sitting on a live call. "
+    "Keep responses brief. Your responses are spoken aloud, so never reply with nothing."
 )
+
+
+def ordinal(day: int) -> str:
+    """Return a day of the month with its English ordinal suffix, e.g. 1 -> "1st"."""
+    suffix = "th" if day in (11, 12, 13) else {1: "st", 2: "nd", 3: "rd"}.get(day % 10, "th")
+    return f"{day}{suffix}"
+
+
+def build_system_instruction(powered_by: str = "") -> str:
+    """Fill in the system instruction, stamping it with today's date.
+
+    Called per session so a long-running server doesn't get stuck on the date
+    it started up.
+    """
+    now = datetime.now()
+    return SYSTEM_INSTRUCTION.format(
+        powered_by=powered_by,
+        # The spoken form models the phrasing we want back on the call; the ISO
+        # form is what the tools take, and carries the month and year the model
+        # needs to resolve relative dates.
+        today_spoken=f"{now:%A} the {ordinal(now.day)}",
+        today_iso=f"{now:%Y-%m-%d}",
+    )
 
 
 def require_env(name: str) -> str:
@@ -78,7 +129,7 @@ def build_llm() -> OpenAILLMService:
             api_key=require_env("OPENAI_API_KEY"),
             settings=OpenAILLMService.Settings(
                 model=os.getenv("OPENAI_MODEL", "gpt-4.1"),
-                system_instruction=SYSTEM_INSTRUCTION.format(powered_by=""),
+                system_instruction=build_system_instruction(),
             ),
         )
 
@@ -90,27 +141,29 @@ def build_llm() -> OpenAILLMService:
     # MODAL_API_KEY is a proxy token, combined as <token-id>.<token-secret>.
     return OpenAILLMService(
         api_key=require_env("MODAL_API_KEY"),
-        base_url=f"{require_env('MODAL_ENDPOINT_URL').rstrip('/')}/v1",
+        base_url=require_env("MODAL_ENDPOINT_URL"),
         settings=OpenAILLMService.Settings(
             model=os.getenv("PHONELLM_MODEL", "pipecat-ai/phonellm-alpha-1"),
             # PhoneLLM is trained for temperature 0
             temperature=0,
-            system_instruction=SYSTEM_INSTRUCTION.format(
-                powered_by=" You are powered by PhoneLLM."
-            ),
+            system_instruction=build_system_instruction(" You are powered by PhoneLLM."),
+            # Disable reasoning
+            extra={"extra_body": {"chat_template_kwargs": {"enable_thinking": False}}},
         ),
     )
 
 
 def build_tts() -> DeepgramFluxTTSService | CartesiaTTSService:
     """Build the TTS service selected by ``TTS_SERVICE`` (``deepgram`` or ``cartesia``)."""
-    service = os.getenv("TTS_SERVICE", "deepgram").strip().lower()
+    service = os.getenv("TTS_SERVICE", "cartesia").strip().lower()
     logger.info(f"TTS service: {service}")
 
     if service == "cartesia":
         return CartesiaTTSService(
             api_key=require_env("CARTESIA_API_KEY"),
+            text_aggregation_mode=TextAggregationMode.TOKEN,
             settings=CartesiaTTSService.Settings(
+                model="sonic-3.6",
                 voice=os.getenv("TTS_VOICE", DEFAULT_CARTESIA_VOICE),
             ),
         )
@@ -151,7 +204,10 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments) -> Non
     context = LLMContext(tools=TOOLS)
 
     # Note: no VAD analyzer here on purpose: Deepgram Flux does its own turn detection
-    user_aggregator, assistant_aggregator = LLMContextAggregatorPair(context)
+    user_aggregator, assistant_aggregator = LLMContextAggregatorPair(
+        context,
+        user_params=LLMUserAggregatorParams(vad_analyzer=SileroVADAnalyzer()),
+    )
 
     # Pipeline - assembled from reusable components
     pipeline = Pipeline(
@@ -168,7 +224,10 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments) -> Non
 
     worker = PipelineWorker(
         pipeline,
-        params=PipelineParams(enable_metrics=True, enable_usage_metrics=True),
+        params=PipelineParams(
+            enable_metrics=True,
+            enable_usage_metrics=True,
+        ),
         observers=[],
         # Report tool calls to the client in full (name, arguments, result) so
         # the web client can label them; the default level reports neither.
@@ -178,6 +237,10 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments) -> Non
         # Shared with the tool handlers via params.app_resources
         app_resources=ReservationStore(),
     )
+
+    runner = WorkerRunner(handle_sigint=runner_args.handle_sigint)
+
+    await runner.add_workers(worker)
 
     @worker.rtvi.event_handler("on_client_ready")
     async def on_client_ready(rtvi):
@@ -197,11 +260,8 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments) -> Non
     @transport.event_handler("on_client_disconnected")
     async def on_client_disconnected(transport, client):
         logger.info("Client disconnected")
-        await worker.cancel()
+        await runner.cancel()
 
-    runner = WorkerRunner(handle_sigint=False)
-
-    await runner.add_workers(worker)
     await runner.run()
 
 

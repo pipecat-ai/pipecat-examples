@@ -107,16 +107,30 @@ uv run bot.py
 
 Open http://localhost:7860 in your browser and talk to it.
 
-### Test it headless
+## Test it headless
 
-The repo ships a behavioral smoke test that drives the whole pipeline — greeting, a factual answer, and multi-turn context — against the live endpoint, no microphone needed. Boot the bot with the eval transport, then run the scenario from a second terminal (both from `server/`):
+The example ships behavioral evals: scripted conversations run against the live bot, no microphone needed. The `pipecat` CLI arrives with the `evals` extra already in `pyproject.toml`, so `uv sync` is the only setup.
+
+The `naturalness` scenario is scored by a judge LLM, configured for [Ollama](https://ollama.com) running `gemma4:12b` locally — no API key, no cost:
 
 ```bash
-uv run bot.py -t eval
-uv run pipecat eval run evals/phonellm_smoke.yaml -v
+ollama pull gemma4:12b
 ```
 
-The checks are deterministic, so no judge LLM is required.
+Run the whole suite. It starts a fresh bot per scenario, so nothing needs to be running first:
+
+```bash
+uv run pipecat eval suite evals/manifest.yaml
+```
+
+Or run a single scenario against a bot you keep up, which is quicker while iterating. Two terminals, both from `server/`:
+
+```bash
+uv run bot.py -t eval                                 # 1: the bot, headless
+uv run pipecat eval run evals/naturalness.yaml -v     # 2: the scenario
+```
+
+See the [evals docs](https://docs.pipecat.ai/pipecat/evals/overview) for the scenario format, judges, and suites.
 
 ## Run the web client
 

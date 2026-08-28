@@ -1,0 +1,80 @@
+name: naturalness
+
+# Conversational-quality checks: how the bot *talks*, not which tools it calls.
+#
+# Each assertion targets a specific way the flow has felt unnatural on real
+# calls: questions dripped out one per turn, and the date read back in full
+# ("Saturday, August 29, 2026") every time it comes up.
+#
+# Text mode with the default local judge (ollama, gemma4:12b), so the harness
+# itself needs no API keys — just the bot's.
+#
+# Run it (two terminals, both in server/):
+#
+#   uv run bot.py -t eval                                  # 1: the bot, headless
+#   uv run pipecat eval run evals/naturalness.yaml -v      # 2: this scenario
+
+judge:
+    eval:
+    service: ollama
+    model: gemma4:12b
+    extra:
+      reasoning_effort: none
+
+turns:
+  # The bot speaks first on connect.
+  - expect:
+      - event: response
+        eval: >-
+          a short greeting that offers help with a reservation. It asks at most
+          one question.
+
+  # The caller leads with only the party size. A natural reply collects what's
+  # still missing in one go, instead of asking for the name now and the date on
+  # some later turn.
+  - user: "Hey. Can I make a reservation for a party of two?"
+    expect:
+      - event: response
+        eval: >-
+          asks for the details still needed to book — BOTH the caller's name AND
+          the day/time — together in this single reply. Asking for only one of
+          them, and leaving the other for a later turn, is a failure.
+
+  # Name plus a relative day and time. The read-back should stay the way a
+  # person would say it out loud.
+  - user: "Yeah, it's Mark. Do you have anything for tomorrow at seven PM?"
+    expect:
+      - event: response
+        eval: >-
+          confirms the booking details back to the caller. Any reference to the
+          date is short, such as "tomorrow" or an ordinal like "the 29th". The
+          reply must NOT contain a four-digit year such as 2026, and must NOT
+          contain a numeric date such as 2026-08-29.
+
+  # Booking is agreed. The confirmation number is the new information; the date
+  # has already been established twice by now and shouldn't be recited again.
+  - user: "Yeah, that's right."
+    expect:
+      - event: function_call
+        name: create_reservation
+        args: { name: "Mark", party_size: 2 }
+      - event: response
+        eval: >-
+          gives the caller the confirmation number. It does not spell the date
+          out in full again — a brief reference like "tomorrow at 7" is fine,
+          but naming the weekday, month, day and year again is a failure.
+
+  # Caller is done: a goodbye and a hang-up, not another question.
+  #
+  # The goodbye is asserted before the tool call, because that's the order the
+  # bot produces them — it speaks, then hangs up. Listing the call first would
+  # consume the goodbye while scanning for it, and nothing follows end_call to
+  # match against: it shuts the pipeline down.
+  - user: "No, that's all. Thanks."
+    expect:
+      - event: response
+        eval: >-
+          a brief, friendly goodbye of roughly one sentence. It does not ask a
+          new question or offer further help.
+      - event: function_call
+        name: end_call

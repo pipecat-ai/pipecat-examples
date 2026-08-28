@@ -218,7 +218,7 @@ __marimo__/
 # Pipecat eval artifacts
 *.eval.log
 *.debug.log
-eval-runs/
+test-runs/
 
 # Node.js (client/)
 # The Python packaging block above ignores `lib/` at any depth, which also
