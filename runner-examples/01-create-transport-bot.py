@@ -131,6 +131,9 @@ async def run_bot(transport: BaseTransport):
         ),
     )
 
+    runner = WorkerRunner(handle_sigint=False)
+    await runner.add_workers(worker)
+
     @transport.event_handler("on_client_connected")
     async def on_client_connected(transport, client):
         logger.info("Client connected")
@@ -142,10 +145,8 @@ async def run_bot(transport: BaseTransport):
     @transport.event_handler("on_client_disconnected")
     async def on_client_disconnected(transport, client):
         logger.info("Client disconnected")
-        await worker.cancel()
+        await runner.cancel()
 
-    runner = WorkerRunner(handle_sigint=False)
-    await runner.add_workers(worker)
     await runner.run()
 
 

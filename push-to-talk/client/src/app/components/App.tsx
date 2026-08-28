@@ -12,11 +12,16 @@ import { PlasmaVisualizer } from '@pipecat-ai/voice-ui-kit/webgl';
 import { LogOutIcon, XIcon, MicIcon } from 'lucide-react';
 import { usePipecatClient } from '@pipecat-ai/client-react';
 import { useCallback, useState } from 'react';
+import type { TransportType } from '../../config';
+import { TransportSelect } from './TransportSelect';
 
 export interface AppProps {
   handleConnect?: () => void | Promise<void>;
   handleDisconnect?: () => void | Promise<void>;
   error?: string | null;
+  transportType: TransportType;
+  onTransportChange: (type: TransportType) => void;
+  availableTransports: TransportType[];
 }
 
 export type PushToTalkState = 'idle' | 'talking';
@@ -62,7 +67,14 @@ const PushToTalkButton = () => {
   );
 };
 
-export const App = ({ handleConnect, handleDisconnect, error }: AppProps) => {
+export const App = ({
+  handleConnect,
+  handleDisconnect,
+  error,
+  transportType,
+  onTransportChange,
+  availableTransports,
+}: AppProps) => {
   const { isConnected } = usePipecatConnectionState();
 
   if (error) {
@@ -87,6 +99,15 @@ export const App = ({ handleConnect, handleDisconnect, error }: AppProps) => {
             <div className="absolute w-full h-full flex items-center justify-center pointer-events-none">
               <TranscriptOverlay participant="remote" className="max-w-md" />
             </div>
+            {availableTransports.length > 1 && (
+              <div className="absolute bottom-6 right-6 z-20">
+                <TransportSelect
+                  transportType={transportType}
+                  onTransportChange={onTransportChange}
+                  availableTransports={availableTransports}
+                />
+              </div>
+            )}
             {isConnected && (
               <>
                 <div className="absolute bottom-32 left-1/2 transform -translate-x-1/2 z-20">

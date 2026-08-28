@@ -1,11 +1,14 @@
 import { NextResponse } from 'next/server';
 
-export async function POST() {
+export async function POST(request: Request) {
   // Use BOT_START_URL from environment or fallback to localhost
   const botStartUrl =
     process.env.BOT_START_URL || 'http://localhost:7860/start';
 
   try {
+    // The client picks the transport, so pass its request body straight through.
+    const requestData = await request.json();
+
     // Prepare headers - make API key optional
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
@@ -19,10 +22,7 @@ export async function POST() {
     const response = await fetch(botStartUrl, {
       method: 'POST',
       headers,
-      body: JSON.stringify({
-        createDailyRoom: true,
-        dailyRoomProperties: { start_video_off: true },
-      }),
+      body: JSON.stringify(requestData),
     });
 
     if (!response.ok) {

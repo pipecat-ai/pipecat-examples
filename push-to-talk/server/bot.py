@@ -8,12 +8,7 @@ import os
 
 from dotenv import load_dotenv
 from loguru import logger
-from pipecat.frames.frames import (
-    Frame,
-    LLMRunFrame,
-    UserStartedSpeakingFrame,
-    UserStoppedSpeakingFrame,
-)
+from pipecat.frames.frames import Frame, LLMRunFrame
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.worker import PipelineParams, PipelineWorker
 from pipecat.processors.aggregators.llm_context import LLMContext
@@ -61,7 +56,7 @@ class PushToTalkUserTurnStartStrategy(BaseUserTurnStartStrategy):
     """
 
     def __init__(self, **kwargs):
-        super().__init__(enable_interruptions=True, enable_user_speaking_frames=False, **kwargs)
+        super().__init__(enable_interruptions=True, **kwargs)
 
     async def process_frame(self, frame: Frame) -> ProcessFrameResult:
         await super().process_frame(frame)
@@ -76,7 +71,9 @@ class PushToTalkUserTurnStartStrategy(BaseUserTurnStartStrategy):
             # aggregator while the button is up. Discard them on press so only
             # speech captured after the press is aggregated into the user message.
             await self.trigger_reset_aggregation()
-            await self.trigger_user_turn_started()
+            # The button is the turn signal, so there are no user speaking
+            # frames to emit alongside it.
+            await self.trigger_user_turn_started(enable_user_speaking_frames=False)
             return ProcessFrameResult.STOP
 
         return ProcessFrameResult.CONTINUE
@@ -95,10 +92,12 @@ class PushToTalkUserTurnStopStrategy(ExternalUserTurnStopStrategy):
         if isinstance(frame, RTVIClientMessageFrame) and frame.type == "push_to_talk":
             state = (frame.data or {}).get("state")
             if state == "start":
-                await self._handle_user_started_speaking(UserStartedSpeakingFrame())
+                await self._handle_user_started_speaking(announced_elsewhere=False)
             elif state == "stop":
                 logger.info("User turn stopped")
-                await self._handle_user_stopped_speaking(UserStoppedSpeakingFrame())
+                # This strategy decides the turn is over (nothing upstream
+                # announced it), so it emits the turn-stop frame itself.
+                await self._handle_user_stopped_speaking(announced_elsewhere=False)
             return ProcessFrameResult.CONTINUE
 
         return await super().process_frame(frame)
@@ -163,6 +162,9 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
         ),
     )
 
+    runner = WorkerRunner(handle_sigint=runner_args.handle_sigint)
+    await runner.add_workers(worker)
+
     @worker.rtvi.event_handler("on_client_ready")
     async def on_client_ready(rtvi):
         logger.info("Client ready event received")
@@ -179,11 +181,8 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     @transport.event_handler("on_client_disconnected")
     async def on_client_disconnected(transport, client):
         logger.info(f"Client disconnected")
-        await worker.cancel()
+        await runner.cancel()
 
-    runner = WorkerRunner(handle_sigint=runner_args.handle_sigint)
-
-    await runner.add_workers(worker)
     await runner.run()
 
 

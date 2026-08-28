@@ -4,7 +4,8 @@ A voice AI agent with push-to-talk functionality. Users hold a button to speak, 
 
 ## How it Works
 
-- **Client**: Hold the "Hold to Talk" button to speak, release to send
+- **Client**: Hold the "Hold to Talk" button to speak, release to send. The
+  transport (SmallWebRTC or Daily) is selectable at runtime; see `client/src/config.ts`
 - **Server**: The user aggregator uses `ExternalUserTurnStrategies`, so it only collects transcription between the button press and release. Audio still flows to STT the whole time; transcripts that arrive outside a held turn are simply ignored.
 - **Real-time**: Uses WebRTC for low-latency audio communication
 
@@ -36,8 +37,11 @@ Edit `.env` and add your API keys:
 3. Run the server:
 
 ```bash
-uv run bot.py -t daily
+uv run bot.py
 ```
+
+Starting the runner without `-t` leaves every transport enabled, so the client
+can pick one per session.
 
 ### Terminal 2: Client Setup
 
@@ -63,11 +67,13 @@ npm run dev
 
 ## Usage
 
-1. Click "Connect" to join the session
-2. Hold "Hold to Talk" button and speak
-3. Release the button to send your message
-4. The AI will respond with audio
-5. Click "Disconnect" to end the session
+1. Pick a transport in the dropdown at the bottom right (SmallWebRTC by default;
+   Daily needs `DAILY_API_KEY` set on the server)
+2. Click "Connect" to join the session
+3. Hold "Hold to Talk" button and speak
+4. Release the button to send your message
+5. The AI will respond with audio
+6. Click "Disconnect" to end the session
 
 ## Architecture
 

@@ -24,7 +24,6 @@ from pipecat.processors.aggregators.llm_response_universal import (
     LLMContextAggregatorPair,
     LLMUserAggregatorParams,
 )
-from pipecat.processors.frame_processor import FrameDirection
 from pipecat.runner.types import RunnerArguments
 from pipecat.services.cartesia.tts import CartesiaTTSService
 from pipecat.services.deepgram.stt import DeepgramSTTService
@@ -43,6 +42,7 @@ async def end_call(params: FunctionCallParams, reason: str):
     Args:
         reason: The reason for ending the call.
     """
+    await params.result_callback(None)
     await params.llm.push_frame(EndWorkerFrame())
 
 
@@ -170,6 +170,9 @@ Relevant information:
             logger.error(f"All {max_retries} dialout attempts failed. Stopping bot.")
             await worker.cancel()
 
+    runner = WorkerRunner(handle_sigint=handle_sigint)
+    await runner.add_workers(worker)
+
     @transport.event_handler("on_first_participant_joined")
     async def on_first_participant_joined(transport, participant):
         logger.debug(f"First participant joined: {participant['id']}")
@@ -177,10 +180,8 @@ Relevant information:
     @transport.event_handler("on_participant_left")
     async def on_participant_left(transport, participant, reason):
         logger.debug(f"Participant left: {participant}, reason: {reason}")
-        await worker.cancel()
+        await runner.cancel()
 
-    runner = WorkerRunner(handle_sigint=handle_sigint)
-    await runner.add_workers(worker)
     await runner.run()
 
 
