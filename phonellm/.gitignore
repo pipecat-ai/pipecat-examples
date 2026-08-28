@@ -221,3 +221,7 @@ __marimo__/
 eval-runs/
 
 # Node.js (client/)
+# The Python packaging block above ignores `lib/` at any depth, which also
+# catches the client's source directory. That one is real source — 26 files
+# import from it — so put it back.
+!client/src/lib/

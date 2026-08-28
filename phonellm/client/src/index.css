@@ -1,0 +1,140 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+/* JetBrains Mono, self-hosted as the upstream variable font rather than
+   @fontsource-variable/jetbrains-mono. Fontsource ships the Google Fonts
+   subsets, which keep Latin/Greek/Cyrillic and drop everything this UI
+   draws its chrome with — ◆ ● ❯ ⋮ ▸ ∨ ▌ all live in Geometric Shapes,
+   Dingbats, Mathematical Operators and Block Elements. The upstream
+   JetBrainsMono[wght].ttf has them all, converted here to woff2 (114 KB
+   for the whole 100–800 axis). See assets/fonts/OFL.txt for the license. */
+@font-face {
+  font-family: "JetBrains Mono Variable";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 800;
+  src: url("./assets/fonts/JetBrainsMono-Variable.woff2")
+    format("woff2-variations");
+}
+
+@theme inline {
+    /* One typeface, everywhere: the whole UI is a terminal. */
+    --font-heading: var(--font-sans);
+    --font-sans: 'JetBrains Mono Variable', ui-monospace, monospace;
+    --font-mono: var(--font-sans);
+    --color-ring: var(--ring);
+    --color-input: var(--input);
+    --color-border: var(--border);
+    --color-destructive: var(--destructive);
+    --color-accent-foreground: var(--accent-foreground);
+    --color-accent: var(--accent);
+    --color-muted-foreground: var(--muted-foreground);
+    --color-muted: var(--muted);
+    --color-secondary-foreground: var(--secondary-foreground);
+    --color-secondary: var(--secondary);
+    --color-primary-foreground: var(--primary-foreground);
+    --color-primary: var(--primary);
+    --color-popover-foreground: var(--popover-foreground);
+    --color-popover: var(--popover);
+    --color-card-foreground: var(--card-foreground);
+    --color-card: var(--card);
+    --color-foreground: var(--foreground);
+    --color-background: var(--background);
+    --radius-sm: calc(var(--radius) * 0.6);
+    --radius-md: calc(var(--radius) * 0.8);
+    --radius-lg: var(--radius);
+    --radius-xl: calc(var(--radius) * 1.4);
+    --radius-2xl: calc(var(--radius) * 1.8);
+    --radius-3xl: calc(var(--radius) * 2.2);
+    --radius-4xl: calc(var(--radius) * 2.6);
+    --color-active: var(--active-background);
+    --color-active-foreground: var(--active-foreground);
+    --color-inactive: var(--inactive-background);
+    --color-inactive-foreground: var(--inactive-foreground);
+    --color-agent: var(--agent);
+    --color-client: var(--client);
+    --color-tool: var(--tool);
+    --animate-ptt-pulse: ptt-pulse 1.5s ease-in-out infinite;
+    /* Hard on/off, no fade: a terminal caret, not a UI caret. */
+    --animate-terminal-caret: terminal-caret 1.06s step-end infinite;
+    --color-inactive-background: var(--inactive-background);
+    --color-active-background: var(--active-background);
+  @keyframes ptt-pulse {
+  50% {
+    outline-color: color-mix(in oklab, var(--active-background) 30%, transparent);
+        }
+    }
+  @keyframes terminal-caret {
+  0%, 50% {
+    opacity: 1;
+        }
+  50.01%, 100% {
+    opacity: 0;
+        }
+    }
+}
+
+/* Dark-only terminal palette on :root — there is no light theme and no
+   theme switching. <html class="dark"> stays in index.html so the kit's
+   dark: utility refinements still apply.
+
+   The accent tokens carry the meaning the chrome is drawn with: agent is
+   the lavender every panel legend and the product name use, client the
+   blue on the user's prompt, active the green for live/go, inactive the
+   pink for muted/stop, and tool the amber on function names and any
+   latency that has run long. */
+:root {
+    --background: #121218;
+    --foreground: #c9cee3;
+    --card: #1a1b23;
+    --card-foreground: #c9cee3;
+    --popover: #1a1b23;
+    --popover-foreground: #c9cee3;
+    --primary: #c9cee3;
+    --primary-foreground: #16161e;
+    --secondary: #24252f;
+    --secondary-foreground: #c9cee3;
+    --muted: #1f202a;
+    --muted-foreground: #6e7288;
+    --accent: #24252f;
+    --accent-foreground: #c9cee3;
+    --destructive: #f7768e;
+    --border: #2a2c38;
+    --input: #2a2c38;
+    --ring: #414868;
+    --radius: 0rem;
+    --active-background: #9ece6a;
+    --active-foreground: #16161e;
+    --inactive-background: #f7768e;
+    --inactive-foreground: #16161e;
+    --agent: #bb9af7;
+    --client: #7aa2f7;
+    --tool: #e0af68;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+    /* Hairline scrollbars in the panel colors — a chrome scrollbar would
+       be the one rounded, glossy thing on the page. */
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+    }
+  /* Squared-off design: --radius: 0 zeroes the token-based radii; this
+     catches the rest (rounded-full pills, thumbs, dots) in registry-owned
+     components without editing them. */
+  *,
+  *::before,
+  *::after {
+    border-radius: 0 !important;
+    }
+  body {
+    @apply bg-background text-foreground;
+    }
+  html {
+    @apply font-sans;
+    }
+}

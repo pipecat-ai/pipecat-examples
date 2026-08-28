@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2024–2025, Daily
+# Copyright (c) 2026, Daily
 #
 # SPDX-License-Identifier: BSD 2-Clause License
 #
@@ -10,8 +10,8 @@ This bot uses a cascade pipeline: Speech-to-Text → LLM → Text-to-Speech
 
 Required AI services:
 - Deepgram Flux (Speech-to-Text)
-- PhoneLLM on Modal (LLM)
-- Deepgram (Text-to-Speech)
+- LLM: PhoneLLM on Modal (default) or OpenAI, selected with ``LLM_SERVICE``
+- TTS: Deepgram Flux (default) or Cartesia, selected with ``TTS_SERVICE``
 
 Run the bot using::
 
@@ -22,26 +22,42 @@ import os
 
 from dotenv import load_dotenv
 from loguru import logger
-from pipecat.audio.vad.silero import SileroVADAnalyzer
 from pipecat.evals.transport import EvalTransportParams
 from pipecat.frames.frames import LLMRunFrame
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.worker import PipelineParams, PipelineWorker
 from pipecat.processors.aggregators.llm_context import LLMContext
-from pipecat.processors.aggregators.llm_response_universal import (
-    LLMContextAggregatorPair,
-    LLMUserAggregatorParams,
+from pipecat.processors.aggregators.llm_response_universal import LLMContextAggregatorPair
+from pipecat.processors.frameworks.rtvi import (
+    RTVIFunctionCallReportLevel,
+    RTVIObserverParams,
 )
 from pipecat.runner.types import RunnerArguments
 from pipecat.runner.utils import create_transport
+from pipecat.services.cartesia.tts import CartesiaTTSService
 from pipecat.services.deepgram.flux.stt import DeepgramFluxSTTService
-from pipecat.services.deepgram.tts import DeepgramTTSService
+from pipecat.services.deepgram.flux.tts import DeepgramFluxTTSService
 from pipecat.services.openai.llm import OpenAILLMService
 from pipecat.transports.base_transport import BaseTransport, TransportParams
 from pipecat.transports.daily.transport import DailyParams
 from pipecat.workers.runner import WorkerRunner
 
+from tools import TOOLS, ReservationStore
+
 load_dotenv(override=True)
+
+
+# Voice defaults per TTS service; override either with TTS_VOICE.
+DEFAULT_DEEPGRAM_VOICE = "flux-heather-en"
+DEFAULT_CARTESIA_VOICE = "86e30c1d-714b-4074-a1f2-1cb6b552fb49"
+
+SYSTEM_INSTRUCTION = (
+    "You are a restaurant reservation assistant on a phone call.{powered_by} "
+    "Your job is to take reservations: use your tools to look up, create, and update reservations. "
+    "Before creating a reservation, collect the caller's name, party size, date, and time. "
+    "Confirm the details back to the caller, and share the confirmation number after booking. "
+    "Keep responses brief. Your responses will be spoken aloud."
+)
 
 
 def require_env(name: str) -> str:
@@ -50,6 +66,65 @@ def require_env(name: str) -> str:
     if not value:
         raise RuntimeError(f"Missing required environment variable: {name}")
     return value
+
+
+def build_llm() -> OpenAILLMService:
+    """Build the LLM service selected by ``LLM_SERVICE`` (``phonellm`` or ``openai``)."""
+    service = os.getenv("LLM_SERVICE", "phonellm").strip().lower()
+    logger.info(f"LLM service: {service}")
+
+    if service == "openai":
+        return OpenAILLMService(
+            api_key=require_env("OPENAI_API_KEY"),
+            settings=OpenAILLMService.Settings(
+                model=os.getenv("OPENAI_MODEL", "gpt-4.1"),
+                system_instruction=SYSTEM_INSTRUCTION.format(powered_by=""),
+            ),
+        )
+
+    if service != "phonellm":
+        raise RuntimeError(f"Unknown LLM_SERVICE: {service!r} (expected 'phonellm' or 'openai')")
+
+    # PhoneLLM served by a Modal endpoint (OpenAI-compatible API).
+    # MODAL_ENDPOINT_URL is the URL printed by `modal endpoint create` / `modal endpoint list`;
+    # MODAL_API_KEY is a proxy token, combined as <token-id>.<token-secret>.
+    return OpenAILLMService(
+        api_key=require_env("MODAL_API_KEY"),
+        base_url=f"{require_env('MODAL_ENDPOINT_URL').rstrip('/')}/v1",
+        settings=OpenAILLMService.Settings(
+            model=os.getenv("PHONELLM_MODEL", "pipecat-ai/phonellm-alpha-1"),
+            # PhoneLLM is trained for temperature 0
+            temperature=0,
+            system_instruction=SYSTEM_INSTRUCTION.format(
+                powered_by=" You are powered by PhoneLLM."
+            ),
+        ),
+    )
+
+
+def build_tts() -> DeepgramFluxTTSService | CartesiaTTSService:
+    """Build the TTS service selected by ``TTS_SERVICE`` (``deepgram`` or ``cartesia``)."""
+    service = os.getenv("TTS_SERVICE", "deepgram").strip().lower()
+    logger.info(f"TTS service: {service}")
+
+    if service == "cartesia":
+        return CartesiaTTSService(
+            api_key=require_env("CARTESIA_API_KEY"),
+            settings=CartesiaTTSService.Settings(
+                voice=os.getenv("TTS_VOICE", DEFAULT_CARTESIA_VOICE),
+            ),
+        )
+
+    if service != "deepgram":
+        raise RuntimeError(f"Unknown TTS_SERVICE: {service!r} (expected 'deepgram' or 'cartesia')")
+
+    # Flux streams LLM tokens straight to synthesis
+    return DeepgramFluxTTSService(
+        api_key=require_env("DEEPGRAM_API_KEY"),
+        settings=DeepgramFluxTTSService.Settings(
+            voice=os.getenv("TTS_VOICE", DEFAULT_DEEPGRAM_VOICE),
+        ),
+    )
 
 
 async def run_bot(transport: BaseTransport, runner_args: RunnerArguments) -> None:
@@ -67,36 +142,16 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments) -> Non
     # Speech-to-Text service
     stt = DeepgramFluxSTTService(api_key=require_env("DEEPGRAM_API_KEY"))
 
-    # Text-to-Speech service
-    tts = DeepgramTTSService(
-        api_key=require_env("DEEPGRAM_API_KEY"),
-        settings=DeepgramTTSService.Settings(
-            voice=os.getenv("DEEPGRAM_VOICE_ID", "aura-2-helena-en"),
-        ),
-    )
+    # Text-to-Speech service (TTS_SERVICE: deepgram | cartesia)
+    tts = build_tts()
 
-    # LLM service: PhoneLLM served by a Modal endpoint (OpenAI-compatible API).
-    # MODAL_ENDPOINT_URL is the URL printed by `modal endpoint create` / `modal endpoint list`;
-    # MODAL_API_KEY is a proxy token, combined as <token-id>.<token-secret>.
-    llm = OpenAILLMService(
-        api_key=require_env("MODAL_API_KEY"),
-        base_url=f"{require_env('MODAL_ENDPOINT_URL').rstrip('/')}/v1",
-        settings=OpenAILLMService.Settings(
-            model=os.getenv("PHONELLM_MODEL", "pipecat-ai/phonellm-alpha-1"),
-            # PhoneLLM is trained for temperature 0
-            temperature=0,
-            system_instruction="You are a helpful assistant in a voice conversation. You are powered by PhoneLLM. Respond to what the user said in a creative, helpful, and brief way.",
-        ),
-    )
+    # LLM service (LLM_SERVICE: phonellm | openai)
+    llm = build_llm()
 
-    context = LLMContext()
-    user_aggregator, assistant_aggregator = LLMContextAggregatorPair(
-        context,
-        user_params=LLMUserAggregatorParams(
-            # Flux detects turns server-side; the VAD is only used for STT metrics.
-            vad_analyzer=SileroVADAnalyzer(),
-        ),
-    )
+    context = LLMContext(tools=TOOLS)
+
+    # Note: no VAD analyzer here on purpose: Deepgram Flux does its own turn detection
+    user_aggregator, assistant_aggregator = LLMContextAggregatorPair(context)
 
     # Pipeline - assembled from reusable components
     pipeline = Pipeline(
@@ -113,18 +168,25 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments) -> Non
 
     worker = PipelineWorker(
         pipeline,
-        params=PipelineParams(
-            enable_metrics=True,
-            enable_usage_metrics=True,
-        ),
+        params=PipelineParams(enable_metrics=True),
         observers=[],
+        # Report tool calls to the client in full (name, arguments, result) so
+        # the web client can label them; the default level reports neither.
+        rtvi_observer_params=RTVIObserverParams(
+            function_call_report_level={"*": RTVIFunctionCallReportLevel.FULL},
+        ),
+        # Shared with the tool handlers via params.app_resources
+        app_resources=ReservationStore(),
     )
 
     @worker.rtvi.event_handler("on_client_ready")
     async def on_client_ready(rtvi):
         # Kick off the conversation
         context.add_message(
-            {"role": "developer", "content": "Start by concisely introducing yourself."}
+            {
+                "role": "developer",
+                "content": "Concisely greet the caller and ask how you can help with their reservation.",
+            }
         )
         await worker.queue_frames([LLMRunFrame()])
 

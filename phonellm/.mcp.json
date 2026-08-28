@@ -1,0 +1,11 @@
+{
+    "mcpServers": {
+        "pipecat-context-hub": {
+            "command": "uvx",
+            "args": [
+                "pipecat-ai-context-hub",
+                "serve"
+            ]
+        }
+    }
+}

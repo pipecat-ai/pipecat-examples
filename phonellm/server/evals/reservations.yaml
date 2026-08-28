@@ -1,0 +1,40 @@
+name: reservations
+
+# Deterministic test of the reservation tools — text mode, no judge LLM needed.
+#
+# Exercises all three tools in tools.py against the in-memory store: look up
+# the seeded reservation, create a new one, then update it.
+#
+# Run it (two terminals, both in server/):
+#
+#   uv run bot.py -t eval                                  # 1: the bot, headless
+#   uv run pipecat eval run evals/reservations.yaml -v     # 2: this scenario
+
+turns:
+  # The bot speaks first on connect; wait for the greeting so we don't barge in.
+  - expect:
+      - event: response
+
+  # Look up the reservation seeded in ReservationStore.
+  - user: "Hi, can you check my reservation? It's under Alice Smith."
+    expect:
+      - event: function_call
+        name: get_reservation
+      - event: response
+
+  # Create a new reservation with every detail supplied up front.
+  - user: "I'd also like to book a new table for Bob Jones, four people, on September 5th 2026 at 6:30 in the evening."
+    expect:
+      - event: function_call
+        name: create_reservation
+        arguments:
+          name: "Bob Jones"
+          party_size: 4
+      - event: response
+
+  # Update the reservation we just created.
+  - user: "Actually, make Bob Jones's reservation five people instead."
+    expect:
+      - event: function_call
+        name: update_reservation
+      - event: response
