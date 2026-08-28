@@ -154,7 +154,6 @@ export const ClientApp: React.FC<Props> = ({
                           <Conversation
                             assistantLabel="Gemini"
                             clientLabel="You"
-                            textMode="tts"
                           />
                         </PanelContent>
                       </Panel>
@@ -178,7 +177,6 @@ export const ClientApp: React.FC<Props> = ({
                       <Conversation
                         assistantLabel="Gemini"
                         clientLabel="You"
-                        textMode="tts"
                       />
                     </PanelContent>
                   </Panel>
@@ -203,7 +201,6 @@ export const ClientApp: React.FC<Props> = ({
                         <Conversation
                           assistantLabel="Gemini"
                           clientLabel="You"
-                          textMode="tts"
                         />
                       </PanelContent>
                     </Panel>
