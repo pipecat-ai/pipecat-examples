@@ -5,7 +5,7 @@ This project demonstrates how to create a voice bot that can automatically navig
 ## How It Works
 
 1. The server receives a request with the phone number to dial out to
-2. The server creates a Daily room with SIP capabilities and starts the bot
+2. The server creates a Daily room with dial-out enabled and starts the bot
 3. The bot dials the specified number and connects to an IVR system
 4. The IVR Navigator automatically detects menu options and navigates toward the specified goal
 5. The bot uses DTMF tones and natural language responses to traverse the phone menu
@@ -161,9 +161,19 @@ For comprehensive information about IVR navigation capabilities, configuration o
 
 ### Call connects but no bot is heard
 
-- Ensure your Daily API key is correct and has SIP capabilities
+- Ensure your Daily API key is correct and your domain has dial-out enabled
 - Verify that the Cartesia API key and voice ID are correct
 - Check that dial-out is enabled on your Daily domain
+
+### `unable to start dialout: dial-out not enabled for room`
+
+The Daily room was created without the `enable_dialout` property. The server sets it via
+`configure(session, enable_dialout=True)` in `server.py`. If you have `DAILY_ROOM_URL` set in your
+`.env`, `configure()` reuses that existing room instead of creating a new one, and that room likely
+doesn't have dial-out enabled — unset `DAILY_ROOM_URL` and let the server create the room.
+
+If the room is configured correctly and you still see this, confirm dial-out is enabled on your
+Daily domain.
 
 ### Bot starts but disconnects immediately
 

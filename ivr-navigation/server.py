@@ -17,7 +17,6 @@ to ensure consistency between local and cloud deployments.
 """
 
 import asyncio
-import json
 import os
 from contextlib import asynccontextmanager
 
@@ -88,8 +87,8 @@ async def handle_dial_out_request(request: Request) -> JSONResponse:
 
         # Create a Daily room with dial-out capabilities
         try:
-            # Use sip_caller_phone for room configuration (this sets up SIP capabilities)
-            room_details = await configure(request.app.state.session, sip_caller_phone=phone_number)
+            # enable_dialout adds the room property required to start a PSTN dial-out
+            room_details = await configure(request.app.state.session, enable_dialout=True)
         except Exception as e:
             logger.error(f"Error creating Daily room: {e}")
             raise HTTPException(status_code=500, detail=f"Failed to create Daily room: {str(e)}")
