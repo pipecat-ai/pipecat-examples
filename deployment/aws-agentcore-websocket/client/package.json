@@ -18,8 +18,8 @@
     "vite": "^6.3.5"
   },
   "dependencies": {
-    "@pipecat-ai/client-js": "^1.5.0",
-    "@pipecat-ai/websocket-transport": "^1.5.0",
+    "@pipecat-ai/client-js": "^1.13.0",
+    "@pipecat-ai/websocket-transport": "^1.7.1",
     "protobufjs": "^7.4.0"
   }
 }

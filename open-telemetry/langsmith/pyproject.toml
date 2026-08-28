@@ -4,8 +4,8 @@ version = "0.1.0"
 description = "A Pipecat example using LangSmith tracing"
 requires-python = ">=3.11"
 dependencies = [
-    "pipecat-ai[daily,webrtc,websocket,silero,cartesia,deepgram,openai,tracing,runner]>=1.4.0",
-    "pipecatcloud>=0.7.1",
+    "pipecat-ai[daily,webrtc,websocket,silero,cartesia,deepgram,openai,tracing,runner]>=1.8.0",
+    "pipecatcloud>=1.2.0",
     "langsmith[pipecat]>=0.9.7",
 ]
 

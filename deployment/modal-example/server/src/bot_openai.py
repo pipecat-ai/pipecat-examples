@@ -194,6 +194,9 @@ async def run_bot(room_url: str, token: str):
     )
     await worker.queue_frame(quiet_frame)
 
+    runner = WorkerRunner()
+    await runner.add_workers(worker)
+
     @worker.rtvi.event_handler("on_client_ready")
     async def on_client_ready(worker):
         # Kick off the conversation
@@ -206,9 +209,6 @@ async def run_bot(room_url: str, token: str):
     @transport.event_handler("on_participant_left")
     async def on_participant_left(transport, participant, reason):
         print(f"Participant left: {participant}")
-        await worker.cancel()
+        await runner.cancel()
 
-    runner = WorkerRunner()
-
-    await runner.add_workers(worker)
     await runner.run()

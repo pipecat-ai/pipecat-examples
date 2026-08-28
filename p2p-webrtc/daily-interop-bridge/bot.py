@@ -100,6 +100,9 @@ async def run_bot(webrtc_connection):
         ),
     )
 
+    runner = WorkerRunner(handle_sigint=False)
+    await runner.add_workers(worker)
+
     @daily_transport.event_handler("on_participant_joined")
     async def on_participant_joined(transport, participant):
         await transport.capture_participant_video(participant["id"])
@@ -111,9 +114,6 @@ async def run_bot(webrtc_connection):
     @pipecat_transport.event_handler("on_client_disconnected")
     async def on_client_disconnected(transport, client):
         logger.info("Pipecat Client disconnected")
-        await worker.cancel()
+        await runner.cancel()
 
-    runner = WorkerRunner(handle_sigint=False)
-
-    await runner.add_workers(worker)
     await runner.run()

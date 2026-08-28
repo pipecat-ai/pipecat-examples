@@ -176,6 +176,9 @@ async def run_bot(
     # Initialize dialout manager
     dialout_manager = DialoutManager(transport, dialout_settings)
 
+    runner = WorkerRunner(handle_sigint=handle_sigint)
+    await runner.add_workers(worker)
+
     @transport.event_handler("on_joined")
     async def on_joined(transport, data):
         await dialout_manager.attempt_dialout()
@@ -192,7 +195,7 @@ async def run_bot(
     @transport.event_handler("on_dialout_stopped")
     async def on_dialout_stopped(transport, data):
         logger.debug(f"Dial-out stopped: {data}")
-        await worker.cancel()
+        await runner.cancel()
 
     @transport.event_handler("on_dialout_warning")
     async def on_dialout_warning(transport, data):
@@ -210,16 +213,13 @@ async def run_bot(
             await dialout_manager.attempt_dialout()
         else:
             logger.error(f"No more retries allowed, stopping bot.")
-            await worker.cancel()
+            await runner.cancel()
 
     @transport.event_handler("on_client_disconnected")
     async def on_client_disconnected(transport, client):
-        logger.info(f"Client disconnected")
-        await worker.cancel()
+        logger.info("Client disconnected")
+        await runner.cancel()
 
-    runner = WorkerRunner(handle_sigint=handle_sigint)
-
-    await runner.add_workers(worker)
     await runner.run()
 
 

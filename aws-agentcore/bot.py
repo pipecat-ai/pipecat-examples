@@ -94,9 +94,12 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
         idle_timeout_secs=runner_args.pipeline_idle_timeout_secs,
     )
 
+    runner = WorkerRunner(handle_sigint=runner_args.handle_sigint)
+    await runner.add_workers(worker)
+
     @transport.event_handler("on_client_connected")
     async def on_client_connected(transport, client):
-        logger.info(f"Client connected")
+        logger.info("Client connected")
         # Kick off the conversation.
         context.add_message(
             {"role": "developer", "content": "Find the first 10 prime numbers greater than 1000"},
@@ -105,8 +108,8 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
 
     @transport.event_handler("on_client_disconnected")
     async def on_client_disconnected(transport, client):
-        logger.info(f"Client disconnected")
-        await worker.cancel()
+        logger.info("Client disconnected")
+        await runner.cancel()
 
     @user_aggregator.event_handler("on_user_turn_stopped")
     async def on_user_turn_stopped(aggregator, strategy, message: UserTurnStoppedMessage):
@@ -120,9 +123,6 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
         line = f"{timestamp}assistant: {message.content}"
         logger.info(f"Transcript: {line}")
 
-    runner = WorkerRunner(handle_sigint=runner_args.handle_sigint)
-
-    await runner.add_workers(worker)
     await runner.run()
 
 

@@ -92,6 +92,9 @@ async def run_bot(transport: BaseTransport, request: AgentRequest, handle_sigint
         ),
     )
 
+    runner = WorkerRunner(handle_sigint=handle_sigint)
+    await runner.add_workers(worker)
+
     # Handle call ready to forward
     @transport.event_handler("on_dialin_ready")
     async def on_dialin_ready(transport, sip_endpoint):
@@ -116,7 +119,7 @@ async def run_bot(transport: BaseTransport, request: AgentRequest, handle_sigint
             logger.info("Call forwarded successfully")
         except Exception as e:
             logger.error(f"Failed to forward call: {str(e)}")
-            await worker.cancel()
+            await runner.cancel()
 
     @transport.event_handler("on_dialin_connected")
     async def on_dialin_connected(transport, data):
@@ -125,7 +128,7 @@ async def run_bot(transport: BaseTransport, request: AgentRequest, handle_sigint
     @transport.event_handler("on_dialin_stopped")
     async def on_dialin_stopped(transport, data):
         logger.info(f"Dial-in stopped: {data}")
-        await worker.cancel()
+        await runner.cancel()
 
     @transport.event_handler("on_dialin_warning")
     async def on_dialin_warning(transport, data):
@@ -134,7 +137,7 @@ async def run_bot(transport: BaseTransport, request: AgentRequest, handle_sigint
     @transport.event_handler("on_dialin_error")
     async def on_dialin_error(transport, data):
         logger.error(f"Dial-in error: {data}")
-        await worker.cancel()
+        await runner.cancel()
 
     @transport.event_handler("on_dtmf_event")
     async def on_dtmf_event(transport, data):
@@ -152,11 +155,8 @@ async def run_bot(transport: BaseTransport, request: AgentRequest, handle_sigint
     @transport.event_handler("on_client_disconnected")
     async def on_client_disconnected(transport, client):
         logger.info("Client disconnected")
-        await worker.cancel()
+        await runner.cancel()
 
-    runner = WorkerRunner(handle_sigint=handle_sigint)
-
-    await runner.add_workers(worker)
     await runner.run()
 
 

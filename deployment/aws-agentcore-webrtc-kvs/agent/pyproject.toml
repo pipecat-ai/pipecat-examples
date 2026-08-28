@@ -7,5 +7,5 @@ dependencies = [
     "aiohttp",
     "boto3",
     "bedrock-agentcore",
-    "pipecat-ai[aws,webrtc,daily,silero,deepgram,openai,cartesia,runner]>=0.0.103",
+    "pipecat-ai[aws,webrtc,daily,silero,deepgram,openai,cartesia,runner]>=1.8.0",
 ]

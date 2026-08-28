@@ -89,9 +89,13 @@ async def run_bot(transport: DailyTransport):
         ),
     )
 
+    runner = WorkerRunner(handle_sigint=True)
+
+    await runner.add_workers(worker)
+
     @transport.event_handler("on_client_connected")
     async def on_client_connected(transport, client):
-        logger.info(f"Client connected")
+        logger.info("Client connected")
         # Kick off the conversation.
         context.add_message(
             {"role": "developer", "content": "Say hello and briefly introduce yourself."}
@@ -100,8 +104,8 @@ async def run_bot(transport: DailyTransport):
 
     @transport.event_handler("on_client_disconnected")
     async def on_client_disconnected(transport, client):
-        logger.info(f"Client disconnected")
-        await worker.cancel()
+        logger.info("Client disconnected")
+        await runner.cancel()
 
     @transport.event_handler("on_call_state_updated")
     async def on_call_state_updated(transport, state):
@@ -109,11 +113,7 @@ async def run_bot(transport: DailyTransport):
         if state == "left":
             await worker.queue_frames([EndFrame()])
 
-    runner = WorkerRunner(handle_sigint=True)
-
     task_id = app.add_async_task("voice_agent")
-
-    await runner.add_workers(worker)
     await runner.run()
 
     app.complete_async_task(task_id)

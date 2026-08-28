@@ -90,6 +90,9 @@ async def main(room_url: str, token: str):
         ),
     )
 
+    runner = WorkerRunner()
+    await runner.add_workers(worker)
+
     @transport.event_handler("on_first_participant_joined")
     async def on_first_participant_joined(transport, participant):
         await transport.capture_participant_transcription(participant["id"])
@@ -100,7 +103,7 @@ async def main(room_url: str, token: str):
 
     @transport.event_handler("on_participant_left")
     async def on_participant_left(transport, participant, reason):
-        await worker.cancel()
+        await runner.cancel()
 
     @transport.event_handler("on_call_state_updated")
     async def on_call_state_updated(transport, state):
@@ -109,9 +112,6 @@ async def main(room_url: str, token: str):
             # whatever is queued, so we use an EndFrame().
             await worker.queue_frame(EndFrame())
 
-    runner = WorkerRunner()
-
-    await runner.add_workers(worker)
     await runner.run()
 
 

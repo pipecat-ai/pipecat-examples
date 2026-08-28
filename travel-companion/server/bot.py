@@ -159,6 +159,9 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     # Registering the functions to be invoked by RTVI
     llm.register_function(None, worker.rtvi.handle_function_call)
 
+    runner = WorkerRunner(handle_sigint=False)
+    await runner.add_workers(worker)
+
     @worker.rtvi.event_handler("on_client_ready")
     async def on_client_ready(rtvi):
         # Kick off the conversation
@@ -172,19 +175,16 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
 
     @worker.rtvi.event_handler("on_client_message")
     async def on_client_message(rtvi, msg):
-        logger.info(f"Client connected")
+        logger.info("Client connected")
         # Sample message to show how it works
         if msg.type == "get-llm-vendor":
             await rtvi.send_server_response(msg, "Google")
 
     @transport.event_handler("on_client_disconnected")
     async def on_client_disconnected(transport, client):
-        logger.info(f"Client disconnected")
-        await worker.cancel()
+        logger.info("Client disconnected")
+        await runner.cancel()
 
-    runner = WorkerRunner(handle_sigint=False)
-
-    await runner.add_workers(worker)
     await runner.run()
 
 

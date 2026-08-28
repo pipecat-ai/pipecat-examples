@@ -140,22 +140,22 @@ async def run_bot(transport: BaseTransport):
         conversation_id=conversation_id,
     )
 
+    runner = WorkerRunner(handle_sigint=False)
+    await runner.add_workers(worker)
+
     @transport.event_handler("on_client_connected")
     async def on_client_connected(transport, client):
-        logger.info(f"Client connected")
+        logger.info("Client connected")
         await audiobuffer.start_recording()
         # Kick off the conversation.
         await worker.queue_frames([LLMRunFrame()])
 
     @transport.event_handler("on_client_disconnected")
     async def on_client_disconnected(transport, client):
-        logger.info(f"Client disconnected")
+        logger.info("Client disconnected")
         await audiobuffer.stop_recording()
-        await worker.cancel()
+        await runner.cancel()
 
-    runner = WorkerRunner(handle_sigint=False)
-
-    await runner.add_workers(worker)
     await runner.run()
 
 

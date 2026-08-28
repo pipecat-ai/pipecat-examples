@@ -115,6 +115,9 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     # can be set. Find supported events here:
     # https://github.com/pipecat-ai/pipecat/blob/main/src/pipecat/processors/audio/audio_buffer_processor.py#L42-L45
 
+    runner = WorkerRunner(handle_sigint=runner_args.handle_sigint)
+    await runner.add_workers(worker)
+
     # Triggered when buffer_size is reached, providing merged audio
     @audio_buffer.event_handler("on_audio_data")
     async def on_audio_data(buffer, audio, sample_rate, num_channels):
@@ -138,7 +141,7 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
 
     @transport.event_handler("on_client_connected")
     async def on_client_connected(transport, client):
-        logger.info(f"Client connected")
+        logger.info("Client connected")
         # start recording audio
         await audio_buffer.start_recording()
         context.add_message(
@@ -155,9 +158,6 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
         logger.info(f"Pipeline finished")
         await audio_uploader.finalize_upload_audio_wav_to_s3()
 
-    runner = WorkerRunner(handle_sigint=runner_args.handle_sigint)
-
-    await runner.add_workers(worker)
     await runner.run()
 
 

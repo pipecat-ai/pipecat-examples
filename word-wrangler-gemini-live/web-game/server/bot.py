@@ -124,6 +124,9 @@ Important guidelines:
         idle_timeout_secs=runner_args.pipeline_idle_timeout_secs,
     )
 
+    runner = WorkerRunner(handle_sigint=runner_args.handle_sigint)
+    await runner.add_workers(worker)
+
     @worker.rtvi.event_handler("on_client_ready")
     async def on_client_ready(rtvi):
         logger.debug("Client ready event received")
@@ -138,16 +141,13 @@ Important guidelines:
 
     @transport.event_handler("on_client_connected")
     async def on_client_connected(transport, client):
-        logger.info(f"Client connected")
+        logger.info("Client connected")
 
     @transport.event_handler("on_client_disconnected")
     async def on_client_disconnected(transport, client):
-        logger.info(f"Client disconnected")
-        await worker.cancel()
+        logger.info("Client disconnected")
+        await runner.cancel()
 
-    runner = WorkerRunner(handle_sigint=runner_args.handle_sigint)
-
-    await runner.add_workers(worker)
     await runner.run()
 
 

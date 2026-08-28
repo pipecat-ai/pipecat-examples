@@ -311,6 +311,9 @@ async def run_example(websocket_client):
     # Set up idle handling with retry logic
     idle_handler = IdleHandler()
 
+    runner = WorkerRunner(handle_sigint=False)
+    await runner.add_workers(worker)
+
     @user_aggregator.event_handler("on_user_turn_idle")
     async def on_user_turn_idle(aggregator):
         logger.info(f"User turn idle")
@@ -322,7 +325,7 @@ async def run_example(websocket_client):
 
     @transport.event_handler("on_client_connected")
     async def on_client_connected(transport, client):
-        logger.info(f"Client connected")
+        logger.info("Client connected")
 
     @worker.rtvi.event_handler("on_client_ready")
     async def on_client_ready(rtvi):
@@ -333,12 +336,9 @@ async def run_example(websocket_client):
 
     @transport.event_handler("on_client_disconnected")
     async def on_client_disconnected(transport, client):
-        logger.info(f"Client disconnected")
-        await worker.cancel()
+        logger.info("Client disconnected")
+        await runner.cancel()
 
-    runner = WorkerRunner(handle_sigint=False)
-
-    await runner.add_workers(worker)
     await runner.run()
 
 

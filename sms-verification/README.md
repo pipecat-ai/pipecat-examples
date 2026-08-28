@@ -32,7 +32,7 @@ The bot uses three LLM tools:
   success event and asks the LLM to wrap up. On mismatch: emits a failure
   event; if a retry is available, sends a fresh code automatically; otherwise
   asks the LLM to wrap up.
-- `end_call()` — pushes an `EndTaskFrame` to cleanly terminate.
+- `end_call()` — pushes an `EndWorkerFrame` to cleanly terminate.
 
 Results are published two ways at once:
 

@@ -5,7 +5,7 @@ description = "A Pipecat example using Langfuse tracing"
 requires-python = ">=3.11"
 dependencies = [
     "pipecat-ai[daily,webrtc,websocket,silero,cartesia,deepgram,openai,tracing,runner]>=1.8.0",
-    "pipecatcloud>=0.7.1",
+    "pipecatcloud>=1.2.0",
     "opentelemetry-exporter-otlp-proto-http",
     "aiohttp",
 ]

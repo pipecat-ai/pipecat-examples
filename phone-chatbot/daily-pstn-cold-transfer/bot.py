@@ -152,6 +152,9 @@ Available functions:
         ),
     )
 
+    runner = WorkerRunner(handle_sigint=handle_sigint)
+    await runner.add_workers(worker)
+
     # ------------ EVENT HANDLERS ------------
 
     @transport.event_handler("on_first_participant_joined")
@@ -178,7 +181,7 @@ Available functions:
     @transport.event_handler("on_dialin_error")
     async def on_dialin_error(transport, data):
         logger.error(f"Dial-in error: {data}")
-        await worker.cancel()
+        await runner.cancel()
 
     @transport.event_handler("on_dialout_answered")
     async def on_dialout_answered(transport, data):
@@ -219,12 +222,10 @@ Available functions:
     async def on_participant_left(transport, participant, reason):
         logger.debug(f"Participant left: {participant}, reason: {reason}")
         # If customer leaves, end the call
-        await worker.cancel()
+        await runner.cancel()
 
     # ------------ RUN PIPELINE ------------
 
-    runner = WorkerRunner(handle_sigint=handle_sigint)
-    await runner.add_workers(worker)
     await runner.run()
 
 

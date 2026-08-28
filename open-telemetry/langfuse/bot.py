@@ -161,24 +161,24 @@ async def run_bot(transport: BaseTransport):
     if recorder:
         recorder.attach(audiobuffer, worker)
 
+    runner = WorkerRunner(handle_sigint=False)
+    await runner.add_workers(worker)
+
     @transport.event_handler("on_client_connected")
     async def on_client_connected(transport, client):
-        logger.info(f"Client connected")
+        logger.info("Client connected")
         # Kick off the conversation.
         await worker.queue_frames([LLMRunFrame()])
 
     @transport.event_handler("on_client_disconnected")
     async def on_client_disconnected(transport, client):
-        logger.info(f"Client disconnected")
+        logger.info("Client disconnected")
         # Collect the audio before cancelling: the recording lives in the
         # pipeline, which stops existing right after.
         if recorder:
             await recorder.stop_and_collect()
-        await worker.cancel()
+        await runner.cancel()
 
-    runner = WorkerRunner(handle_sigint=False)
-
-    await runner.add_workers(worker)
     await runner.run()
 
     # Media is linked to the trace by id, so the spans no longer have to be open.

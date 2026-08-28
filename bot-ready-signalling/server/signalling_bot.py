@@ -69,9 +69,11 @@ async def main():
             ),
         )
 
+        worker = PipelineWorker(Pipeline([tts, transport.output()]))
+
         runner = WorkerRunner()
 
-        worker = PipelineWorker(Pipeline([tts, transport.output()]))
+        await runner.add_workers(worker)
 
         # Register an event handler so we can play the audio when we receive a specific message
         @transport.event_handler("on_app_message")
@@ -90,7 +92,6 @@ async def main():
                 ]
             )
 
-        await runner.add_workers(worker)
         await runner.run()
 
 
