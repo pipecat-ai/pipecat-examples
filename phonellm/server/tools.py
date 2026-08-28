@@ -168,7 +168,7 @@ async def end_call(params: FunctionCallParams):
     # Resolve the call first so the LLM can produce its farewell turn; the
     # EndWorkerFrame then drains the queued frames — the closing TTS among them —
     # before the worker shuts down.
-    await params.result_callback({"success": True})
+    await params.result_callback(None)
     await params.llm.push_frame(EndWorkerFrame())
 
 

@@ -1,0 +1,30 @@
+# Runs every scenario in this directory against bot.py as one command:
+#
+#   uv run pipecat eval suite evals/manifest.yaml
+#
+# Unlike `pipecat eval run`, the suite starts the bot itself — one fresh bot per
+# scenario, each on its own port — so nothing has to be running first and no
+# scenario inherits another's context or reservation store. That isolation is
+# load-bearing for `naturalness`: it ends by calling end_call, which shuts the
+# worker down, so it can't share a bot with anything scheduled after it.
+#
+# Exits non-zero if any scenario fails, so it drops straight into CI.
+# Handy flags: -s <scenario> to run just one, -n <name> to label the run
+# directory, -d to keep the full per-pipeline debug logs.
+
+# Paths resolve relative to this file: the bot is one level up, and scenario
+# names resolve to <this dir>/<name>.yaml.
+bots_dir: ..
+scenarios_dir: .
+runs_dir: eval-runs
+
+# Two at a time: each run is a bot process plus a judge call, and the judge is
+# one local ollama model serving every run on this machine.
+concurrency: 4
+
+suite:
+  - bot: bot.py
+    scenarios:
+      - phonellm_smoke # pipeline + Modal endpoint are alive
+      - reservations # the three reservation tools fire correctly
+      - naturalness # how the bot talks: question grouping, date brevity

@@ -23,12 +23,16 @@ from datetime import datetime
 
 from dotenv import load_dotenv
 from loguru import logger
+from pipecat.audio.vad.silero import SileroVADAnalyzer
 from pipecat.evals.transport import EvalTransportParams
 from pipecat.frames.frames import LLMRunFrame
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.worker import PipelineParams, PipelineWorker
 from pipecat.processors.aggregators.llm_context import LLMContext
-from pipecat.processors.aggregators.llm_response_universal import LLMContextAggregatorPair
+from pipecat.processors.aggregators.llm_response_universal import (
+    LLMContextAggregatorPair,
+    LLMUserAggregatorParams,
+)
 from pipecat.processors.frameworks.rtvi import (
     RTVIFunctionCallReportLevel,
     RTVIObserverParams,
@@ -57,7 +61,10 @@ SYSTEM_INSTRUCTION = (
     "You are a restaurant reservation assistant on a phone call.{powered_by} "
     "Today is {today_spoken} ({today_iso}). "
     "Your job is to take reservations: use your tools to look up, create, and update reservations. "
-    "Before creating a reservation, collect the caller's name, party size, date, and time. "
+    "Before creating a reservation you need the caller's name, party size, date, and time. "
+    "Once the caller has said what they want, ask for whatever is still missing in one turn — "
+    "group the open questions into a single natural sentence rather than asking for one "
+    "detail per turn. Don't ask for any of it before they've said what they're after. "
     'Resolve relative dates like "tomorrow" or "next Friday" against today\'s date, and pass '
     "dates to your tools in YYYY-MM-DD format. "
     'Say dates the short way a person would on the phone: "tomorrow", "Saturday", or "the 29th". '
@@ -129,8 +136,7 @@ def build_llm() -> OpenAILLMService:
             # PhoneLLM is trained for temperature 0
             temperature=0,
             system_instruction=build_system_instruction(" You are powered by PhoneLLM."),
-            # Reasoning is a property of the model's chat template, so it's
-            # turned off through the template's kwargs, not a request field.
+            # Disable reasoning
             extra={"extra_body": {"chat_template_kwargs": {"enable_thinking": False}}},
         ),
     )
@@ -187,7 +193,10 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments) -> Non
     context = LLMContext(tools=TOOLS)
 
     # Note: no VAD analyzer here on purpose: Deepgram Flux does its own turn detection
-    user_aggregator, assistant_aggregator = LLMContextAggregatorPair(context)
+    user_aggregator, assistant_aggregator = LLMContextAggregatorPair(
+        context,
+        user_params=LLMUserAggregatorParams(vad_analyzer=SileroVADAnalyzer()),
+    )
 
     # Pipeline - assembled from reusable components
     pipeline = Pipeline(
@@ -204,7 +213,10 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments) -> Non
 
     worker = PipelineWorker(
         pipeline,
-        params=PipelineParams(enable_metrics=True, enable_usage_metrics=True),
+        params=PipelineParams(
+            enable_metrics=True,
+            enable_usage_metrics=True,
+        ),
         observers=[],
         # Report tool calls to the client in full (name, arguments, result) so
         # the web client can label them; the default level reports neither.

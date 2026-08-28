@@ -11,6 +11,13 @@ name: phonellm_smoke
 #   uv run bot.py -t eval                                   # 1: the bot, headless
 #   uv run pipecat eval run evals/phonellm_smoke.yaml -v    # 2: this scenario
 
+judge:
+    eval:
+    service: ollama
+    model: gemma4:12b
+    extra:
+      reasoning_effort: none
+
 turns:
   # The bot speaks first on connect; wait for the greeting so we don't barge in.
   - expect:

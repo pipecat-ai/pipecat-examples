@@ -10,6 +10,14 @@ name: reservations
 #   uv run bot.py -t eval                                  # 1: the bot, headless
 #   uv run pipecat eval run evals/reservations.yaml -v     # 2: this scenario
 
+
+judge:
+  eval:
+    service: ollama
+    model: gemma4:12b
+    extra:
+      reasoning_effort: none
+
 turns:
   # The bot speaks first on connect; wait for the greeting so we don't barge in.
   - expect:
@@ -23,11 +31,11 @@ turns:
       - event: response
 
   # Create a new reservation with every detail supplied up front.
-  - user: "I'd also like to book a new table for Bob Jones, four people, on September 5th 2026 at 6:30 in the evening."
+  - user: "I'd also like to book a new table for Bob Jones, four people, tomorrow at 6:30pm."
     expect:
       - event: function_call
         name: create_reservation
-        arguments:
+        args:
           name: "Bob Jones"
           party_size: 4
       - event: response
