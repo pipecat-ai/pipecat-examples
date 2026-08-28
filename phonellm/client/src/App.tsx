@@ -187,7 +187,7 @@ function AgentCaption({ phase, error }: { phase: Phase; error: string | null }) 
   const [prefix, action] = {
     idle: ["not connected — ", "connect to talk to the agent"],
     starting: ["connecting — ", "negotiating the session"],
-    live: ["connected — ", "say something, or type below"],
+    live: ["connected — ", "say something, or type on the right"],
   }[phase]
 
   return (

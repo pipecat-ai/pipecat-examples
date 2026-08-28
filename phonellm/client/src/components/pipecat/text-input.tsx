@@ -85,7 +85,16 @@ export function TextInput({
           className="pointer-events-none flex w-max items-center whitespace-pre"
         >
           <span>{value}</span>
-          <span className="inline-block h-[1.15em] w-[0.6em] animate-terminal-caret bg-foreground" />
+          {/* The caret only blinks once there is a session to type into —
+              before that it sits dim and still, like a dead terminal. */}
+          <span
+            className={cn(
+              "inline-block h-[1.15em] w-[0.6em]",
+              isConnected
+                ? "animate-terminal-caret bg-foreground"
+                : "bg-muted-foreground/40"
+            )}
+          />
           {!value && <span className="ml-1 text-muted-foreground">{placeholder}</span>}
         </div>
         <input
