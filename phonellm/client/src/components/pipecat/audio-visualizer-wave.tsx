@@ -26,6 +26,44 @@ export type { VisualizerState };
 
 type ParticipantType = Parameters<typeof usePipecatClientMediaTrack>[1];
 
+/**
+ * Threshold pattern the dither post-process scatters its rounding error
+ * with. Bayer is the classic ordered dither — the woven crosshatch that
+ * reads as "retro" — at 2x2, 4x4 or 8x8; bigger matrices hold more
+ * shades and show less structure. "ign" is interleaved gradient noise,
+ * which trades the grid for a fine, almost grainless stipple. "noise" is
+ * plain white noise, i.e. film grain.
+ */
+export type DitherMethod = "bayer2" | "bayer4" | "bayer8" | "ign" | "noise";
+
+/** Tuning for the retro dither post-process (see `dither`). */
+export interface DitherOptions {
+  /** Threshold pattern (default "bayer8"). */
+  method?: DitherMethod;
+  /**
+   * Chunky pixel size in CSS px (default 3). The aura is sampled once
+   * per cell, so this is a real low-resolution render rather than a blur
+   * — and one dither cell covers one chunky pixel. 1 leaves the canvas
+   * at full resolution and dithers alone.
+   */
+  pixelSize?: number;
+  /**
+   * Colour steps per channel (default 4, so a 64-colour palette). 2 is
+   * one bit per channel — eight colours, maximum crunch.
+   */
+  levels?: number;
+  /**
+   * Steps for the alpha channel (defaults to `levels`). 2 hard-stipples
+   * the orb's edge against the page; raise it for a softer falloff.
+   */
+  alphaLevels?: number;
+  /**
+   * How much of the pattern to apply, 0–1 (default 1). 0 is plain
+   * rounding — flat posterized bands — and 1 the full dither.
+   */
+  strength?: number;
+}
+
 export interface AudioVisualizerWaveViewProps {
   /** Audio track to visualize. Rests as a calm drifting aura when null. */
   track?: MediaStreamTrack | null;
@@ -126,6 +164,19 @@ export interface AudioVisualizerWaveViewProps {
    * configuration, not animation.
    */
   iterations?: number;
+  /**
+   * Retro dither post-process: quantizes the finished pixel to a coarse
+   * palette and scatters the rounding error into an ordered pattern, over
+   * an optional chunky pixel grid. `true` takes the defaults; pass an
+   * object to tune it (see {@link DitherOptions}).
+   *
+   * Compiled into the shader, so switching it on or off — or changing
+   * `method` — rebuilds the WebGL program; the numeric knobs are uniforms
+   * and change freely. A dithered canvas also renders at a 1:1 pixel
+   * ratio: retro pixels are defined in CSS pixels, and supersampling
+   * would only average the pattern back out.
+   */
+  dither?: boolean | DitherOptions;
   /**
    * Background optimization: "dark" composites tonemapped light, "light"
    * boosts saturation. Defaults to detecting the root element's "dark"
@@ -377,12 +428,85 @@ function rgbToHsv([r, g, b]: [number, number, number]): [
   return [h, max === 0 ? 0 : d / max, max];
 }
 
+const DITHER_DEFAULTS = {
+  method: "bayer8",
+  pixelSize: 3,
+  levels: 4,
+  strength: 1,
+} as const satisfies Required<Omit<DitherOptions, "alphaLevels">>;
+
+/** Stable stand-in for `dither: true`, so the resolved knobs stay stable. */
+const DITHER_ON: DitherOptions = {};
+
+/**
+ * The threshold expression behind each dither method, substituted into
+ * the shader so the hot path carries no branch.
+ *
+ * The Bayer matrices are the classic ordered dither (Bayer, "An
+ * optimum method for two-level rendition of continuous-tone pictures",
+ * ICC 1973): a fixed weave whose crosshatch is exactly what reads as
+ * retro. "ign" is interleaved gradient noise from Jimenez, "Next
+ * Generation Post Processing in Call of Duty: Advanced Warfare"
+ * (SIGGRAPH 2014) — two fracts and a dot product, yet it spreads far
+ * more evenly than a hash, so it dithers as cleanly as blue noise
+ * without needing a texture. "noise" is the plain hash, i.e. grain.
+ */
+const DITHER_PATTERN: Record<DitherMethod, string> = {
+  bayer2: "bayer2(cell)",
+  bayer4: "bayer4(cell)",
+  bayer8: "bayer8(cell)",
+  ign: "fract(52.9829189 * fract(dot(cell, vec2(0.06711056, 0.00583715))))",
+  noise: "randFibo(cell).x",
+};
+
+/** The dither post-process, compiled in only when it is enabled. */
+const makeDitherSource = (method: DitherMethod) => `
+// Bayer threshold matrix, evaluated from the recursive doubling that
+// defines it rather than sampled from a lookup table — no texture, and
+// no integer bitwise ops, which GLSL ES 1.00 does not have. bayer2 is
+// the 2x2 base [[0,2],[3,1]]/4 and each doubling folds in a
+// quarter-weighted finer copy. Reducing mod 2 up front keeps the
+// arithmetic exact however large the canvas gets.
+float bayer2(vec2 a) {
+  a = mod(floor(a), 2.0);
+  return fract(a.x * 0.5 + a.y * a.y * 0.75);
+}
+float bayer4(vec2 a) { return bayer2(a * 0.5) * 0.25 + bayer2(a); }
+float bayer8(vec2 a) { return bayer4(a * 0.5) * 0.25 + bayer2(a); }
+
+/** Threshold in [0,1) for one cell of the retro pixel grid. */
+float ditherThreshold(vec2 cell) {
+  // uDitherStrength blends toward a flat 0.5, which is plain rounding:
+  // at 0 the aura posterizes into hard bands, at 1 it fully dithers.
+  return mix(0.5, ${DITHER_PATTERN[method]}, uDitherStrength);
+}
+
+// Quantize to \`levels\` steps, offset by the threshold first so the
+// rounding error lands as a pattern the eye integrates back into the
+// original shade instead of as a band. levels - 1 is the step count, so
+// 2 levels means black and white and nothing between.
+float quantize(float x, float levels, float threshold) {
+  float steps = max(levels - 1.0, 1.0);
+  return floor(clamp(x, 0.0, 1.0) * steps + threshold) / steps;
+}
+
+`;
+
 /**
  * Fragment shader with the ribbon count baked in as a compile-time
  * constant, which keeps the hot loop unrollable. Fixed style parameters
- * are literals rather than uniforms for the same reason.
+ * are literals rather than uniforms for the same reason. The dither
+ * post-process is compile-time too: off, it costs nothing at all.
  */
-const makeShaderSource = (iterations: number) => `
+const makeShaderSource = (iterations: number, dither: DitherMethod | null) => {
+  // A 1/255 nudge that hides 8-bit banding in the smooth falloff. The
+  // coarse dither supersedes it — quantizing to a handful of levels
+  // rounds a sub-step perturbation straight back away.
+  const antiBanding = dither
+    ? ""
+    : "    color += (randFibo(fragCoord).x - 0.5) / 255.0;\n";
+
+  return `
 const float TAU = 6.283185;
 const float ITERATIONS = ${iterations.toFixed(1)};
 
@@ -444,8 +568,19 @@ vec2 turb(vec2 pos, float t, float it) {
   return pos;
 }
 
-void mainImage(out vec4 fragColor, in vec2 fragCoord) {
-  vec2 uv = fragCoord / iResolution.xy;
+${dither ? makeDitherSource(dither) : ""}void mainImage(out vec4 fragColor, in vec2 fragCoord) {
+${
+  dither
+    ? `  // Retro pixel grid: every fragment in a cell samples the aura at that
+  // cell's centre, so the whole effect is computed at the chunky
+  // resolution rather than smooth-shaded and blocked up afterwards. At a
+  // uPixelSize of 1 this is the identity — fragCoord already sits on
+  // pixel centres — and the dither alone remains.
+  vec2 cell = floor(fragCoord / uPixelSize);
+  fragCoord = (cell + 0.5) * uPixelSize;
+`
+    : ""
+}  vec2 uv = fragCoord / iResolution.xy;
 
   vec3 pp = vec3(0.0);
   // Wave phase, integrated on the CPU (see PHASE_RATE) rather than read
@@ -531,8 +666,7 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
   // Dark mode (default)
   if(uMode < 0.5) {
     color = (-pp * uDensity) * 1.2 + highlight;
-    color += (randFibo(fragCoord).x - 0.5) / 255.0;
-    color = Tonemap(color);
+${antiBanding}    color = Tonemap(color);
     float alpha = luma(color) * uMix;
     fragColor = vec4(color * uMix, alpha);
   }
@@ -540,8 +674,7 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
   // Light mode
   else {
     color = -pp * uDensity + highlight;
-    color += (randFibo(fragCoord).x - 0.5) / 255.0;
-
+${antiBanding}
     // Preserve hue by tone mapping brightness only
     float brightness = length(color);
     vec3 direction = brightness > 0.0 ? color / brightness : color;
@@ -564,7 +697,24 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
     float alpha = mappedBrightness * clamp(uMix, 1.0, 2.0);
     fragColor = vec4(color, alpha);
   }
-}`;
+${
+  dither
+    ? `
+  // Post-process the finished pixel: quantize it to a coarse palette and
+  // scatter the rounding error with the ordered pattern. Colour and alpha
+  // share one threshold so they stay in step — the orb's soft edge
+  // stipples out instead of staying smooth against chunky insides.
+  float threshold = ditherThreshold(cell);
+  fragColor = vec4(
+    quantize(fragColor.r, uDitherLevels, threshold),
+    quantize(fragColor.g, uDitherLevels, threshold),
+    quantize(fragColor.b, uDitherLevels, threshold),
+    quantize(fragColor.a, uDitherAlphaLevels, threshold)
+  );
+`
+    : ""
+}}`;
+};
 
 /**
  * The mutable uniform store behind one shader instance. ReactShaderToy
@@ -616,6 +766,14 @@ type AuraUniformStore = {
   uColorHsv: { type: "3fv"; value: [number, number, number] };
   /** Shine tint as shader RGB floats. */
   uHighlightColor: { type: "3fv"; value: [number, number, number] };
+  /** Retro pixel grid size in canvas pixels; 1 renders at full res. */
+  uPixelSize: { type: "1f"; value: number };
+  /** Colour steps per channel the dither quantizes to. */
+  uDitherLevels: { type: "1f"; value: number };
+  /** Steps the dither quantizes alpha to. */
+  uDitherAlphaLevels: { type: "1f"; value: number };
+  /** Pattern strength: 0 posterizes flat, 1 is the full dither. */
+  uDitherStrength: { type: "1f"; value: number };
 };
 
 interface AuraEngine {
@@ -670,6 +828,10 @@ function createAuraEngine(): AuraEngine {
       uColor: { type: "3fv", value: [...DEFAULT_RGB] },
       uColorHsv: { type: "3fv", value: rgbToHsv(DEFAULT_RGB) },
       uHighlightColor: { type: "3fv", value: defaultHighlightRgb(DEFAULT_RGB) },
+      uPixelSize: { type: "1f", value: DITHER_DEFAULTS.pixelSize },
+      uDitherLevels: { type: "1f", value: DITHER_DEFAULTS.levels },
+      uDitherAlphaLevels: { type: "1f", value: DITHER_DEFAULTS.levels },
+      uDitherStrength: { type: "1f", value: DITHER_DEFAULTS.strength },
     },
   };
 }
@@ -751,6 +913,10 @@ function useAuraUniforms(opts: {
   highlight: number;
   noHighlight: boolean;
   highlightColor?: string;
+  ditherPixelSize: number;
+  ditherLevels: number;
+  ditherAlphaLevels: number;
+  ditherStrength: number;
   themeMode?: "dark" | "light";
   className?: string;
   rootRef: RefObject<HTMLDivElement | null>;
@@ -776,6 +942,10 @@ function useAuraUniforms(opts: {
     highlight,
     noHighlight,
     highlightColor,
+    ditherPixelSize,
+    ditherLevels,
+    ditherAlphaLevels,
+    ditherStrength,
     themeMode,
     className,
     rootRef,
@@ -964,6 +1134,10 @@ function useAuraUniforms(opts: {
     uniforms.uSmoothing.value = smoothing;
     uniforms.uDensity.value = density;
     uniforms.uHighlight.value = noHighlight ? 0 : highlight;
+    uniforms.uPixelSize.value = ditherPixelSize;
+    uniforms.uDitherLevels.value = ditherLevels;
+    uniforms.uDitherAlphaLevels.value = ditherAlphaLevels;
+    uniforms.uDitherStrength.value = ditherStrength;
   }, [
     engine,
     amplitude,
@@ -976,6 +1150,10 @@ function useAuraUniforms(opts: {
     density,
     highlight,
     noHighlight,
+    ditherPixelSize,
+    ditherLevels,
+    ditherAlphaLevels,
+    ditherStrength,
   ]);
 
   // Resolve CSS-flavored colors to shader RGB. className is a dependency
@@ -1076,6 +1254,7 @@ export const AudioVisualizerWaveView = memo(function AudioVisualizerWaveView({
   noHighlight = false,
   highlightColor,
   iterations = 24,
+  dither = false,
   themeMode,
   volume,
   isConnecting = false,
@@ -1083,6 +1262,24 @@ export const AudioVisualizerWaveView = memo(function AudioVisualizerWaveView({
   className,
 }: AudioVisualizerWaveViewProps) {
   const rootRef = useRef<HTMLDivElement>(null);
+
+  // Resolved to primitives rather than an options object: `dither={{...}}`
+  // is a fresh literal every render, and both the shader source and the
+  // canvas remount key have to key off values that hold still.
+  const ditherOpts = typeof dither === "object" ? dither : DITHER_ON;
+  const ditherMethod = dither
+    ? (ditherOpts.method ?? DITHER_DEFAULTS.method)
+    : null;
+  const ditherPixelSize = Math.max(
+    1,
+    ditherOpts.pixelSize ?? DITHER_DEFAULTS.pixelSize,
+  );
+  const ditherLevels = Math.max(2, ditherOpts.levels ?? DITHER_DEFAULTS.levels);
+  const ditherAlphaLevels = Math.max(2, ditherOpts.alphaLevels ?? ditherLevels);
+  const ditherStrength = Math.min(
+    1,
+    Math.max(0, ditherOpts.strength ?? DITHER_DEFAULTS.strength),
+  );
 
   const state: VisualizerState = isConnecting
     ? "connecting"
@@ -1113,6 +1310,10 @@ export const AudioVisualizerWaveView = memo(function AudioVisualizerWaveView({
     highlight,
     noHighlight,
     highlightColor,
+    ditherPixelSize,
+    ditherLevels,
+    ditherAlphaLevels,
+    ditherStrength,
     themeMode,
     className,
     rootRef,
@@ -1120,8 +1321,8 @@ export const AudioVisualizerWaveView = memo(function AudioVisualizerWaveView({
 
   const ribbonCount = Math.max(1, Math.round(iterations));
   const shaderSource = useMemo(
-    () => makeShaderSource(ribbonCount),
-    [ribbonCount],
+    () => makeShaderSource(ribbonCount, ditherMethod),
+    [ribbonCount, ditherMethod],
   );
 
   return (
@@ -1133,12 +1334,16 @@ export const AudioVisualizerWaveView = memo(function AudioVisualizerWaveView({
       className={className}
     >
       <ReactShaderToy
-        key={ribbonCount}
+        key={`${ribbonCount}:${ditherMethod ?? "off"}`}
         fs={shaderSource}
-        devicePixelRatio={Math.min(
-          globalThis.devicePixelRatio ?? 1,
-          MAX_PIXEL_RATIO,
-        )}
+        devicePixelRatio={
+          // Retro pixels are sized in CSS pixels, and supersampling would
+          // only average the pattern back out — so a dithered canvas
+          // renders 1:1, which is cheaper besides.
+          ditherMethod
+            ? 1
+            : Math.min(globalThis.devicePixelRatio ?? 1, MAX_PIXEL_RATIO)
+        }
         uniforms={uniforms}
         contextAttributes={AURA_CONTEXT_ATTRIBUTES}
         onError={(error) => {

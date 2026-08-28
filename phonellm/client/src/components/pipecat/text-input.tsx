@@ -1,213 +1,113 @@
-"use client";
+"use client"
 
-import type { SendTextOptions, TransportState } from "@pipecat-ai/client-js";
 import {
   useConversationContext,
   usePipecatClient,
   usePipecatClientTransportState,
-} from "@pipecat-ai/client-react";
-import { Loader2Icon, SendIcon } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+} from "@pipecat-ai/client-react"
+import { useCallback, useLayoutEffect, useRef, useState } from "react"
 
-import {
-  InputGroup,
-  InputGroupAddon,
-  InputGroupButton,
-  InputGroupInput,
-  InputGroupTextarea,
-} from "@/components/ui/input-group";
+import { cn } from "@/lib/utils"
 
-export interface TextInputViewProps {
-  /** Called with the trimmed message when the user sends. */
-  onSend?: (message: string) => Promise<void> | void;
-  /** Disable the composer entirely. */
-  disabled?: boolean;
-  /** Use a textarea; Enter still sends, Shift+Enter inserts a newline. */
-  multiline?: boolean;
-  placeholder?: string;
-  /** Accessible name for the input. */
-  "aria-label"?: string;
-  /** Content for the send button. Defaults to a send icon. */
-  buttonContent?: React.ReactNode;
-  /** Side the send button sits on in multiline mode. */
-  buttonPosition?: "left" | "right";
-  /** Overrides merged onto the send button (variant, size, …). */
-  buttonProps?: Partial<React.ComponentProps<typeof InputGroupButton>>;
-  /** Classes for the InputGroup root. */
-  className?: string;
+const CONNECTED_STATES = ["connected", "ready"]
+
+export interface TextInputProps {
+  /** Placeholder shown while the field is empty. */
+  placeholder?: string
+  className?: string
 }
 
 /**
- * Message composer: an input with an inline send button, built on the
- * input-group primitive. Enter sends (ignored while an IME is composing);
- * Shift+Enter inserts a newline in multiline mode. Messages are trimmed
- * before sending, the field clears only after a successful send — a failed
- * send keeps the draft — and focus returns to the field once the send
- * settles.
- */
-export function TextInputView({
-  onSend,
-  disabled = false,
-  multiline = false,
-  placeholder = "Type message…",
-  "aria-label": ariaLabel = "Message",
-  buttonContent,
-  buttonPosition = "right",
-  buttonProps,
-  className,
-}: TextInputViewProps) {
-  const [message, setMessage] = useState("");
-  const [isSending, setIsSending] = useState(false);
-  const inputRef = useRef<HTMLInputElement | HTMLTextAreaElement>(null);
-
-  // The input is disabled while a send is in flight, which drops focus.
-  // Restore it once the send settles (success or failure) — after the
-  // re-render that re-enables the input, hence the effect.
-  const wasSending = useRef(false);
-  useEffect(() => {
-    if (wasSending.current && !isSending) inputRef.current?.focus();
-    wasSending.current = isSending;
-  }, [isSending]);
-
-  const handleSend = useCallback(async () => {
-    const text = message.trim();
-    if (!text || isSending) return;
-    setIsSending(true);
-    try {
-      await onSend?.(text);
-      // Clear only on success so a failed send keeps the draft.
-      setMessage("");
-    } catch (error) {
-      console.error("TextInput: send failed", error);
-    } finally {
-      setIsSending(false);
-    }
-  }, [message, onSend, isSending]);
-
-  const handleKeyDown = (
-    e: React.KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>,
-  ) => {
-    if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
-      e.preventDefault();
-      void handleSend();
-    }
-  };
-
-  const canSend = !disabled && !isSending && message.trim().length > 0;
-
-  const inputProps = {
-    placeholder,
-    "aria-label": ariaLabel,
-    value: message,
-    onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
-      setMessage(e.target.value),
-    onKeyDown: handleKeyDown,
-    disabled: disabled || isSending,
-  };
-
-  return (
-    <InputGroup data-slot="text-input" className={className}>
-      {multiline ? (
-        <InputGroupTextarea
-          ref={inputRef as React.Ref<HTMLTextAreaElement>}
-          {...inputProps}
-        />
-      ) : (
-        <InputGroupInput
-          ref={inputRef as React.Ref<HTMLInputElement>}
-          {...inputProps}
-        />
-      )}
-      <InputGroupAddon
-        align={multiline ? "block-end" : "inline-end"}
-        // The primitive's block-end addon is justify-start; flip it for the
-        // (default) right-hand send button.
-        className={
-          multiline && buttonPosition === "right" ? "justify-end" : undefined
-        }
-      >
-        <InputGroupButton
-          onClick={() => void handleSend()}
-          disabled={!canSend}
-          aria-label="Send message"
-          aria-busy={isSending || undefined}
-          size={buttonContent ? "xs" : "icon-xs"}
-          {...buttonProps}
-        >
-          {isSending ? (
-            <Loader2Icon className="animate-spin" />
-          ) : (
-            (buttonContent ?? <SendIcon />)
-          )}
-        </InputGroupButton>
-      </InputGroupAddon>
-    </InputGroup>
-  );
-}
-
-const CONNECTED_STATES: TransportState[] = ["connected", "ready"];
-
-export interface TextInputProps extends Omit<
-  TextInputViewProps,
-  "onSend" | "disabled"
-> {
-  /** Options forwarded to client.sendText(). */
-  sendTextOptions?: SendTextOptions;
-  /** Placeholder shown while disconnected. */
-  disconnectedPlaceholder?: string;
-  /** Skip injecting the sent message into the local conversation store. */
-  noInject?: boolean;
-  /** Called after a message is successfully sent. */
-  onSent?: (message: string) => void;
-  /** Disable the composer even while connected. */
-  disabled?: boolean;
-}
-
-/**
- * Message composer wired to the Pipecat client: injects the user message
- * into the conversation store (so it renders immediately) and sends it to
- * the bot via client.sendText(). Disabled until the transport is connected.
- * Must be rendered inside a PipecatClientProvider.
+ * The prompt line: type a turn instead of speaking it. The field renders
+ * its own text and a blinking block caret trailing it — the native caret
+ * is hidden and the input's text is transparent, so what you read is the
+ * line underneath, scrolled left once the text outruns the field. Sends on
+ * Enter, injects the message into the conversation so it lands in the
+ * transcript immediately, and clears only on a successful send. Must be
+ * rendered inside a PipecatClientProvider.
  */
 export function TextInput({
-  sendTextOptions,
-  disconnectedPlaceholder = "Connect to send",
-  noInject = false,
-  onSent,
-  disabled,
-  placeholder,
-  ...props
+  placeholder = "type or talk",
+  className,
 }: TextInputProps) {
-  const client = usePipecatClient();
-  const transportState = usePipecatClientTransportState();
-  const isConnected = CONNECTED_STATES.includes(transportState);
-  const { injectMessage } = useConversationContext();
+  const client = usePipecatClient()
+  const transportState = usePipecatClientTransportState()
+  const isConnected = CONNECTED_STATES.includes(transportState)
+  const { injectMessage } = useConversationContext()
 
-  const handleSend = useCallback(
-    async (message: string) => {
-      if (!isConnected || !client) return;
+  const [value, setValue] = useState("")
+  const [isSending, setIsSending] = useState(false)
+  const lineRef = useRef<HTMLDivElement>(null)
+  const [shift, setShift] = useState(0)
 
-      if (!noInject) {
-        injectMessage({
-          role: "user",
-          parts: [
-            { text: message, final: true, createdAt: new Date().toISOString() },
-          ],
-        });
-      }
+  // Keep the caret in view: once the line is wider than the field, slide it
+  // left by the overflow, the way a terminal scrolls its input.
+  useLayoutEffect(() => {
+    const line = lineRef.current
+    const field = line?.parentElement
+    if (!line || !field) return
+    const overflow = line.scrollWidth - field.clientWidth
+    setShift(overflow > 0 ? -overflow : 0)
+  }, [value])
 
-      await client.sendText(message, sendTextOptions);
-      onSent?.(message);
-    },
-    [isConnected, client, injectMessage, noInject, onSent, sendTextOptions],
-  );
+  const send = useCallback(async () => {
+    const text = value.trim()
+    if (!text || !isConnected || !client || isSending) return
+    setIsSending(true)
+    try {
+      // Inject first, so the line appears in the transcript straight away
+      // and the bot's reply lands under it.
+      injectMessage({
+        role: "user",
+        parts: [{ text, final: true, createdAt: new Date().toISOString() }],
+      })
+      await client.sendText(text)
+      // Clear only on success, so a failed send keeps the draft.
+      setValue("")
+    } catch (error) {
+      console.error("TextInput: send failed", error)
+    } finally {
+      setIsSending(false)
+    }
+  }, [value, isConnected, client, isSending, injectMessage])
 
   return (
-    <TextInputView
-      onSend={handleSend}
-      disabled={disabled || !isConnected}
-      placeholder={isConnected ? placeholder : disconnectedPlaceholder}
-      {...props}
-    />
-  );
+    <div
+      data-slot="text-input"
+      className={cn("flex min-w-0 items-center gap-2", className)}
+    >
+      <span className="shrink-0 select-none text-muted-foreground">❯</span>
+      <label className="relative min-w-0 flex-1 overflow-hidden">
+        <div
+          ref={lineRef}
+          aria-hidden
+          style={{ transform: `translateX(${shift}px)` }}
+          className="pointer-events-none flex w-max items-center whitespace-pre"
+        >
+          <span>{value}</span>
+          <span className="inline-block h-[1.15em] w-[0.6em] animate-terminal-caret bg-foreground" />
+          {!value && <span className="ml-1 text-muted-foreground">{placeholder}</span>}
+        </div>
+        <input
+          value={value}
+          onChange={(event) => setValue(event.target.value)}
+          onKeyDown={(event) => {
+            if (
+              event.key === "Enter" &&
+              !event.shiftKey &&
+              !event.nativeEvent.isComposing
+            ) {
+              event.preventDefault()
+              void send()
+            }
+          }}
+          disabled={!isConnected || isSending}
+          aria-label="Message"
+          spellCheck={false}
+          autoComplete="off"
+          className="absolute inset-0 w-full bg-transparent text-transparent caret-transparent outline-none"
+        />
+      </label>
+    </div>
+  )
 }

@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "PhoneLLM voice bot built with Pipecat"
 requires-python = ">=3.11"
 dependencies = [
-    "pipecat-ai[daily,deepgram,evals,openai,runner,silero,webrtc]>=1.8.1",
+    "pipecat-ai[cartesia,daily,deepgram,evals,openai,runner,webrtc]>=1.8.1",
     "pipecatcloud",
 ]
 
