@@ -22,8 +22,7 @@ from pipecat.frames.frames import (
     SystemFrame,
 )
 from pipecat.pipeline.pipeline import Pipeline
-from pipecat.pipeline.runner import PipelineRunner
-from pipecat.pipeline.task import PipelineParams, PipelineTask
+from pipecat.pipeline.worker import PipelineParams, PipelineWorker
 from pipecat.processors.aggregators.llm_context import LLMContext
 from pipecat.processors.aggregators.llm_response_universal import (
     LLMAssistantAggregator,
@@ -39,6 +38,7 @@ from pipecat.services.openai.llm import OpenAILLMService
 from pipecat.transports.base_transport import BaseTransport, TransportParams
 from pipecat.transports.daily.transport import DailyParams
 from pipecat.transports.websocket.fastapi import FastAPIWebsocketParams
+from pipecat.workers.runner import WorkerRunner
 from typing_extensions import Literal
 
 load_dotenv(override=True)
@@ -251,7 +251,6 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments) -> Non
         api_key=os.environ["CARTESIA_API_KEY"],
         settings=CartesiaTTSService.Settings(
             voice="db6b0ed5-d5d3-463d-ae85-518a07d3c2b4",
-            model="sonic-3.5",
         ),
     )
 
@@ -274,7 +273,7 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments) -> Non
         ]
     )
 
-    task = PipelineTask(
+    worker = PipelineWorker(
         pipeline,
         params=PipelineParams(
             audio_out_sample_rate=44100,
@@ -284,13 +283,16 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments) -> Non
         idle_timeout_secs=runner_args.pipeline_idle_timeout_secs,
     )
 
+    runner = WorkerRunner(handle_sigint=runner_args.handle_sigint)
+    await runner.add_workers(worker)
+
     @stt.event_handler("on_turn_eager_end")
     async def on_turn_eager_end(_service, transcript: str):
-        await task.queue_frames([TurnEagerEndFrame(transcript=transcript)])
+        await worker.queue_frames([TurnEagerEndFrame(transcript=transcript)])
 
     @stt.event_handler("on_turn_resume")
     async def on_turn_resume(_service):
-        await task.queue_frames([TurnResumeFrame()])
+        await worker.queue_frames([TurnResumeFrame()])
 
     @transport.event_handler("on_client_connected")
     async def on_client_connected(transport, client):
@@ -302,16 +304,14 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments) -> Non
                 "content": "Please introduce yourself to the user.",
             }
         )
-        await task.queue_frames([LLMRunFrame()])
+        await worker.queue_frames([LLMRunFrame()])
 
     @transport.event_handler("on_client_disconnected")
     async def on_client_disconnected(transport, client):
         logger.info("Client disconnected")
-        await task.cancel()
+        await runner.cancel()
 
-    runner = PipelineRunner(handle_sigint=runner_args.handle_sigint)
-
-    await runner.run(task)
+    await runner.run()
 
 
 async def bot(runner_args: RunnerArguments) -> None:
