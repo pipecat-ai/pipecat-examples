@@ -119,6 +119,55 @@ The bot supports two deployment modes controlled by the `ENV` variable:
 
    Open this URL in your browser to observe the bot navigating through the IVR system in real-time.
 
+## Evals
+
+`evals/` drives this bot through its navigation path automatically, with no phone
+call and no PSTN charges. The eval harness connects to the bot over a local
+WebSocket (`bot.py -t eval`) and plays the *IVR's* side of the call — each
+`user:` turn in a scenario is a menu prompt the bot would otherwise hear over the
+phone — then asserts on what the `IVRNavigator` decides to send back.
+
+Two scenarios:
+
+- **`pharmacy_ivr`** — the full path from [Expected Navigation Path](#expected-navigation-path):
+  the bot picks prescription services, keys in the date of birth and prescription
+  number, hears the status, and calls `end_call`.
+- **`human_answers`** — a person picks up instead of a machine. The classifier has
+  to say `<mode>conversation</mode>` and the bot must not start keying digits.
+
+Both run in text mode: an IVR-navigating bot barely speaks — its output is
+`<dtmf>` and `<ivr>` tags that `IVRProcessor` strips before TTS — so there's
+little audio to judge, and the tags are right there in the LLM text.
+
+### Running the evals
+
+The scenarios judge with a local [Ollama](https://ollama.com) model, so install
+Ollama, start it, and pull the judge:
+
+```bash
+ollama pull gemma4:12b
+```
+
+The harness ships in the `evals` extra, which `uv sync` installs from this
+project's dev dependencies (the deployed image builds with `--no-dev` and skips
+it). Then run the suite:
+
+```bash
+uv run pipecat eval suite evals/manifest.yaml
+```
+
+It starts a fresh bot per scenario, so nothing needs to be running first. Useful
+flags: `-s pharmacy_ivr` for a single scenario, `-d` to keep the full
+per-pipeline debug logs, `--repeat N` to measure flakiness. Results land in
+`evals/test-runs/<timestamp>/`, and the suite exits non-zero if anything fails.
+
+To iterate on one scenario against a bot you're already running:
+
+```bash
+uv run bot.py -t eval                                        # terminal 1
+uv run pipecat eval run evals/scenarios/pharmacy_ivr.yaml -v # terminal 2
+```
+
 ## Production Deployment
 
 You can deploy your bot to Pipecat Cloud and server to your infrastructure to run this bot in a production environment.

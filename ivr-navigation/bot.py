@@ -4,9 +4,15 @@
 # SPDX-License-Identifier: BSD 2-Clause License
 #
 
-"""simple_dialout.py.
+"""bot.py.
 
-Daily PSTN Dial-out Bot.
+IVR Navigation Bot. Dials out over Daily PSTN and uses an ``IVRNavigator`` to
+work through the callee's phone menu toward a goal.
+
+Run it in production through ``server.py`` (Daily dial-out), or headless against
+the eval harness::
+
+    uv run bot.py -t eval
 """
 
 import os
@@ -24,7 +30,8 @@ from pipecat.processors.aggregators.llm_response_universal import (
     LLMContextAggregatorPair,
     LLMUserAggregatorParams,
 )
-from pipecat.runner.types import RunnerArguments
+from pipecat.runner.types import EvalRunnerArguments, RunnerArguments
+from pipecat.runner.utils import create_transport
 from pipecat.services.cartesia.tts import CartesiaTTSService
 from pipecat.services.deepgram.stt import DeepgramSTTService
 from pipecat.services.llm_service import FunctionCallParams
@@ -46,56 +53,12 @@ async def end_call(params: FunctionCallParams, reason: str):
     await params.llm.push_frame(EndWorkerFrame())
 
 
-async def run_bot(transport: BaseTransport, handle_sigint: bool) -> None:
-    """Run the voice bot with the given parameters."""
+def wire_dialout(transport: DailyTransport, worker: PipelineWorker, runner: WorkerRunner) -> None:
+    """Wire up Daily PSTN dial-out, with retries, for this session.
 
-    stt = DeepgramSTTService(api_key=os.getenv("DEEPGRAM_API_KEY"))
-    tts = CartesiaTTSService(
-        api_key=os.getenv("CARTESIA_API_KEY", ""),
-        settings=CartesiaTTSService.Settings(
-            voice="b7d50908-b17c-442d-ad8d-810c63997ed9",  # Use Helpful Woman voice by default
-        ),
-    )
-
-    llm = OpenAILLMService(api_key=os.getenv("OPENAI_API_KEY"))
-
-    ivr_navigator = IVRNavigator(
-        llm=llm,
-        ivr_prompt="""You are calling Daily Pharmacy on behalf of Mark Backman. Your goal is to obtain status of his prescription and whether it's ready for pickup. Once you have received that information, call the end_call function with the reason 'Call completed' to end the call.
-
-Relevant information:
-- Date of birth: 01/01/1970
-- Prescription number: 1234567""",
-    )
-
-    context = LLMContext(tools=[end_call])
-    user_aggregator, assistant_aggregator = LLMContextAggregatorPair(
-        context,
-        user_params=LLMUserAggregatorParams(
-            vad_analyzer=SileroVADAnalyzer(),
-        ),
-    )
-
-    pipeline = Pipeline(
-        [
-            transport.input(),
-            stt,
-            user_aggregator,
-            ivr_navigator,
-            tts,
-            transport.output(),
-            assistant_aggregator,
-        ]
-    )
-
-    worker = PipelineWorker(
-        pipeline,
-        params=PipelineParams(
-            enable_metrics=True,
-            enable_usage_metrics=True,
-        ),
-    )
-
+    Only the Daily transport places a call. Under the eval transport the harness
+    is already "on the line" playing the IVR's side, so none of this applies.
+    """
     # ------------ RETRY LOGIC VARIABLES ------------
     max_retries = 5
     retry_count = 0
@@ -170,9 +133,6 @@ Relevant information:
             logger.error(f"All {max_retries} dialout attempts failed. Stopping bot.")
             await worker.cancel()
 
-    runner = WorkerRunner(handle_sigint=handle_sigint)
-    await runner.add_workers(worker)
-
     @transport.event_handler("on_first_participant_joined")
     async def on_first_participant_joined(transport, participant):
         logger.debug(f"First participant joined: {participant['id']}")
@@ -182,11 +142,95 @@ Relevant information:
         logger.debug(f"Participant left: {participant}, reason: {reason}")
         await runner.cancel()
 
+
+async def run_bot(transport: BaseTransport, handle_sigint: bool) -> None:
+    """Run the voice bot with the given parameters."""
+
+    stt = DeepgramSTTService(api_key=os.getenv("DEEPGRAM_API_KEY"))
+    tts = CartesiaTTSService(
+        api_key=os.getenv("CARTESIA_API_KEY", ""),
+        settings=CartesiaTTSService.Settings(
+            voice="b7d50908-b17c-442d-ad8d-810c63997ed9",  # Use Helpful Woman voice by default
+        ),
+    )
+
+    llm = OpenAILLMService(api_key=os.getenv("OPENAI_API_KEY"))
+
+    ivr_navigator = IVRNavigator(
+        llm=llm,
+        ivr_prompt="""You are calling Daily Pharmacy on behalf of Mark Backman. Your goal is to obtain status of his prescription and whether it's ready for pickup. Once you have received that information, call the end_call function with the reason 'Call completed' to end the call.
+
+Relevant information:
+- Date of birth: 01/01/1970
+- Prescription number: 1234567""",
+    )
+
+    context = LLMContext(tools=[end_call])
+    user_aggregator, assistant_aggregator = LLMContextAggregatorPair(
+        context,
+        user_params=LLMUserAggregatorParams(
+            vad_analyzer=SileroVADAnalyzer(),
+        ),
+    )
+
+    pipeline = Pipeline(
+        [
+            transport.input(),
+            stt,
+            user_aggregator,
+            ivr_navigator,
+            tts,
+            transport.output(),
+            assistant_aggregator,
+        ]
+    )
+
+    worker = PipelineWorker(
+        pipeline,
+        params=PipelineParams(
+            enable_metrics=True,
+            enable_usage_metrics=True,
+        ),
+    )
+
+    runner = WorkerRunner(handle_sigint=handle_sigint)
+    await runner.add_workers(worker)
+
+    if isinstance(transport, DailyTransport):
+        wire_dialout(transport, worker, runner)
+    else:
+        # Eval transport: the harness plays the IVR's side, so there's no call to
+        # place — just shut down when it hangs up.
+        @transport.event_handler("on_client_disconnected")
+        async def on_client_disconnected(transport, client):
+            logger.debug("Client disconnected")
+            await runner.cancel()
+
     await runner.run()
 
 
 async def bot(runner_args: RunnerArguments):
     """Main bot entry point compatible with Pipecat Cloud."""
+    # Behavioral evals: run with `-t eval` to drive this bot via `pipecat eval`.
+    # There's no dial-out, and no `/start` body — the scenario supplies the IVR
+    # prompts the bot would otherwise hear over PSTN.
+    if isinstance(runner_args, EvalRunnerArguments):
+        # Imported here, not at module scope: the eval extras aren't installed in
+        # the deployed image.
+        from pipecat.evals.transport import EvalTransportParams
+
+        transport = await create_transport(
+            runner_args,
+            {
+                "eval": lambda: EvalTransportParams(
+                    audio_in_enabled=True,
+                    audio_out_enabled=True,
+                ),
+            },
+        )
+        await run_bot(transport, runner_args.handle_sigint)
+        return
+
     # Body is always a dict (compatible with both local and Pipecat Cloud)
     body_data = runner_args.body
     room_url = body_data.get("room_url")
@@ -217,3 +261,9 @@ async def bot(runner_args: RunnerArguments):
     transport._body_data = body_data
 
     await run_bot(transport, runner_args.handle_sigint)
+
+
+if __name__ == "__main__":
+    from pipecat.runner.run import main
+
+    main()

@@ -10,6 +10,9 @@ dependencies = [
 
 [dependency-groups]
 dev = [
+    # `evals` brings the local judge/TTS/STT the eval harness runs; the deployed
+    # bot never needs them, so it stays out of the image (Dockerfile: --no-dev).
+    "pipecat-ai[evals]>=1.8.0",
     "pre-commit~=4.2.0",
     "ruff~=0.12.1",
     "python-dotenv>=1.0.1,<2.0.0",
