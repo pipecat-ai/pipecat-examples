@@ -5,7 +5,7 @@ description = "Pipecat SMS verification bot — call by phone or browser, receiv
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-    "pipecat-ai[websocket,webrtc,cartesia,google,openai,silero,deepgram,runner]>=1.4.0",
+    "pipecat-ai[websocket,webrtc,cartesia,google,openai,silero,deepgram,runner]>=1.8.0",
     "twilio>=9.3.0",
 ]
 
