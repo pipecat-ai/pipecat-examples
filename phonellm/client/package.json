@@ -14,7 +14,7 @@
   "dependencies": {
     "@base-ui/react": "^1.7.0",
     "@pipecat-ai/client-js": "^1.13.0",
-    "@pipecat-ai/client-react": "file:../../../../../../tmp/pipecat-ai-client-react-1.8.2.tgz",
+    "@pipecat-ai/client-react": "^1.8.2",
     "@pipecat-ai/daily-transport": "^1.6.8",
     "@pipecat-ai/small-webrtc-transport": "^1.10.6",
     "@tailwindcss/vite": "^4",
