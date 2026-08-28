@@ -6,10 +6,13 @@
 
 """Pseudo reservation tools for the phonellm example bot.
 
-Tools are declared with explicit ``FunctionSchema`` objects bundled into a
-``ToolsSchema``. Each schema carries its ``handler``, so listing the schema on
-the ``LLMContext`` (``LLMContext(tools=TOOLS)``) both advertises the tool to
-the LLM and registers the handler — no separate registration step.
+Tools are declared as **direct functions**: a single async function is both the
+handler and the schema. Pipecat derives the tool's name, description, parameters
+and which of them are required from the signature and the Google-style
+docstring, so listing the function in ``LLMContext(tools=TOOLS)`` is all it
+takes — no ``FunctionSchema`` and no separate registration step.
+
+Alongside the reservation tools, ``end_call`` hangs the call up.
 
 The "backend" is an in-memory ``ReservationStore``, shared with the handlers
 via ``PipelineWorker(app_resources=...)`` and read back as
@@ -19,8 +22,8 @@ via ``PipelineWorker(app_resources=...)`` and read back as
 from typing import Any
 
 from loguru import logger
-from pipecat.adapters.schemas.function_schema import FunctionSchema
-from pipecat.adapters.schemas.tools_schema import ToolsSchema
+from pipecat.adapters.schemas.direct_function import tool_options
+from pipecat.frames.frames import EndWorkerFrame
 from pipecat.services.llm_service import FunctionCallParams
 
 
@@ -67,11 +70,20 @@ class ReservationStore:
         return None
 
 
-async def get_reservation(params: FunctionCallParams):
+async def get_reservation(
+    params: FunctionCallParams,
+    confirmation_number: str | None = None,
+    name: str | None = None,
+):
+    """Look up an existing reservation by confirmation number or by the name it's under.
+
+    Args:
+        confirmation_number: The reservation's confirmation number, e.g. '101'.
+        name: The full name the reservation is under, e.g. 'Alice Smith'.
+    """
     store: ReservationStore = params.app_resources
-    args = params.arguments
-    reservation = store.find(args.get("confirmation_number"), args.get("name"))
-    logger.info(f"get_reservation({args}) -> {reservation}")
+    reservation = store.find(confirmation_number, name)
+    logger.info(f"get_reservation({confirmation_number=}, {name=}) -> {reservation}")
     if reservation:
         await params.result_callback({"found": True, "reservation": reservation})
     else:
@@ -80,25 +92,52 @@ async def get_reservation(params: FunctionCallParams):
         )
 
 
-async def create_reservation(params: FunctionCallParams):
+async def create_reservation(
+    params: FunctionCallParams,
+    name: str,
+    party_size: int,
+    date: str,
+    time: str,
+):
+    """Create a new reservation once the name, party size, date, and time are all known.
+
+    Args:
+        name: The full name to put the reservation under.
+        party_size: Number of people in the party.
+        date: Reservation date in YYYY-MM-DD format.
+        time: Reservation time in 24-hour HH:MM format.
+    """
     store: ReservationStore = params.app_resources
-    args = params.arguments
-    reservation = store.create(
-        name=args["name"],
-        party_size=args["party_size"],
-        date=args["date"],
-        time=args["time"],
-    )
-    logger.info(f"create_reservation({args}) -> {reservation}")
+    reservation = store.create(name=name, party_size=party_size, date=date, time=time)
+    logger.info(f"create_reservation({name=}, {party_size=}, {date=}, {time=}) -> {reservation}")
     await params.result_callback({"success": True, "reservation": reservation})
 
 
-async def update_reservation(params: FunctionCallParams):
+async def update_reservation(
+    params: FunctionCallParams,
+    confirmation_number: str | None = None,
+    name: str | None = None,
+    party_size: int | None = None,
+    date: str | None = None,
+    time: str | None = None,
+):
+    """Update an existing reservation.
+
+    Look it up by confirmation number or name, then change only the fields the
+    caller wants changed.
+
+    Args:
+        confirmation_number: The reservation's confirmation number, e.g. '101'.
+        name: The full name the reservation is under (also used to look it up when no confirmation number is given).
+        party_size: New number of people in the party.
+        date: New reservation date in YYYY-MM-DD format.
+        time: New reservation time in 24-hour HH:MM format.
+    """
     store: ReservationStore = params.app_resources
-    args = params.arguments
-    reservation = store.find(args.get("confirmation_number"), args.get("name"))
+    reservation = store.find(confirmation_number, name)
+    updates = {"name": name, "party_size": party_size, "date": date, "time": time}
     if not reservation:
-        logger.info(f"update_reservation({args}) -> not found")
+        logger.info(f"update_reservation({confirmation_number=}, {updates}) -> not found")
         await params.result_callback(
             {
                 "success": False,
@@ -106,88 +145,31 @@ async def update_reservation(params: FunctionCallParams):
             }
         )
         return
-    for field in ("name", "party_size", "date", "time"):
-        if args.get(field) is not None:
-            reservation[field] = args[field]
-    logger.info(f"update_reservation({args}) -> {reservation}")
+    for field, value in updates.items():
+        if value is not None:
+            reservation[field] = value
+    logger.info(f"update_reservation({confirmation_number=}, {updates}) -> {reservation}")
     await params.result_callback({"success": True, "reservation": reservation})
 
 
-get_reservation_schema = FunctionSchema(
-    name="get_reservation",
-    description="Look up an existing reservation by confirmation number or by the name it's under.",
-    properties={
-        "confirmation_number": {
-            "type": "string",
-            "description": "The reservation's confirmation number, e.g. '101'.",
-        },
-        "name": {
-            "type": "string",
-            "description": "The full name the reservation is under, e.g. 'Alice Smith'.",
-        },
-    },
-    required=[],
-    handler=get_reservation,
-)
+# cancel_on_interruption=False so the tool call survives interruptions — without
+# it, the bot's own farewell audio bleeding back through the mic can register as
+# a new turn, cancel the in-flight end_call, and leave the caller saying goodbye
+# twice.
+@tool_options(cancel_on_interruption=False)
+async def end_call(params: FunctionCallParams):
+    """End the call and hang up.
 
-create_reservation_schema = FunctionSchema(
-    name="create_reservation",
-    description="Create a new reservation once the name, party size, date, and time are all known.",
-    properties={
-        "name": {
-            "type": "string",
-            "description": "The full name to put the reservation under.",
-        },
-        "party_size": {
-            "type": "integer",
-            "description": "Number of people in the party.",
-        },
-        "date": {
-            "type": "string",
-            "description": "Reservation date in YYYY-MM-DD format.",
-        },
-        "time": {
-            "type": "string",
-            "description": "Reservation time in 24-hour HH:MM format.",
-        },
-    },
-    required=["name", "party_size", "date", "time"],
-    handler=create_reservation,
-)
+    Use this once the caller is finished — they say goodbye, or their reservation
+    is settled and they need nothing else. Say a short farewell in the same turn:
+    the call stays up until that has finished playing.
+    """
+    logger.info("end_call -> hanging up once the farewell has played")
+    # Resolve the call first so the LLM can produce its farewell turn; the
+    # EndWorkerFrame then drains the queued frames — the closing TTS among them —
+    # before the worker shuts down.
+    await params.result_callback({"success": True})
+    await params.llm.push_frame(EndWorkerFrame())
 
-update_reservation_schema = FunctionSchema(
-    name="update_reservation",
-    description="Update an existing reservation. Look it up by confirmation number or name, then change only the fields the caller wants changed.",
-    properties={
-        "confirmation_number": {
-            "type": "string",
-            "description": "The reservation's confirmation number, e.g. '101'.",
-        },
-        "name": {
-            "type": "string",
-            "description": "The full name the reservation is under (also used to look it up when no confirmation number is given).",
-        },
-        "party_size": {
-            "type": "integer",
-            "description": "New number of people in the party.",
-        },
-        "date": {
-            "type": "string",
-            "description": "New reservation date in YYYY-MM-DD format.",
-        },
-        "time": {
-            "type": "string",
-            "description": "New reservation time in 24-hour HH:MM format.",
-        },
-    },
-    required=[],
-    handler=update_reservation,
-)
 
-TOOLS = ToolsSchema(
-    standard_tools=[
-        get_reservation_schema,
-        create_reservation_schema,
-        update_reservation_schema,
-    ]
-)
+TOOLS = [get_reservation, create_reservation, update_reservation, end_call]

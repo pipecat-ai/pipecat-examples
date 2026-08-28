@@ -19,6 +19,7 @@ Run the bot using::
 """
 
 import os
+from datetime import datetime
 
 from dotenv import load_dotenv
 from loguru import logger
@@ -38,6 +39,7 @@ from pipecat.services.cartesia.tts import CartesiaTTSService
 from pipecat.services.deepgram.flux.stt import DeepgramFluxSTTService
 from pipecat.services.deepgram.flux.tts import DeepgramFluxTTSService
 from pipecat.services.openai.llm import OpenAILLMService
+from pipecat.services.tts_service import TextAggregationMode
 from pipecat.transports.base_transport import BaseTransport, TransportParams
 from pipecat.transports.daily.transport import DailyParams
 from pipecat.workers.runner import WorkerRunner
@@ -53,11 +55,42 @@ DEFAULT_CARTESIA_VOICE = "86e30c1d-714b-4074-a1f2-1cb6b552fb49"
 
 SYSTEM_INSTRUCTION = (
     "You are a restaurant reservation assistant on a phone call.{powered_by} "
+    "Today is {today_spoken} ({today_iso}). "
     "Your job is to take reservations: use your tools to look up, create, and update reservations. "
     "Before creating a reservation, collect the caller's name, party size, date, and time. "
+    'Resolve relative dates like "tomorrow" or "next Friday" against today\'s date, and pass '
+    "dates to your tools in YYYY-MM-DD format. "
+    'Say dates the short way a person would on the phone: "tomorrow", "Saturday", or "the 29th". '
+    "Never say the year, and never read a YYYY-MM-DD date aloud — that format is for tool "
+    "arguments only. "
     "Confirm the details back to the caller, and share the confirmation number after booking. "
+    "When the caller says goodbye, or their reservation is settled and they need nothing else, "
+    "say a short goodbye and call end_call to hang up. "
     "Keep responses brief. Your responses will be spoken aloud."
 )
+
+
+def ordinal(day: int) -> str:
+    """Return a day of the month with its English ordinal suffix, e.g. 1 -> "1st"."""
+    suffix = "th" if day in (11, 12, 13) else {1: "st", 2: "nd", 3: "rd"}.get(day % 10, "th")
+    return f"{day}{suffix}"
+
+
+def build_system_instruction(powered_by: str = "") -> str:
+    """Fill in the system instruction, stamping it with today's date.
+
+    Called per session so a long-running server doesn't get stuck on the date
+    it started up.
+    """
+    now = datetime.now()
+    return SYSTEM_INSTRUCTION.format(
+        powered_by=powered_by,
+        # The spoken form models the phrasing we want back on the call; the ISO
+        # form is what the tools take, and carries the month and year the model
+        # needs to resolve relative dates.
+        today_spoken=f"{now:%A} the {ordinal(now.day)}",
+        today_iso=f"{now:%Y-%m-%d}",
+    )
 
 
 def require_env(name: str) -> str:
@@ -78,7 +111,7 @@ def build_llm() -> OpenAILLMService:
             api_key=require_env("OPENAI_API_KEY"),
             settings=OpenAILLMService.Settings(
                 model=os.getenv("OPENAI_MODEL", "gpt-4.1"),
-                system_instruction=SYSTEM_INSTRUCTION.format(powered_by=""),
+                system_instruction=build_system_instruction(),
             ),
         )
 
@@ -90,27 +123,30 @@ def build_llm() -> OpenAILLMService:
     # MODAL_API_KEY is a proxy token, combined as <token-id>.<token-secret>.
     return OpenAILLMService(
         api_key=require_env("MODAL_API_KEY"),
-        base_url=f"{require_env('MODAL_ENDPOINT_URL').rstrip('/')}/v1",
+        base_url=require_env("MODAL_ENDPOINT_URL"),
         settings=OpenAILLMService.Settings(
             model=os.getenv("PHONELLM_MODEL", "pipecat-ai/phonellm-alpha-1"),
             # PhoneLLM is trained for temperature 0
             temperature=0,
-            system_instruction=SYSTEM_INSTRUCTION.format(
-                powered_by=" You are powered by PhoneLLM."
-            ),
+            system_instruction=build_system_instruction(" You are powered by PhoneLLM."),
+            # Reasoning is a property of the model's chat template, so it's
+            # turned off through the template's kwargs, not a request field.
+            extra={"extra_body": {"chat_template_kwargs": {"enable_thinking": False}}},
         ),
     )
 
 
 def build_tts() -> DeepgramFluxTTSService | CartesiaTTSService:
     """Build the TTS service selected by ``TTS_SERVICE`` (``deepgram`` or ``cartesia``)."""
-    service = os.getenv("TTS_SERVICE", "deepgram").strip().lower()
+    service = os.getenv("TTS_SERVICE", "cartesia").strip().lower()
     logger.info(f"TTS service: {service}")
 
     if service == "cartesia":
         return CartesiaTTSService(
             api_key=require_env("CARTESIA_API_KEY"),
+            text_aggregation_mode=TextAggregationMode.TOKEN,
             settings=CartesiaTTSService.Settings(
+                model="sonic-3.6",
                 voice=os.getenv("TTS_VOICE", DEFAULT_CARTESIA_VOICE),
             ),
         )
@@ -179,6 +215,10 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments) -> Non
         app_resources=ReservationStore(),
     )
 
+    runner = WorkerRunner(handle_sigint=runner_args.handle_sigint)
+
+    await runner.add_workers(worker)
+
     @worker.rtvi.event_handler("on_client_ready")
     async def on_client_ready(rtvi):
         # Kick off the conversation
@@ -197,11 +237,8 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments) -> Non
     @transport.event_handler("on_client_disconnected")
     async def on_client_disconnected(transport, client):
         logger.info("Client disconnected")
-        await worker.cancel()
+        await runner.cancel()
 
-    runner = WorkerRunner(handle_sigint=False)
-
-    await runner.add_workers(worker)
     await runner.run()
 
 
