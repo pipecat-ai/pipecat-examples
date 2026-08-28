@@ -14,9 +14,12 @@
 
 # Paths resolve relative to this file: the bot is one level up, and scenario
 # names resolve to <this dir>/<name>.yaml.
-bots_dir: ..
-scenarios_dir: .
-runs_dir: eval-runs
+bots_dir: ../
+scenarios_dir: scenarios         # scenario names resolve to <dir>/<name>.yaml
+concurrency: 4
+runs_dir: test-runs              # logs + recordings -> test-runs/<timestamp>/
+record: true                     # set true (or pass -a) to record conversation audio
+spawn: "{python} {bot} -t eval --port {port}"
 
 # Two at a time: each run is a bot process plus a judge call, and the judge is
 # one local ollama model serving every run on this machine.

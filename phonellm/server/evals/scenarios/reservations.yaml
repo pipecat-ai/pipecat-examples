@@ -30,8 +30,14 @@ turns:
         name: get_reservation
       - event: response
 
-  # Create a new reservation with every detail supplied up front.
+  # Create a new reservation with every detail supplied up front. The bot reads
+  # the details back before booking, as the system prompt tells it to, so the
+  # booking lands on the turn that answers it.
   - user: "I'd also like to book a new table for Bob Jones, four people, tomorrow at 6:30pm."
+    expect:
+      - event: response
+
+  - user: "Yes, that's right."
     expect:
       - event: function_call
         name: create_reservation

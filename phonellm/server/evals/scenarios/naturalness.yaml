@@ -65,11 +65,16 @@ turns:
           but naming the weekday, month, day and year again is a failure.
 
   # Caller is done: a goodbye and a hang-up, not another question.
-  - user: "Great, thanks."
+  #
+  # The goodbye is asserted before the tool call, because that's the order the
+  # bot produces them — it speaks, then hangs up. Listing the call first would
+  # consume the goodbye while scanning for it, and nothing follows end_call to
+  # match against: it shuts the pipeline down.
+  - user: "No, that's all. Thanks."
     expect:
-      - event: function_call
-        name: end_call
       - event: response
         eval: >-
           a brief, friendly goodbye of roughly one sentence. It does not ask a
           new question or offer further help.
+      - event: function_call
+        name: end_call
