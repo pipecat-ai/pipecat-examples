@@ -20,10 +20,8 @@ import {
 } from "@/hooks/use-pipecat-metrics"
 import { useBotSpeaking, useSessionVersions } from "@/hooks/use-session"
 import { useToolCallFlash } from "@/hooks/use-tool-calls"
+import { sessionConfig } from "@/lib/session-config"
 import { cn } from "@/lib/utils"
-
-/** The WebRTC offer endpoint; the Vite dev proxy maps /api to the bot. */
-const OFFER_URL = import.meta.env.VITE_OFFER_URL ?? "/api/offer"
 
 /**
  * The model's context window — the denominator the token readout counts
@@ -332,11 +330,16 @@ function Session({
   )
 }
 
+/**
+ * Transport and connect strategy for this build — smallwebrtc against a local
+ * bot in dev, Daily via the start endpoint in production. Resolved once at
+ * module load: it reads build-time env, and changing transportType rebuilds
+ * the client.
+ */
+const SESSION = sessionConfig()
+
 export function App() {
-  const { client, connect, disconnect, error } = usePipecatApp({
-    transportType: "smallwebrtc",
-    connectParams: { connectionUrl: OFFER_URL },
-  })
+  const { client, connect, disconnect, error } = usePipecatApp(SESSION)
 
   if (!client) {
     return (

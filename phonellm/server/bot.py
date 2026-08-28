@@ -168,9 +168,7 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments) -> Non
 
     worker = PipelineWorker(
         pipeline,
-        params=PipelineParams(
-            enable_metrics=True
-        ),
+        params=PipelineParams(enable_metrics=True),
         observers=[],
         # Report tool calls to the client in full (name, arguments, result) so
         # the web client can label them; the default level reports neither.

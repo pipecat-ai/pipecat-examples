@@ -118,6 +118,35 @@ uv run pipecat eval run evals/phonellm_smoke.yaml -v
 
 The checks are deterministic, so no judge LLM is required.
 
+## Run the web client
+
+`client/` is a Vite + React voice console built from [Pipecat Voice UI Kit](https://voiceuikit.pipecat.ai) components — an alternative to the prebuilt UI on port 7860.
+
+Start the bot with the WebRTC transport (from `server/`):
+
+```bash
+uv run bot.py -t webrtc
+```
+
+Then, from `client/` in a second terminal:
+
+```bash
+npm install
+npm run dev
+```
+
+Open http://localhost:5173 and hit Connect. The dev server proxies `/api` to the bot on port 7860.
+
+### Build it
+
+```bash
+npm run build    # typecheck + production build to dist/
+```
+
+A production build switches to the Daily transport and connects to a Pipecat Cloud agent, since the local SmallWebRTC bot isn't there to talk to. Starting a session needs your Pipecat Cloud API key, so the client posts to `client/api/connect.ts` — a serverless function that holds the key and returns only the Daily room to join. On Vercel that function deploys with the app; set `BOT_START_URL` (the agent's full start endpoint) and `BOT_START_PUBLIC_KEY` in the project.
+
+See [client/README.md](client/README.md) for the transport table and the other build options.
+
 ## Deploying to Pipecat Cloud
 
 The quickest path is a [cloud build](https://docs.pipecat.ai/pipecat-cloud/guides/cloud-builds): `pipecat cloud deploy` uploads your source and builds the image on Pipecat Cloud from the committed `server/Dockerfile` — no local Docker, no container registry. The deploy config is already in `server/pcc-deploy.toml`. You'll need a [Pipecat Cloud account](https://pipecat.daily.co) and the cloud plugin:

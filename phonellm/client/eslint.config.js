@@ -20,6 +20,13 @@ export default defineConfig([
     },
   },
   {
+    // Serverless functions run on Node, not in the browser.
+    files: ['api/**/*.ts'],
+    languageOptions: {
+      globals: globals.node,
+    },
+  },
+  {
     // Registry-installed shadcn / voice UI kit sources: keep them as
     // shipped rather than rewriting them to satisfy local lint rules.
     files: [

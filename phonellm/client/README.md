@@ -20,8 +20,27 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:5173 and hit Connect. The dev server proxies `/api`
-to the bot's WebRTC offer endpoint on port 7860 (see `vite.config.ts`).
+Open http://localhost:5173 and hit Connect. The dev server proxies
+`/api/offer` to the bot on port 7860 (see `vite.config.ts`).
+
+## Transports
+
+The app reaches a bot two different ways, and picks one per build:
+
+| | dev | production |
+|---|---|---|
+| transport | `smallwebrtc` | `daily` |
+| bot | one you run locally | a Pipecat Cloud agent |
+| connect | straight to `/api/offer` | POST `/api/connect`, join the room it returns |
+
+Local dev talks to your own bot, which serves its own offer endpoint — no
+start step, nothing secret. Pipecat Cloud agents are reached over Daily, and
+starting a session takes the organization's public API key. That key can't
+ship in a bundle, so the browser posts to `api/connect.ts` (a serverless
+function) and gets back only the Daily room and token it may join.
+
+`VITE_TRANSPORT` forces one either way; see `.env.example` for the full set
+of variables.
 
 ## Build
 
@@ -30,33 +49,26 @@ npm run build    # typecheck + production build to dist/
 npm run preview
 ```
 
-In production, either serve the app behind a proxy that maps `/api` to the
-bot, or set the offer endpoint directly at build time:
+A production build defaults to the Daily path, so it needs the start
+endpoint deployed alongside it. On Vercel, `api/connect.ts` is picked up
+automatically — set the two server-side variables in the project:
 
-```bash
-VITE_OFFER_URL=https://bot.example.com/api/offer npm run build
+```
+BOT_START_URL=https://api.pipecat.daily.co/v1/public/phonellm-example/start
+BOT_START_PUBLIC_KEY=pk_...
 ```
 
-## Voice UI Kit components
-
-Components come from the `@pipecat` registry configured in
-`components.json`. To add or update one:
+They have no `VITE_` prefix, so they stay on the server and out of the
+bundle. To exercise that path locally, `vercel dev` serves the function and
+the app together:
 
 ```bash
-npx shadcn@latest add @pipecat/<name>            # install
-npx shadcn@latest add @pipecat/<name> --overwrite # update in place
-npx shadcn@latest list @pipecat                   # see what's available
+VITE_TRANSPORT=daily vercel dev
 ```
 
-Registry-installed files (`src/components/ui/`, `src/components/pipecat/`,
-`src/hooks/use-pipecat-*.ts`) are kept as shipped; a scoped override in
-`eslint.config.js` relaxes a few strict lint rules for those paths only.
+To build a client that talks to a self-hosted bot over SmallWebRTC instead,
+pin the transport and point it at the bot:
 
-## Notes
-
-- Only the SmallWebRTC transport is installed. The kit's transport loader
-  references the other transports optionally; `vite.config.ts` aliases
-  them to `src/lib/optional-transport-stub.ts`. To use another transport,
-  install its package and remove its alias.
-- Dark mode is fixed: `class="dark"` on `<html>` plus a single dark token
-  set in `src/index.css`. There is no theme switching.
+```bash
+VITE_TRANSPORT=smallwebrtc VITE_OFFER_URL=https://bot.example.com/api/offer npm run build
+```
