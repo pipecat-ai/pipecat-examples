@@ -115,7 +115,7 @@ function ToolCounter({ name, label }: { name: string; label: string }) {
         flashing ? "text-active duration-0" : "text-foreground"
       )}
       className={cn(
-        "-mx-1 px-1 pt-5 pb-3 transition-colors duration-700 not-first:border-l not-first:border-border not-first:pl-3",
+        "pt-5 pb-3 transition-colors duration-700 not-first:border-l not-first:border-border not-first:pl-3",
         flashing &&
           "bg-active/25 duration-0 [&_[data-slot=metric-label]]:text-active"
       )}
