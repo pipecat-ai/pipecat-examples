@@ -4,8 +4,8 @@ version = "0.1.0"
 description = "Simple chatbot built with Pipecat"
 requires-python = ">=3.11"
 dependencies = [
-    "pipecat-ai[daily,deepgram,elevenlabs,google,openai,runner,silero,webrtc]>=1.4.0",
-    "pipecatcloud>=0.7.1",
+    "pipecat-ai[daily,deepgram,elevenlabs,google,openai,runner,silero,webrtc]>=1.8.0",
+    "pipecatcloud>=1.2.0",
 ]
 
 [dependency-groups]
@@ -17,4 +17,4 @@ dev = [
 [tool.ruff]
 line-length = 100
 [tool.ruff.lint]
-select = ["I"]
+select = ["I","UP"]

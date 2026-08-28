@@ -9,11 +9,11 @@
     "lint": "eslint"
   },
   "dependencies": {
-    "@pipecat-ai/client-js": "^1.10.0",
-    "@pipecat-ai/client-react": "^1.6.0",
-    "@pipecat-ai/daily-transport": "^1.6.5",
-    "@pipecat-ai/small-webrtc-transport": "^1.10.3",
-    "@pipecat-ai/voice-ui-kit": "^0.11.0",
+    "@pipecat-ai/client-js": "^1.13.0",
+    "@pipecat-ai/client-react": "^1.8.2",
+    "@pipecat-ai/daily-transport": "^1.6.8",
+    "@pipecat-ai/small-webrtc-transport": "^1.10.6",
+    "@pipecat-ai/voice-ui-kit": "^0.13.1",
     "next": "15.5.5",
     "react": "19.1.0",
     "react-dom": "19.1.0"

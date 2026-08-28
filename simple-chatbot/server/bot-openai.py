@@ -47,14 +47,13 @@ from pipecat.processors.aggregators.llm_response_universal import (
     LLMUserAggregatorParams,
 )
 from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
-from pipecat.runner.types import DailyRunnerArguments, RunnerArguments, SmallWebRTCRunnerArguments
+from pipecat.runner.types import RunnerArguments
+from pipecat.runner.utils import create_transport
 from pipecat.services.deepgram.stt import DeepgramSTTService
 from pipecat.services.elevenlabs.tts import ElevenLabsTTSService
 from pipecat.services.openai.llm import OpenAILLMService
 from pipecat.transports.base_transport import BaseTransport, TransportParams
-from pipecat.transports.daily.transport import DailyParams, DailyTransport
-from pipecat.transports.smallwebrtc.connection import SmallWebRTCConnection
-from pipecat.transports.smallwebrtc.transport import SmallWebRTCTransport
+from pipecat.transports.daily.transport import DailyParams
 from pipecat.workers.runner import WorkerRunner
 
 load_dotenv(override=True)
@@ -111,6 +110,24 @@ class TalkingAnimation(FrameProcessor):
             self._is_talking = False
 
         await self.push_frame(frame, direction)
+
+
+transport_params = {
+    "daily": lambda: DailyParams(
+        audio_in_enabled=True,
+        audio_out_enabled=True,
+        video_out_enabled=True,
+        video_out_width=1024,
+        video_out_height=576,
+    ),
+    "webrtc": lambda: TransportParams(
+        audio_in_enabled=True,
+        audio_out_enabled=True,
+        video_out_enabled=True,
+        video_out_width=1024,
+        video_out_height=576,
+    ),
+}
 
 
 async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
@@ -174,6 +191,10 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     # Queue initial static frame so video starts immediately
     await worker.queue_frame(quiet_frame)
 
+    runner = WorkerRunner(handle_sigint=runner_args.handle_sigint)
+
+    await runner.add_workers(worker)
+
     @worker.rtvi.event_handler("on_client_ready")
     async def on_client_ready(rtvi):
         logger.info("Client ready event received")
@@ -188,50 +209,14 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     @transport.event_handler("on_client_disconnected")
     async def on_client_disconnected(transport, client):
         logger.info("Client disconnected")
-        await worker.cancel()
+        await runner.cancel()
 
-    runner = WorkerRunner(handle_sigint=runner_args.handle_sigint)
-
-    await runner.add_workers(worker)
     await runner.run()
 
 
 async def bot(runner_args: RunnerArguments):
     """Main bot entry point."""
-
-    transport = None
-
-    match runner_args:
-        case DailyRunnerArguments():
-            transport = DailyTransport(
-                runner_args.room_url,
-                runner_args.token,
-                "Pipecat Bot",
-                params=DailyParams(
-                    audio_in_enabled=True,
-                    audio_out_enabled=True,
-                    video_out_enabled=True,
-                    video_out_width=1024,
-                    video_out_height=576,
-                ),
-            )
-        case SmallWebRTCRunnerArguments():
-            webrtc_connection: SmallWebRTCConnection = runner_args.webrtc_connection
-
-            transport = SmallWebRTCTransport(
-                webrtc_connection=webrtc_connection,
-                params=TransportParams(
-                    audio_in_enabled=True,
-                    audio_out_enabled=True,
-                    video_out_enabled=True,
-                    video_out_width=1024,
-                    video_out_height=576,
-                ),
-            )
-        case _:
-            logger.error(f"Unsupported runner arguments type: {type(runner_args)}")
-            return
-
+    transport = await create_transport(runner_args, transport_params)
     await run_bot(transport, runner_args)
 
 
