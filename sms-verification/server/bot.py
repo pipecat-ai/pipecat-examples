@@ -22,19 +22,19 @@ A single ``bot(runner_args)`` entry point runs against two transports:
 The bot pushes ``RTVIServerMessageFrame`` for in-call clients (WebRTC mode) and
 publishes the same payload to the SSE bus for clients watching from outside the
 call (Twilio mode).
+
+The verification tools themselves live in ``tools.py``; the per-call state they
+share is a ``VerificationSession`` passed to the worker as ``app_resources``.
 """
 
 import os
-import re
 
 import aiohttp
 from dotenv import load_dotenv
 from loguru import logger
-from pipecat.adapters.schemas.function_schema import FunctionSchema
-from pipecat.adapters.schemas.tools_schema import ToolsSchema
 from pipecat.audio.dtmf.types import KeypadEntry
 from pipecat.audio.vad.silero import SileroVADAnalyzer
-from pipecat.frames.frames import EndTaskFrame, LLMRunFrame
+from pipecat.frames.frames import LLMRunFrame
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.worker import PipelineParams, PipelineWorker
 from pipecat.processors.aggregators.dtmf_aggregator import DTMFAggregator
@@ -43,14 +43,11 @@ from pipecat.processors.aggregators.llm_response_universal import (
     LLMContextAggregatorPair,
     LLMUserAggregatorParams,
 )
-from pipecat.processors.frame_processor import FrameDirection
-from pipecat.processors.frameworks.rtvi import RTVIServerMessageFrame
 from pipecat.runner.types import RunnerArguments, WebSocketRunnerArguments
 from pipecat.runner.utils import create_transport
 from pipecat.services.cartesia.tts import CartesiaTTSService
 from pipecat.services.deepgram.stt import DeepgramSTTService
 from pipecat.services.google.llm import GoogleLLMService
-from pipecat.services.llm_service import FunctionCallParams
 
 # Swap GoogleLLMService for OpenAILLMService by uncommenting the import below
 # and the `llm = OpenAILLMService(...)` block in ``run_bot``.
@@ -60,13 +57,9 @@ from pipecat.transports.websocket.fastapi import FastAPIWebsocketParams
 from pipecat.workers.runner import WorkerRunner
 from pydantic import BaseModel
 
-from events import bus
-from sms import generate_code, send_verification_sms
+from tools import TOOLS, VerificationSession
 
 load_dotenv(override=True)
-
-
-MAX_ATTEMPTS = 2
 
 
 SYSTEM_PROMPT = """You are a friendly verification assistant on a voice call.
@@ -82,16 +75,6 @@ Follow this script exactly:
 5. Use the tool result's `say` field as your spoken reply, then immediately call the `end_call` tool if the result includes `end_call: true`. If a new code was sent for a retry, the tool result's `say` field already covers both input options — use it as-is without paraphrasing.
 
 Your output will be converted to audio. Do not include emoji or special characters."""
-
-
-INPUT_LINE_DTMF = (
-    "Your six digit code is on its way. When it arrives, you have two options: "
-    "you can say the six digits out loud, or you can type them on your phone keypad "
-    "and press the pound key when you are done."
-)
-INPUT_LINE_VOICE_ONLY = (
-    "Your six digit code is on its way. When it arrives, please read the six digits back to me."
-)
 
 
 class CallInfo(BaseModel):
@@ -146,12 +129,6 @@ async def get_call_info(call_sid: str | None) -> CallInfo | None:
         return None
 
 
-def normalize_digits(raw: str) -> str:
-    """Strip everything that is not a digit. Handles 'one two three' poorly —
-    rely on the LLM to convert words to digits before calling the tool."""
-    return re.sub(r"\D", "", raw or "")
-
-
 async def run_bot(
     transport: BaseTransport, phone_number: str, dtmf_enabled: bool, runner_args: RunnerArguments
 ) -> None:
@@ -172,151 +149,21 @@ async def run_bot(
         ),
     )
 
-    input_line = INPUT_LINE_DTMF if dtmf_enabled else INPUT_LINE_VOICE_ONLY
+    # Per-call state for the tools in tools.py; handed to them below as the
+    # worker's `app_resources`.
+    session = VerificationSession(phone_number=phone_number, dtmf_enabled=dtmf_enabled)
+
     llm = GoogleLLMService(
         api_key=os.getenv("GOOGLE_API_KEY"),
         settings=GoogleLLMService.Settings(
             system_instruction=SYSTEM_PROMPT.format(
                 phone_number=phone_number,
-                input_line=input_line,
+                input_line=session.input_line,
             ),
         ),
     )
 
-    state = {"code": None, "attempts": 0, "resolved": False}
-
-    async def emit(event: dict, llm_service=None) -> None:
-        """Publish an event to in-call (RTVI) and out-of-call (SSE) listeners."""
-        if event.get("type") == "verification_result":
-            state["resolved"] = True
-        await bus.publish(event)
-        if llm_service is not None:
-            await llm_service.push_frame(RTVIServerMessageFrame(data=event))
-
-    async def handle_send_code(params: FunctionCallParams) -> None:
-        target = params.arguments.get("phone_number") or phone_number
-        code = generate_code()
-        sent = send_verification_sms(target, code)
-        if sent:
-            state["code"] = code
-            logger.info(f"Verification code for {target}: {code}")
-            await params.result_callback(
-                {
-                    "sent": True,
-                    "say": input_line,
-                }
-            )
-        else:
-            await params.result_callback(
-                {
-                    "sent": False,
-                    "say": "I wasn't able to send the code. Please try again later.",
-                    "end_call": True,
-                }
-            )
-
-    async def handle_verify_code(params: FunctionCallParams) -> None:
-        received = normalize_digits(params.arguments.get("digits", ""))
-        expected = state["code"]
-
-        if expected and received == expected:
-            await emit({"type": "verification_result", "success": True}, llm_service=params.llm)
-            await params.result_callback(
-                {
-                    "matched": True,
-                    "say": "Perfect, those digits match. You're verified. Goodbye!",
-                    "end_call": True,
-                }
-            )
-            return
-
-        state["attempts"] += 1
-        await emit({"type": "verification_result", "success": False}, llm_service=params.llm)
-
-        if state["attempts"] >= MAX_ATTEMPTS:
-            await params.result_callback(
-                {
-                    "matched": False,
-                    "say": "Those digits did not match and we've used all our attempts. Goodbye!",
-                    "end_call": True,
-                }
-            )
-            return
-
-        # Retry: send a fresh code automatically.
-        new_code = generate_code()
-        sent = send_verification_sms(phone_number, new_code)
-        if sent:
-            state["code"] = new_code
-            logger.info(f"Retry code for {phone_number}: {new_code}")
-            retry_options = (
-                "you can say the six digits out loud, or you can type them on your "
-                "phone keypad and press the pound key when you are done"
-                if dtmf_enabled
-                else "please read the six digits back to me"
-            )
-            await params.result_callback(
-                {
-                    "matched": False,
-                    "retry_sent": True,
-                    "say": (
-                        "Those digits did not match. I just sent a new six digit code. "
-                        f"When it arrives, {retry_options}."
-                    ),
-                }
-            )
-        else:
-            await params.result_callback(
-                {
-                    "matched": False,
-                    "retry_sent": False,
-                    "say": "Those digits did not match and I couldn't send a new code. Goodbye!",
-                    "end_call": True,
-                }
-            )
-
-    async def handle_end_call(params: FunctionCallParams) -> None:
-        await params.result_callback({"ended": True})
-        await params.llm.push_frame(EndTaskFrame(), FrameDirection.UPSTREAM)
-
-    llm.register_function("send_verification_code", handle_send_code)
-    llm.register_function("verify_code", handle_verify_code)
-    llm.register_function("end_call", handle_end_call)
-
-    tools = ToolsSchema(
-        standard_tools=[
-            FunctionSchema(
-                name="send_verification_code",
-                description="Send a six-digit verification code by SMS to the user's phone number.",
-                properties={
-                    "phone_number": {
-                        "type": "string",
-                        "description": "E.164 phone number, e.g. +15551234567",
-                    },
-                },
-                required=["phone_number"],
-            ),
-            FunctionSchema(
-                name="verify_code",
-                description="Verify the six digits the user provided. Returns match status and the next spoken line.",
-                properties={
-                    "digits": {
-                        "type": "string",
-                        "description": "The six digits the user provided, joined as a single numeric string (e.g. '482915').",
-                    },
-                },
-                required=["digits"],
-            ),
-            FunctionSchema(
-                name="end_call",
-                description="End the call. Use only when the tool result tells you to.",
-                properties={},
-                required=[],
-            ),
-        ]
-    )
-
-    context = LLMContext(tools=tools)
+    context = LLMContext(tools=TOOLS)
     user_aggregator, assistant_aggregator = LLMContextAggregatorPair(
         context,
         user_params=LLMUserAggregatorParams(
@@ -353,7 +200,13 @@ async def run_bot(
             enable_usage_metrics=True,
         ),
         idle_timeout_secs=runner_args.pipeline_idle_timeout_secs,
+        # Shared with the tool handlers via params.app_resources
+        app_resources=session,
     )
+
+    runner = WorkerRunner(handle_sigint=runner_args.handle_sigint)
+
+    await runner.add_workers(worker)
 
     @transport.event_handler("on_client_connected")
     async def on_client_connected(transport, client):
@@ -366,17 +219,10 @@ async def run_bot(
     @transport.event_handler("on_client_disconnected")
     async def on_client_disconnected(transport, client):
         logger.info("Client disconnected; cancelling task")
-        if not state["resolved"]:
-            await bus.publish({"type": "verification_result", "success": False})
-        await worker.cancel()
+        if not session.resolved:
+            await session.emit({"type": "verification_result", "success": False})
+        await runner.cancel()
 
-    # We use `handle_sigint=False` because `uvicorn` is controlling keyboard
-    # interruptions. We use `force_gc=True` to force garbage collection after
-    # the runner finishes running a task which could be useful for long running
-    # applications with multiple clients connecting.
-    runner = WorkerRunner(handle_sigint=runner_args.handle_sigint, force_gc=True)
-
-    await runner.add_workers(worker)
     await runner.run()
 
 
