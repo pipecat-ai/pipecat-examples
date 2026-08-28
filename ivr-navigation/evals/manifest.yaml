@@ -1,0 +1,29 @@
+# Runs every scenario in this directory against bot.py as one command:
+#
+#   uv run pipecat eval suite evals/manifest.yaml
+#
+# The suite starts the bot itself — one fresh bot per scenario, each on its own
+# port — so nothing has to be running first and no scenario inherits another's
+# IVR state. That matters here: pharmacy_ivr ends by calling end_call, which
+# tears the worker down, so it can't share a bot with anything after it.
+#
+# Exits non-zero if any scenario fails, so it drops straight into CI. Handy
+# flags: -s <scenario> to run just one, -n <name> to label the run directory,
+# -d to keep the full per-pipeline debug logs.
+
+# Paths resolve relative to this file: the bot is one level up, and scenario
+# names resolve to <this dir>/scenarios/<name>.yaml.
+bots_dir: ../
+scenarios_dir: scenarios
+runs_dir: test-runs
+spawn: "{python} {bot} -t eval --port {port}"
+
+# Both scenarios are text-mode, so a run is a bot process plus a judge call, and
+# the judge is one local ollama model serving every run on this machine.
+concurrency: 2
+
+suite:
+  - bot: bot.py
+    scenarios:
+      - pharmacy_ivr # the documented navigation path, menu to hang-up
+      - human_answers # a person picks up: classify as conversation, don't key

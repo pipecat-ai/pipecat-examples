@@ -1,0 +1,47 @@
+name: pharmacy_ivr
+
+# The full navigation path this example is built around: the bot calls Daily
+# Pharmacy, picks the prescription-services option, keys in Mark Backman's date
+# of birth and prescription number, hears the status, and hangs up.
+#
+# The scenario plays the *IVR's* side. Each `user:` turn is a menu prompt the
+# bot would otherwise hear over PSTN, and the assertions are on what the
+# IVRNavigator decides to send back.
+#
+# Text mode, on purpose: an IVR-navigating bot barely speaks. Its output is
+# `<dtmf>` and `<ivr>` tags that IVRProcessor strips out of the TTS stream, so
+# there is almost no audio to transcribe and judge — but the tags are right
+# there in the LLM text, which is what `response` asserts on in text mode.
+
+judge: !include judge_text.yaml
+
+turns:
+  # The IVR answers and reads its main menu. Two LLM responses come back on this
+  # turn: IVRNavigator classifies the caller first (`<mode>ivr</mode>`), then
+  # re-runs with the navigation prompt and picks an option. `response` content
+  # checks aggregate across a turn, so this matches the second one.
+  - user: "Thank you for calling Daily Pharmacy. Press 1 for prescription services. Press 2 for pharmacy hours. Press 3 for store location. Press 0 to speak with a pharmacist."
+    expect:
+      - event: response
+        text_contains: "<dtmf>1</dtmf>"
+
+  # Prescription services asks to verify the patient. The bot has the date of
+  # birth in its goal prompt and keys it in one digit at a time.
+  - user: "Please enter your date of birth as an eight digit number, using two digits for the month, two digits for the day, and four digits for the year."
+    expect:
+      - event: response
+        eval: "keys in the date of birth 01/01/1970 as the DTMF digits 0, 1, 0, 1, 1, 9, 7, 0 in that order"
+
+  # Same again for the prescription number.
+  - user: "Thank you. Now please enter your seven digit prescription number."
+    expect:
+      - event: response
+        eval: "keys in the prescription number as the DTMF digits 1, 2, 3, 4, 5, 6, 7 in that order"
+
+  # Goal reached. The bot's prompt tells it to call end_call once it has the
+  # status, and end_call pushes an EndWorkerFrame — so the function call is the
+  # last thing to assert on; the pipeline is torn down behind it.
+  - user: "I found your prescription for Ibuprofen 800 milligrams. It was filled this morning and is ready for pickup. Our pharmacy is open until 9 PM today."
+    expect:
+      - event: function_call
+        name: end_call

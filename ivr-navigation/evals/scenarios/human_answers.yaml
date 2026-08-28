@@ -1,0 +1,24 @@
+name: human_answers
+
+# The other half of IVRNavigator's job: not every call is answered by a machine.
+# When a person picks up, the classifier has to say so (`<mode>conversation</mode>`)
+# and the bot must NOT start keying digits at them.
+#
+# This example doesn't register an `on_conversation_detected` handler — it's a
+# pure IVR demo — so the classification itself is the whole assertion, plus the
+# silence after it.
+
+judge: !include judge_text.yaml
+
+turns:
+  - user: "Daily Pharmacy, this is Sarah speaking. How can I help you today?"
+    expect:
+      - event: response
+        text_contains: "<mode>conversation</mode>"
+
+      # Conversation mode fires an event and stops there: no navigation prompt
+      # is swapped in, so nothing re-runs the LLM. A second response here would
+      # mean the bot fell through into IVR navigation.
+      - event: response
+        absent: true
+        within_ms: 10000
