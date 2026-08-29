@@ -203,7 +203,6 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments) -> Non
 
     context = LLMContext(tools=TOOLS)
 
-    # Note: no VAD analyzer here on purpose: Deepgram Flux does its own turn detection
     user_aggregator, assistant_aggregator = LLMContextAggregatorPair(
         context,
         user_params=LLMUserAggregatorParams(vad_analyzer=SileroVADAnalyzer()),
