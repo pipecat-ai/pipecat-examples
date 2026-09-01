@@ -28,7 +28,23 @@ modal setup
 
 This opens your browser to authenticate and writes your API credentials to a local Modal profile.
 
-### 2. Create the endpoint
+### 2. Create a proxy token
+
+The bot authenticates with a workspace proxy token rather than your local credentials. Create it before the endpoint — an authenticated endpoint requires a proxy token to already exist in the workspace, and `modal endpoint create` fails without one:
+
+```bash
+modal workspace proxy-tokens create
+```
+
+This prints a token ID (`wk-...`) and secret (`ws-...`). Save the secret now — it can't be retrieved later. Combined as `<token-id>.<token-secret>`, they form the API key the bot sends as a Bearer token.
+
+On workspaces with RBAC enabled, new tokens start with no environment access, and the endpoint rejects them with `401 "Webhook token not found"`. Allow the token into the environment the endpoint will live in (`main` unless you create it elsewhere):
+
+```bash
+modal workspace proxy-tokens allow <token-id> main
+```
+
+### 3. Create the endpoint
 
 ```bash
 modal endpoint create --model pipecat-ai/phonellm-alpha-1
@@ -38,7 +54,9 @@ Modal provisions an [Auto Endpoint](https://modal.com/docs/guide/endpoints) — 
 
 > **Note:** The CLI can't retrieve the endpoint URL after the fact — `modal endpoint list` shows status but not the URL. If you lose it, find it on the endpoint's page in the [Modal dashboard](https://modal.com/) (`modal dashboard` opens it).
 
-### 3. Check that it's running
+> **Note:** `modal endpoint create --unauthenticated` skips the token requirement, but leaves the endpoint open to anyone on the internet. The rest of this guide assumes the authenticated endpoint above.
+
+### 4. Check that it's running
 
 List your endpoints and their status (`provisioning` → `live`):
 
@@ -55,22 +73,6 @@ modal curl <endpoint-url>/v1/models
 A JSON response listing `pipecat-ai/phonellm-alpha-1` means the endpoint is healthy.
 
 > **Note:** Endpoints scale to zero when idle. The first request after creation (or after a quiet period) returns 503 while the model spins up — this can take several minutes for a 30B model, and the container logs (`modal app logs`) may go quiet during kernel compilation. Keep retrying.
-
-### 4. Create a proxy token
-
-The bot authenticates with a workspace proxy token rather than your local credentials:
-
-```bash
-modal workspace proxy-tokens create
-```
-
-This prints a token ID (`wk-...`) and secret (`ws-...`). Save the secret now — it can't be retrieved later. Combined as `<token-id>.<token-secret>`, they form the API key the bot sends as a Bearer token.
-
-On workspaces with RBAC enabled, new tokens start with no environment access, and the endpoint rejects them with `401 "Webhook token not found"`. Allow the token into the environment the endpoint lives in (`main` unless you created it elsewhere):
-
-```bash
-modal workspace proxy-tokens allow <token-id> main
-```
 
 ### 5. Verify end to end (optional)
 

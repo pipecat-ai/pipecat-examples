@@ -32,10 +32,35 @@ must log in themselves — it's a browser flow. Ask them to run:
 
 There is no `modal login`; `modal setup` is the auth command.
 
-## 3. PhoneLLM endpoint
+## 3. Proxy token
+
+The bot authenticates with a workspace proxy token rather than local Modal credentials,
+and this has to come **before** creating the endpoint: an authenticated endpoint requires
+a proxy token to already exist in the workspace, so `modal endpoint create` fails without
+one.
+
+If `MODAL_API_KEY` is already in `server/.env`, keep it. Otherwise create one:
+
+```bash
+modal workspace proxy-tokens create --json
+```
+
+Combine as `<token-id>.<token-secret>` (`wk-....ws-...`) and write it to `server/.env`
+without echoing the secret (create that file with `cp server/.env.example server/.env`
+first if it doesn't exist yet). The secret is shown once and cannot be retrieved later.
+
+On RBAC workspaces the new token has no environment access and the endpoint will
+return `401 "Webhook token not found"`. Authorize it (the endpoint lives in `main`
+unless created elsewhere):
+
+```bash
+modal workspace proxy-tokens allow <token-id> main
+```
+
+## 4. PhoneLLM endpoint
 
 Check for an existing endpoint: `modal endpoint list --json`, looking for a live
-`phonellm-alpha-1`. If present, skip to step 4.
+`phonellm-alpha-1`. If present, skip to step 5.
 
 If absent, **ask the user before creating** (it provisions GPU infrastructure —
 takes ~20–30 minutes and bills their workspace):
@@ -48,7 +73,7 @@ modal endpoint create --model pipecat-ai/phonellm-alpha-1
 retrieve it later (`modal endpoint list` shows status only). Then poll
 `modal endpoint list --json` every ~30s (in the background) until status is `live`.
 
-## 4. Endpoint URL
+## 5. Endpoint URL
 
 If `MODAL_ENDPOINT_URL` is already in `server/.env`, keep it. If you just ran
 `endpoint create`, use the URL from its output. Otherwise **ask the user to paste it**
@@ -56,32 +81,13 @@ from their create-output scrollback or the endpoint's page in the Modal dashboar
 (`modal dashboard`). Do not guess hostnames — the URL's label is not derivable from
 the endpoint name.
 
-## 5. Proxy token
-
-If `MODAL_API_KEY` is already in `server/.env`, keep it. Otherwise create one:
-
-```bash
-modal workspace proxy-tokens create --json
-```
-
-Combine as `<token-id>.<token-secret>` (`wk-....ws-...`) and write it to `server/.env`
-without echoing the secret. The secret is shown once and cannot be retrieved later.
-
-On RBAC workspaces the new token has no environment access and the endpoint will
-return `401 "Webhook token not found"`. Authorize it (the endpoint lives in `main`
-unless created elsewhere):
-
-```bash
-modal workspace proxy-tokens allow <token-id> main
-```
-
 ## 6. Configure .env
 
 If `server/.env` doesn't exist, `cp server/.env.example server/.env`. Ensure it has:
 
 - `DEEPGRAM_API_KEY` — **ask the user for it** if missing; never invent keys.
-- `MODAL_ENDPOINT_URL` — from step 4.
-- `MODAL_API_KEY` — from step 5.
+- `MODAL_ENDPOINT_URL` — from step 5.
+- `MODAL_API_KEY` — from step 3.
 
 ## 7. Health-check the endpoint
 
@@ -97,7 +103,7 @@ Interpret the result:
   Retry every ~30s (in the background). A 30B model can take several minutes. An
   *instant* 503 that persists well past 10 minutes suggests a wrong URL — re-verify
   with the user rather than retrying forever.
-- **401 "Webhook token not found"** — the RBAC `allow` step (5) is missing.
+- **401 "Webhook token not found"** — the RBAC `allow` step (3) is missing.
 
 Optionally verify the exact request path the bot uses:
 
