@@ -1,0 +1,13 @@
+node_modules/
+dist/
+coverage/
+package-lock.json
+pnpm-lock.yaml
+yarn.lock
+
+# Source installed from the shadcn registries; leave it as upstream wrote it.
+src/components/ui/
+src/components/pipecat/
+src/hooks/use-pipecat-app.ts
+src/lib/transports.ts
+src/lib/visualizer.ts
