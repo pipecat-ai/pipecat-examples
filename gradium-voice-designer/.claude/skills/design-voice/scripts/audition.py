@@ -96,6 +96,7 @@ class PollTimeout(ApiError):
 
 # --------------------------------------------------------------------------- key
 
+
 def read_dotenv_value(path: pathlib.Path, wanted: str) -> str | None:
     """Read one variable from a .env file the way python-dotenv would.
 
@@ -160,13 +161,19 @@ def load_api_key(explicit: str | None) -> str:
 
 # --------------------------------------------------------------------------- http
 
+
 class Client:
     def __init__(self, api_key: str, base_url: str = BASE_URL):
         self._key = api_key
         self._base = base_url.rstrip("/")
 
-    def _request(self, method: str, path: str, body: dict | None = None,
-                 stream_to: pathlib.Path | None = None) -> dict | None:
+    def _request(
+        self,
+        method: str,
+        path: str,
+        body: dict | None = None,
+        stream_to: pathlib.Path | None = None,
+    ) -> dict | None:
         data = json.dumps(body).encode() if body is not None else None
         req = urllib.request.Request(
             self._base + path,
@@ -198,8 +205,11 @@ class Client:
             raise ApiError(f"{method} {path} failed mid-transfer: {e}") from None
 
     def generate(self, prompt: str, language: str, n: int) -> list[dict]:
-        out = self._request("POST", "/voice-generator/generate",
-                            {"prompt": prompt, "language": language, "n_samples": n})
+        out = self._request(
+            "POST",
+            "/voice-generator/generate",
+            {"prompt": prompt, "language": language, "n_samples": n},
+        )
         return out["embeddings"]
 
     def get_embedding(self, embedding_id: str) -> dict | None:
@@ -228,13 +238,18 @@ class Client:
         start = time.monotonic()
         part = path.with_suffix(path.suffix + ".part")
         try:
-            self._request("POST", "/speech/tts", {
-                "text": text,
-                "voice_id": voice_id,
-                "model_name": model,
-                "output_format": "wav",
-                "only_audio": True,
-            }, stream_to=part)
+            self._request(
+                "POST",
+                "/speech/tts",
+                {
+                    "text": text,
+                    "voice_id": voice_id,
+                    "model_name": model,
+                    "output_format": "wav",
+                    "only_audio": True,
+                },
+                stream_to=part,
+            )
             fix_wav_sizes(part)
             part.replace(path)
         finally:
@@ -242,11 +257,15 @@ class Client:
         return time.monotonic() - start
 
     def keep(self, embedding_id: str, name: str, description: str) -> dict:
-        return self._request("POST", "/voices/from-embedding", {
-            "voxium_embedding_id": embedding_id,
-            "name": name,
-            "description": description,
-        })
+        return self._request(
+            "POST",
+            "/voices/from-embedding",
+            {
+                "voxium_embedding_id": embedding_id,
+                "name": name,
+                "description": description,
+            },
+        )
 
     def delete_embedding(self, embedding_id: str) -> bool:
         """Delete a candidate. False if it was already gone; raises on other errors."""
@@ -268,8 +287,10 @@ class Client:
             except ApiError as e:
                 failed.append(eid)
                 print(f"  could not delete {eid}: {str(e).splitlines()[0]}", file=sys.stderr)
-        print(f"Deleted {removed} {what}{'s' if removed != 1 else ''}"
-              + (f"; {len(failed)} could not be deleted, try `discard` later" if failed else ""))
+        print(
+            f"Deleted {removed} {what}{'s' if removed != 1 else ''}"
+            + (f"; {len(failed)} could not be deleted, try `discard` later" if failed else "")
+        )
 
 
 def explain(status: int, method: str, path: str, text: str) -> str:
@@ -277,7 +298,11 @@ def explain(status: int, method: str, path: str, text: str) -> str:
     try:
         parsed = json.loads(text)
         if isinstance(parsed, dict) and "detail" in parsed:
-            detail = parsed["detail"] if isinstance(parsed["detail"], str) else json.dumps(parsed["detail"])
+            detail = (
+                parsed["detail"]
+                if isinstance(parsed["detail"], str)
+                else json.dumps(parsed["detail"])
+            )
     except ValueError:
         pass
     hints = {
@@ -285,9 +310,9 @@ def explain(status: int, method: str, path: str, text: str) -> str:
         401: "the API key is invalid or expired",
         404: "the id could not be resolved; the candidate may have expired (30 days)",
         409: "a voice already exists for this candidate; the detail names it, use that "
-             "voice_id with `apply --voice-id`",
+        "voice_id with `apply --voice-id`",
         422: "the request was rejected as invalid; the script checks language and take "
-             "count first, so read the detail",
+        "count first, so read the detail",
     }
     hint = hints.get(status)
     msg = f"{method} {path} -> HTTP {status}"
@@ -299,6 +324,7 @@ def explain(status: int, method: str, path: str, text: str) -> str:
 
 
 # --------------------------------------------------------------------------- wav
+
 
 def fix_wav_sizes(path: pathlib.Path) -> None:
     """Rewrite the RIFF and data lengths of a streamed WAV.
@@ -332,6 +358,7 @@ def fix_wav_sizes(path: pathlib.Path) -> None:
 def wav_seconds(path: pathlib.Path) -> float | None:
     try:
         import wave
+
         with wave.open(str(path), "rb") as w:
             return w.getnframes() / float(w.getframerate())
     except Exception:
@@ -339,6 +366,7 @@ def wav_seconds(path: pathlib.Path) -> float | None:
 
 
 # --------------------------------------------------------------------------- session
+
 
 def slugify(name: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-") or "voice"
@@ -358,7 +386,9 @@ def load_session(session_dir: pathlib.Path) -> dict:
 
 
 def save_session(session_dir: pathlib.Path, session: dict) -> None:
-    (session_dir / "session.json").write_text(json.dumps(session, indent=2) + "\n", encoding="utf-8")
+    (session_dir / "session.json").write_text(
+        json.dumps(session, indent=2) + "\n", encoding="utf-8"
+    )
 
 
 def utc_now() -> str:
@@ -382,24 +412,32 @@ def new_session_dir(name: str, out_dir: str | None) -> pathlib.Path:
 
 # --------------------------------------------------------------------------- commands
 
+
 def cmd_generate(args: argparse.Namespace) -> int:
     prompt = args.prompt.strip()
     if not prompt:
         raise ApiError("the description is blank")
     if len(prompt) > MAX_PROMPT_CHARS:
-        raise ApiError(f"the description is {len(prompt)} characters; the limit is {MAX_PROMPT_CHARS}")
+        raise ApiError(
+            f"the description is {len(prompt)} characters; the limit is {MAX_PROMPT_CHARS}"
+        )
     line = args.line.strip()
     if not line:
         raise ApiError("the audition line is blank")
     if len(line) > MAX_LINE_CHARS:
-        raise ApiError(f"the audition line is {len(line)} characters; the limit is {MAX_LINE_CHARS}")
+        raise ApiError(
+            f"the audition line is {len(line)} characters; the limit is {MAX_LINE_CHARS}"
+        )
     if args.language not in LANGUAGES:
         raise ApiError(f"language must be one of {', '.join(LANGUAGES)}")
     if not 1 <= args.takes <= MAX_TAKES:
         raise ApiError(f"takes must be between 1 and {MAX_TAKES}")
     if args.model != DEFAULT_MODEL:
-        print(f"note: auditioning with model {args.model!r}, but Pipecat's GradiumTTSService "
-              f"cannot select a model, so the bot will use the server default.", file=sys.stderr)
+        print(
+            f"note: auditioning with model {args.model!r}, but Pipecat's GradiumTTSService "
+            f"cannot select a model, so the bot will use the server default.",
+            file=sys.stderr,
+        )
 
     image_src = None
     if args.image:
@@ -419,7 +457,9 @@ def cmd_generate(args: argparse.Namespace) -> int:
         if image_src.resolve() != (session_dir / image_name).resolve():
             shutil.copy2(image_src, session_dir / image_name)
 
-    print(f"Designing \"{args.name}\" ({args.language}, {args.takes} take{'s' if args.takes != 1 else ''})")
+    print(
+        f'Designing "{args.name}" ({args.language}, {args.takes} take{"s" if args.takes != 1 else ""})'
+    )
     print(f"  {prompt}")
     if image_src is not None:
         print(f"  from image {image_src} (copied to {session_dir / image_name})")
@@ -449,7 +489,7 @@ def cmd_generate(args: argparse.Namespace) -> int:
         elapsed = client.wait_ready(ids)
         print(f" ready in {elapsed:.1f}s")
 
-        print(f"Rendering the audition line: \"{line}\"")
+        print(f'Rendering the audition line: "{line}"')
         for take in session["takes"]:
             path = session_dir / f"take-{take['take']}.wav"
             dt = client.tts_to_file(take["embedding_id"], line, args.model, path)
@@ -468,8 +508,10 @@ def cmd_generate(args: argparse.Namespace) -> int:
         if isinstance(e, KeyboardInterrupt):
             raise
         if isinstance(e, PollTimeout):
-            raise ApiError(f"{e}. The candidates were deleted. Run `generate` again; "
-                           "if it repeats, simplify the description.") from None
+            raise ApiError(
+                f"{e}. The candidates were deleted. Run `generate` again; "
+                "if it repeats, simplify the description."
+            ) from None
         raise ApiError(f"{e}\nThe candidates were deleted. Run `generate` again.") from None
 
     print()
@@ -515,7 +557,10 @@ def cmd_play(args: argparse.Namespace) -> int:
     for i, t in enumerate(takes):
         path = session_dir / t["file"]
         secs = wav_seconds(path)
-        print(f"Playing take {t['take']}" + (f" ({secs:.1f}s)" if secs else "") + f"  {path}", flush=True)
+        print(
+            f"Playing take {t['take']}" + (f" ({secs:.1f}s)" if secs else "") + f"  {path}",
+            flush=True,
+        )
         if any("{path}" in a for a in player):
             argv = [a.replace("{path}", str(path)) for a in player]
         else:
@@ -536,13 +581,15 @@ def cmd_keep(args: argparse.Namespace) -> int:
         return 0
     chosen = next((t for t in session["takes"] if t["take"] == args.take), None)
     if chosen is None:
-        raise ApiError(f"no take {args.take} in {session_dir}; takes are 1 to {len(session['takes'])}")
+        raise ApiError(
+            f"no take {args.take} in {session_dir}; takes are 1 to {len(session['takes'])}"
+        )
 
     client = Client(load_api_key(args.api_key), args.url)
     name = (args.name or session["name"]).strip()
     description = (args.description or session["prompt"])[:500]
 
-    print(f"Keeping take {args.take} as \"{name}\"")
+    print(f'Keeping take {args.take} as "{name}"')
     kept = client.keep(chosen["embedding_id"], name, description)
     voice_id = kept["uid"]
     session["kept"] = {
@@ -557,7 +604,7 @@ def cmd_keep(args: argparse.Namespace) -> int:
     # The voice is permanent from here, so say so before any cleanup can fail.
     print()
     print(f"voice_id: {voice_id}")
-    print(f"This voice is now permanent in your Gradium account as \"{name}\".")
+    print(f'This voice is now permanent in your Gradium account as "{name}".')
     print(f"Recorded in {session_dir / 'session.json'}")
     print()
 
@@ -607,7 +654,9 @@ def py_string(text: str) -> str:
 def cmd_apply(args: argparse.Namespace) -> int:
     bot = pathlib.Path(args.bot)
     if not bot.is_file():
-        raise ApiError(f"{bot} does not exist. Scaffold the server first (see references/pipecat-bot.md).")
+        raise ApiError(
+            f"{bot} does not exist. Scaffold the server first (see references/pipecat-bot.md)."
+        )
 
     language = args.language
     session = None
@@ -634,7 +683,7 @@ def cmd_apply(args: argparse.Namespace) -> int:
     if idx is None:
         print(
             f"No GRADIUM_VOICE_ID constant in {bot}. Add one near the top:\n"
-            f"    GRADIUM_VOICE_ID = \"{voice_id}\"\n"
+            f'    GRADIUM_VOICE_ID = "{voice_id}"\n'
             "and pass voice=GRADIUM_VOICE_ID to GradiumTTSService.Settings "
             "(see references/pipecat-bot.md).",
             file=sys.stderr,
@@ -648,9 +697,9 @@ def cmd_apply(args: argparse.Namespace) -> int:
 
     header = "# The Gradium voice this bot speaks with, designed with the design-voice skill."
     if name and brief:
-        label = f"Voice \"{name}\": {brief}"
+        label = f'Voice "{name}": {brief}'
     else:
-        label = f"Voice \"{name}\"" if name else brief
+        label = f'Voice "{name}"' if name else brief
     new_block = [indent + header]
     if label.strip():
         new_block += [indent + l for l in wrap_comment(" ".join(label.split()))]
@@ -665,12 +714,16 @@ def cmd_apply(args: argparse.Namespace) -> int:
             lines[lidx] = f'{lindent}GRADIUM_LANGUAGE = "{language}"'
             notes.append(f'  language: GRADIUM_LANGUAGE = "{language}"')
         elif language != "en":
-            notes.append(f"  language: no GRADIUM_LANGUAGE constant in this file; make sure the "
-                         f"speech-to-text service is set to {language!r}")
+            notes.append(
+                f"  language: no GRADIUM_LANGUAGE constant in this file; make sure the "
+                f"speech-to-text service is set to {language!r}"
+            )
     if args.persona:
         pidx = next((i for i, l in enumerate(lines) if PERSONA_RE.match(l)), None)
         if pidx is None:
-            notes.append("  persona: no PERSONA constant in this file; set the system prompt by hand")
+            notes.append(
+                "  persona: no PERSONA constant in this file; set the system prompt by hand"
+            )
         else:
             pindent = PERSONA_RE.match(lines[pidx]).group("indent")
             lines[pidx] = f"{pindent}PERSONA = {py_string(args.persona)}"
@@ -678,13 +731,17 @@ def cmd_apply(args: argparse.Namespace) -> int:
     if args.llm:
         lidx = next((i for i, l in enumerate(lines) if LLM_RE.match(l)), None)
         if lidx is None:
-            notes.append("  llm: no LLM_PROVIDER constant in this file (not the template); "
-                         "its LLM is whatever it already uses")
+            notes.append(
+                "  llm: no LLM_PROVIDER constant in this file (not the template); "
+                "its LLM is whatever it already uses"
+            )
         else:
             m = LLM_RE.match(lines[lidx])
             lines[lidx] = f'{m.group("indent")}LLM_PROVIDER = "{args.llm}"'
-            notes.append(f'  llm: LLM_PROVIDER = "{args.llm}" (was {m.group("val")!r}; '
-                         f"needs {LLM_PROVIDERS[args.llm]} in .env)")
+            notes.append(
+                f'  llm: LLM_PROVIDER = "{args.llm}" (was {m.group("val")!r}; '
+                f"needs {LLM_PROVIDERS[args.llm]} in .env)"
+            )
 
     text = "\n".join(lines) + "\n"
     try:
@@ -704,13 +761,14 @@ def cmd_apply(args: argparse.Namespace) -> int:
 
     print(f"Updated {bot}")
     print(f"  was: {previous.strip()}")
-    print(f"  now: GRADIUM_VOICE_ID = \"{voice_id}\"")
+    print(f'  now: GRADIUM_VOICE_ID = "{voice_id}"')
     for n in notes:
         print(n)
     return 0
 
 
 # --------------------------------------------------------------------------- client
+
 
 def copy_tree_keep_existing(src: pathlib.Path, dest: pathlib.Path) -> tuple[int, int]:
     """Copy src into dest without overwriting anything. Returns (copied, kept)."""
@@ -744,8 +802,10 @@ def cmd_client(args: argparse.Namespace) -> int:
         if not (template / "package.json").is_file():
             raise ApiError(f"the client template is missing from {template}")
         copied, kept = copy_tree_keep_existing(template, client_dir)
-        print(f"Scaffolded {client_dir}/ from the skill's client template "
-              f"({copied} files copied" + (f", {kept} existing kept" if kept else "") + ")")
+        print(
+            f"Scaffolded {client_dir}/ from the skill's client template "
+            f"({copied} files copied" + (f", {kept} existing kept" if kept else "") + ")"
+        )
 
     public = client_dir / "public"
     public.mkdir(parents=True, exist_ok=True)
@@ -758,8 +818,10 @@ def cmd_client(args: argparse.Namespace) -> int:
     image_url = None
     if image_src is not None:
         if not image_src.is_file():
-            print(f"warning: {image_src} is missing; the client will show the visualizer instead",
-                  file=sys.stderr)
+            print(
+                f"warning: {image_src} is missing; the client will show the visualizer instead",
+                file=sys.stderr,
+            )
         elif image_src.suffix.lower() not in IMAGE_EXTS:
             raise ApiError(f"{image_src} is not a supported image ({', '.join(IMAGE_EXTS)})")
         else:
@@ -895,8 +957,11 @@ def cmd_env(args: argparse.Namespace) -> int:
             pass
         print(("Updated " if existed else "Created ") + f"{path}: set " + ", ".join(written))
 
-    print(f"bot reads: {path}" + ("" if path.is_file() else " (not created yet)")
-          + (f"   LLM provider: {provider}" if provider else ""))
+    print(
+        f"bot reads: {path}"
+        + ("" if path.is_file() else " (not created yet)")
+        + (f"   LLM provider: {provider}" if provider else "")
+    )
     missing = []
     for var in required + sorted(set(updates) - set(required)):
         in_file = read_dotenv_value(path, var)
@@ -905,40 +970,64 @@ def cmd_env(args: argparse.Namespace) -> int:
         if in_file:
             print(f"  {var}: set")
         elif in_shell and has_empty_line:
-            print(f"  {var}: MISSING. The empty {var}= line in {path} overrides the value "
-                  f"exported in the shell; run `env --from-env` to fill it in")
+            print(
+                f"  {var}: MISSING. The empty {var}= line in {path} overrides the value "
+                f"exported in the shell; run `env --from-env` to fill it in"
+            )
             missing.append(var)
         elif in_shell:
-            print(f"  {var}: set in the shell only (fine for `uv run bot.py`; Docker and "
-                  f"Pipecat Cloud read the file, `env --from-env` copies it there)")
+            print(
+                f"  {var}: set in the shell only (fine for `uv run bot.py`; Docker and "
+                f"Pipecat Cloud read the file, `env --from-env` copies it there)"
+            )
         else:
             print(f"  {var}: MISSING")
             missing.append(var)
     if missing:
-        print(f"Add with: python3 {sys.argv[0]} env --set {missing[0]}=<value>"
-              + (" ..." if len(missing) > 1 else ""))
+        print(
+            f"Add with: python3 {sys.argv[0]} env --set {missing[0]}=<value>"
+            + (" ..." if len(missing) > 1 else "")
+        )
     return 0
 
 
 # --------------------------------------------------------------------------- cli
 
+
 def build_parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    p = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     p.add_argument("--url", default=BASE_URL, help=argparse.SUPPRESS)
-    p.add_argument("--api-key", default=None, help="Gradium API key (default: GRADIUM_API_KEY, then .env)")
+    p.add_argument(
+        "--api-key", default=None, help="Gradium API key (default: GRADIUM_API_KEY, then .env)"
+    )
     sub = p.add_subparsers(dest="cmd", required=True)
 
     g = sub.add_parser("generate", help="describe a voice and render N takes")
     g.add_argument("--name", required=True, help="working name for the voice, e.g. Receptionist")
-    g.add_argument("--prompt", required=True, help=f"voice description, up to {MAX_PROMPT_CHARS} chars")
-    g.add_argument("--line", default=DEFAULT_LINE, help=f"audition line every take speaks, up to {MAX_LINE_CHARS} chars")
+    g.add_argument(
+        "--prompt", required=True, help=f"voice description, up to {MAX_PROMPT_CHARS} chars"
+    )
+    g.add_argument(
+        "--line",
+        default=DEFAULT_LINE,
+        help=f"audition line every take speaks, up to {MAX_LINE_CHARS} chars",
+    )
     g.add_argument("--language", default="en", choices=LANGUAGES)
     g.add_argument("--takes", type=int, default=3, help=f"how many takes, 1 to {MAX_TAKES}")
-    g.add_argument("--model", default=DEFAULT_MODEL, help="TTS model for the audition (experiments only)")
-    g.add_argument("--out-dir", default=None, help="session directory (default: voices/<slug of name>)")
-    g.add_argument("--image", default=None,
-                   help=f"reference image the description was written from ({', '.join(IMAGE_EXTS)}); "
-                        "a copy is kept with the session and the client shows it")
+    g.add_argument(
+        "--model", default=DEFAULT_MODEL, help="TTS model for the audition (experiments only)"
+    )
+    g.add_argument(
+        "--out-dir", default=None, help="session directory (default: voices/<slug of name>)"
+    )
+    g.add_argument(
+        "--image",
+        default=None,
+        help=f"reference image the description was written from ({', '.join(IMAGE_EXTS)}); "
+        "a copy is kept with the session and the client shows it",
+    )
     g.set_defaults(func=cmd_generate)
 
     pl = sub.add_parser("play", help="play the takes")
@@ -950,8 +1039,12 @@ def build_parser() -> argparse.ArgumentParser:
     k = sub.add_parser("keep", help="promote one take to a permanent voice")
     k.add_argument("--session", required=True)
     k.add_argument("--take", type=int, required=True, help="the take to keep, 1-based")
-    k.add_argument("--name", default=None, help="voice name in the account (default: the session name)")
-    k.add_argument("--description", default=None, help="voice description in the account (default: the prompt)")
+    k.add_argument(
+        "--name", default=None, help="voice name in the account (default: the session name)"
+    )
+    k.add_argument(
+        "--description", default=None, help="voice description in the account (default: the prompt)"
+    )
     k.add_argument("--keep-others", action="store_true", help="do not delete the rejected takes")
     k.set_defaults(func=cmd_keep)
 
@@ -963,34 +1056,80 @@ def build_parser() -> argparse.ArgumentParser:
     a.add_argument("--bot", default="server/bot.py", help="path to the Pipecat bot file")
     a.add_argument("--session", default=None, help="session directory with a kept take")
     a.add_argument("--voice-id", default=None, help="a permanent voice_id, instead of --session")
-    a.add_argument("--name", default=None, help="voice name for the comment (default: from the session)")
-    a.add_argument("--brief", default=None, help="voice description for the comment (default: from the session)")
-    a.add_argument("--language", default=None, choices=LANGUAGES,
-                   help="language for GRADIUM_LANGUAGE (default: from the session)")
-    a.add_argument("--persona", default=None,
-                   help='one sentence for the PERSONA constant, e.g. "You are Fionn, the support agent for Northgate IT."')
-    a.add_argument("--llm", default=None, choices=sorted(LLM_PROVIDERS),
-                   help="LLM provider for the LLM_PROVIDER constant")
+    a.add_argument(
+        "--name", default=None, help="voice name for the comment (default: from the session)"
+    )
+    a.add_argument(
+        "--brief",
+        default=None,
+        help="voice description for the comment (default: from the session)",
+    )
+    a.add_argument(
+        "--language",
+        default=None,
+        choices=LANGUAGES,
+        help="language for GRADIUM_LANGUAGE (default: from the session)",
+    )
+    a.add_argument(
+        "--persona",
+        default=None,
+        help='one sentence for the PERSONA constant, e.g. "You are Fionn, the support agent for Northgate IT."',
+    )
+    a.add_argument(
+        "--llm",
+        default=None,
+        choices=sorted(LLM_PROVIDERS),
+        help="LLM provider for the LLM_PROVIDER constant",
+    )
     a.set_defaults(func=cmd_apply)
 
     c = sub.add_parser("client", help="scaffold the web client and write its voice.json")
-    c.add_argument("--session", default=None, help="session directory (name, image, brief, persona)")
+    c.add_argument(
+        "--session", default=None, help="session directory (name, image, brief, persona)"
+    )
     c.add_argument("--client", default="client", help="client directory (default: client)")
-    c.add_argument("--name", default=None, help="voice name shown in the client (default: from the session)")
-    c.add_argument("--image", default=None, help="image to show instead of the visualizer (default: the session's)")
-    c.add_argument("--brief", default=None, help="voice description shown under the name (default: from the session)")
-    c.add_argument("--persona", default=None, help="persona line (default: the one `apply` recorded)")
+    c.add_argument(
+        "--name", default=None, help="voice name shown in the client (default: from the session)"
+    )
+    c.add_argument(
+        "--image",
+        default=None,
+        help="image to show instead of the visualizer (default: the session's)",
+    )
+    c.add_argument(
+        "--brief",
+        default=None,
+        help="voice description shown under the name (default: from the session)",
+    )
+    c.add_argument(
+        "--persona", default=None, help="persona line (default: the one `apply` recorded)"
+    )
     c.set_defaults(func=cmd_client)
 
-    e = sub.add_parser("env", help="create or update the .env the bot reads, and report what is set")
-    e.add_argument("--provider", default=None, choices=sorted(LLM_PROVIDERS),
-                   help="LLM provider whose key is required (default: LLM_PROVIDER from --bot)")
+    e = sub.add_parser(
+        "env", help="create or update the .env the bot reads, and report what is set"
+    )
+    e.add_argument(
+        "--provider",
+        default=None,
+        choices=sorted(LLM_PROVIDERS),
+        help="LLM provider whose key is required (default: LLM_PROVIDER from --bot)",
+    )
     e.add_argument("--bot", default="server/bot.py", help="bot file to read LLM_PROVIDER from")
-    e.add_argument("--file", default=None, help=".env path (default: server/.env if present, else .env)")
-    e.add_argument("--set", action="append", metavar="VAR=value",
-                   help="write a variable (repeatable); the value is never printed")
-    e.add_argument("--from-env", action="store_true",
-                   help="copy required variables that are exported in the shell into the file")
+    e.add_argument(
+        "--file", default=None, help=".env path (default: server/.env if present, else .env)"
+    )
+    e.add_argument(
+        "--set",
+        action="append",
+        metavar="VAR=value",
+        help="write a variable (repeatable); the value is never printed",
+    )
+    e.add_argument(
+        "--from-env",
+        action="store_true",
+        help="copy required variables that are exported in the shell into the file",
+    )
     e.set_defaults(func=cmd_env)
     return p
 
