@@ -4,48 +4,58 @@
 # SPDX-License-Identifier: BSD 2-Clause License
 #
 
-import os
+"""Frame processors that turn the LLM's story text into pages and pictures."""
+
+import asyncio
 import re
 
-import google.ai.generativelanguage as glm
-from async_timeout import timeout
 from loguru import logger
 from pipecat.frames.frames import (
     Frame,
     LLMFullResponseEndFrame,
+    OutputImageRawFrame,
     TextFrame,
     UserStoppedSpeakingFrame,
 )
+from pipecat.processors.aggregators.llm_context import LLMContext
 from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
-from pipecat.services.google.llm import GoogleLLMService
-from pipecat.transports.daily.transport import DailyTransportMessageFrame
+from pipecat.processors.frameworks.rtvi import RTVIServerMessageFrame
+from pipecat.services.image_service import ImageGenService
+from pipecat.services.llm_service import LLMService
 
 from prompts import (
     CUE_ASSISTANT_TURN,
     CUE_USER_TURN,
     FIRST_IMAGE_PROMPT,
     IMAGE_GEN_PROMPT,
+    IMAGE_PROMPT_INSTRUCTIONS,
     NEXT_IMAGE_PROMPT,
 )
 from utils.helpers import load_sounds
 
 sounds = load_sounds(["talking.wav", "listening.wav", "ding.wav"])
 
+# How long to wait for an illustration before narrating the page without one.
+IMAGE_GEN_TIMEOUT_SECS = 15
+
 # -------------- Frame Types ------------- #
 
 
 class StoryPageFrame(TextFrame):
-    # Frame for each sentence in the story before a [break]
+    """A sentence of the story, delimited by [break] in the LLM output."""
+
     pass
 
 
 class StoryImageFrame(TextFrame):
-    # Frame for trigger image generation
+    """An inline <image prompt> found in the LLM output."""
+
     pass
 
 
 class StoryPromptFrame(TextFrame):
-    # Frame for prompting the user for input
+    """The question the LLM asks the user at the end of each response."""
+
     pass
 
 
@@ -53,24 +63,20 @@ class StoryPromptFrame(TextFrame):
 
 
 class StoryImageProcessor(FrameProcessor):
-    """Processor for image prompt frames that will be sent to the FAL service.
+    """Illustrates each story page before it is narrated.
 
-    This processor is responsible for consuming frames of type `StoryImageFrame`.
-    It processes them by passing it to the FAL service.
-    The processed frames are then yielded back.
-
-    Attributes:
-        _image_gen_service: The FAL service, generates the images (fast fast!).
+    For every `StoryPageFrame` the processor asks the LLM (out of band, via
+    `run_inference`) for a short image prompt that keeps characters consistent
+    with earlier pages, generates a picture from it, pushes the image frame to
+    the transport's video output and then passes the page on to TTS.
     """
 
-    def __init__(self, image_gen_service):
+    def __init__(self, llm: LLMService, image_gen: ImageGenService):
         super().__init__()
-        self._image_gen_service = image_gen_service
-        # Create a new LLM service to use a different system prompt, etc
-        self._llm_service = GoogleLLMService(api_key=os.getenv("GOOGLE_API_KEY"))
-
-        self.pages = []
-        self.image_descriptions = []
+        self._llm = llm
+        self._image_gen = image_gen
+        self._pages: list[str] = []
+        self._image_descriptions: list[str] = []
 
     def can_generate_metrics(self) -> bool:
         return True
@@ -79,68 +85,67 @@ class StoryImageProcessor(FrameProcessor):
         await super().process_frame(frame, direction)
 
         if isinstance(frame, StoryPageFrame):
-            # Special syntax for the first page
-            if self.pages == []:
-                prompt = FIRST_IMAGE_PROMPT % frame.text
-            else:
-                prompt = NEXT_IMAGE_PROMPT % (
-                    " ".join(self.pages),
-                    "; ".join(self.image_descriptions),
-                    frame.text,
-                )
+            await self._illustrate(frame.text)
 
-            await self.start_ttfb_metrics()
-            # TODO: This is coupled to google implementation now
-            txt = glm.Content(role="user", parts=[glm.Part(text=prompt)])
-            llm_response = await self._llm_service._client.generate_content_async(
-                contents=[txt], stream=False
-            )
-            image_description = llm_response.text
-            self.pages.append(frame.text)
-            self.image_descriptions.append(image_description)
-            try:
-                async with timeout(15):
-                    async for i in self._image_gen_service.run_image_gen(
-                        IMAGE_GEN_PROMPT % image_description
-                    ):
-                        await self.push_frame(i)
-            except TimeoutError:
-                logger.debug("Image gen timeout")
-                pass
-            await self.stop_ttfb_metrics()
-            # Push the StoryPageFrame so it gets TTS
-            await self.push_frame(frame)
+        await self.push_frame(frame, direction)
+
+    async def _illustrate(self, page: str):
+        if not self._pages:
+            prompt = FIRST_IMAGE_PROMPT % page
         else:
-            await self.push_frame(frame)
+            prompt = NEXT_IMAGE_PROMPT % (
+                " ".join(self._pages),
+                "; ".join(self._image_descriptions),
+                page,
+            )
+
+        await self.start_ttfb_metrics()
+        try:
+            description = await self._llm.run_inference(
+                LLMContext(messages=[{"role": "user", "content": prompt}]),
+                system_instruction=IMAGE_PROMPT_INSTRUCTIONS,
+            )
+            if not description:
+                logger.warning("No image description generated, skipping illustration")
+                return
+
+            self._pages.append(page)
+            self._image_descriptions.append(description)
+
+            async with asyncio.timeout(IMAGE_GEN_TIMEOUT_SECS):
+                async for image in self._image_gen.run_image_gen(IMAGE_GEN_PROMPT % description):
+                    if isinstance(image, OutputImageRawFrame):
+                        await self.push_frame(image)
+                    else:
+                        logger.warning(f"Image generation returned {image}")
+        except TimeoutError:
+            logger.debug("Image generation timed out, narrating without an illustration")
+        finally:
+            await self.stop_ttfb_metrics()
 
 
 class StoryProcessor(FrameProcessor):
-    """Primary frame processor. It takes the frames generated by the LLM
-    and processes them into image prompts and story pages (sentences).
-    For a clearer picture of how this works, reference prompts.py
+    """Splits the streamed LLM output into story pages and image prompts.
 
-    Attributes:
-        _messages (list): A list of llm messages.
-        _text (str): A buffer to store the text from text frames.
-        _story (list): A list to store the story sentences, or 'pages'.
-
-    Methods:
-        process_frame: Processes a frame and removes any [break] or [image] tokens.
+    The prompt asks the LLM to end every story sentence with `[break]` and to
+    wrap image prompts in `<...>`. This processor buffers the text frames,
+    emits a `StoryPageFrame` per sentence (so TTS speaks one page at a time)
+    and a `StoryImageFrame` per inline image prompt, and tells the client whose
+    turn it is via RTVI server messages. See prompts.py for the format.
     """
 
-    def __init__(self, messages, story):
+    def __init__(self):
         super().__init__()
-        self._messages = messages
         self._text = ""
-        self._story = story
 
     async def process_frame(self, frame: Frame, direction: FrameDirection):
         await super().process_frame(frame, direction)
 
         if isinstance(frame, UserStoppedSpeakingFrame):
-            # Send an app message to the UI
-            await self.push_frame(DailyTransportMessageFrame(CUE_ASSISTANT_TURN))
+            # Let the UI know the bot is about to respond
+            await self.push_frame(RTVIServerMessageFrame(data=CUE_ASSISTANT_TURN))
             await self.push_frame(sounds["talking"])
+            await self.push_frame(frame, direction)
 
         elif isinstance(frame, TextFrame):
             # Add new text to the buffer
@@ -155,14 +160,14 @@ class StoryProcessor(FrameProcessor):
             # We use a different frame type, as to avoid image generation ingest
             await self.push_frame(StoryPromptFrame(self._text))
             self._text = ""
-            await self.push_frame(frame)
-            # Send an app message to the UI
-            await self.push_frame(DailyTransportMessageFrame(CUE_USER_TURN))
+            await self.push_frame(frame, direction)
+            # Hand the turn back to the user
+            await self.push_frame(RTVIServerMessageFrame(data=CUE_USER_TURN))
             await self.push_frame(sounds["listening"])
 
-        # Anything that is not a TextFrame pass through
+        # Anything that is not a TextFrame passes through
         else:
-            await self.push_frame(frame)
+            await self.push_frame(frame, direction)
 
     async def process_text_content(self):
         """Process text content in order of appearance, handling both image prompts and story breaks."""
@@ -179,7 +184,7 @@ class StoryProcessor(FrameProcessor):
             image_pos = image_match.start() if image_match else float("inf")
             break_pos = break_match.start() if break_match else float("inf")
 
-            if image_pos < break_pos:
+            if image_match and image_pos < break_pos:
                 # Process image prompt first
                 image_prompt = image_match.group(1)
                 # Remove the image prompt from the text
@@ -191,10 +196,8 @@ class StoryProcessor(FrameProcessor):
                 before_break = parts[0].replace("\n", " ").strip()
 
                 if len(before_break) > 2:
-                    self._story.append(before_break)
                     await self.push_frame(StoryPageFrame(before_break))
-                    # await self.push_frame(sounds["ding"])
-                    await self.push_frame(DailyTransportMessageFrame(CUE_ASSISTANT_TURN))
+                    await self.push_frame(RTVIServerMessageFrame(data=CUE_ASSISTANT_TURN))
 
                 # Keep the remainder (if any) in the buffer
                 self._text = parts[1].strip() if len(parts) > 1 else ""

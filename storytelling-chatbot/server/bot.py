@@ -4,12 +4,19 @@
 # SPDX-License-Identifier: BSD 2-Clause License
 #
 
-import argparse
+"""Storytelling chatbot.
+
+A voice-driven "choose your own adventure" storyteller. Gemini writes the story
+a few sentences at a time, Imagen illustrates each page, ElevenLabs narrates it,
+and the bot pauses after every scene to ask the listener what should happen next.
+
+Run locally with ``uv run bot.py`` (SmallWebRTC by default) or deploy the same
+file to Pipecat Cloud; ``pipecat.runner`` provides the server glue in both cases.
+"""
+
 import asyncio
 import os
-import sys
 
-import aiohttp
 from dotenv import load_dotenv
 from loguru import logger
 from pipecat.audio.vad.silero import SileroVADAnalyzer
@@ -21,141 +28,153 @@ from pipecat.processors.aggregators.llm_response_universal import (
     LLMContextAggregatorPair,
     LLMUserAggregatorParams,
 )
+from pipecat.processors.frameworks.rtvi import RTVIServerMessageFrame
+from pipecat.runner.types import RunnerArguments
+from pipecat.runner.utils import create_transport
+from pipecat.services.deepgram.stt import DeepgramSTTService
 from pipecat.services.elevenlabs.tts import ElevenLabsTTSService
 from pipecat.services.google.image import GoogleImageGenService
 from pipecat.services.google.llm import GoogleLLMService
-from pipecat.transports.daily.transport import (
-    DailyParams,
-    DailyTransport,
-    DailyTransportMessageFrame,
-)
+from pipecat.transports.base_transport import BaseTransport, TransportParams
+from pipecat.transports.daily.transport import DailyParams
 from pipecat.workers.runner import WorkerRunner
 
 from processors import StoryImageProcessor, StoryProcessor
 from prompts import CUE_USER_TURN, LLM_BASE_PROMPT
-from utils.helpers import load_images, load_sounds
+from utils.helpers import load_images
 
 load_dotenv(override=True)
 
-logger.remove(0)
-logger.add(sys.stderr, level="DEBUG")
+# The hosted demo is shared, so each story ends after this many seconds.
+# Set to 0 to disable the limit.
+MAX_SESSION_SECS = int(os.getenv("MAX_SESSION_SECS", "300"))
 
-sounds = load_sounds(["listening.wav"])
+# The bot "video" is the current story illustration, so it needs a video
+# output track. We store functions so transport params don't get instantiated
+# until the desired transport is selected.
+transport_params = {
+    "daily": lambda: DailyParams(
+        audio_in_enabled=True,
+        audio_out_enabled=True,
+        video_out_enabled=True,
+        video_out_width=1024,
+        video_out_height=1024,
+    ),
+    "webrtc": lambda: TransportParams(
+        audio_in_enabled=True,
+        audio_out_enabled=True,
+        video_out_enabled=True,
+        video_out_width=1024,
+        video_out_height=1024,
+    ),
+}
+
+# Static book images shown before the first illustration is generated.
 images = load_images(["book1.png", "book2.png"])
 
 
-async def main(room_url, token=None):
-    async with aiohttp.ClientSession() as session:
-        # -------------- Transport --------------- #
+async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
+    logger.info("Starting storytelling bot")
 
-        transport = DailyTransport(
-            room_url,
-            token,
-            "Storytelling Bot",
-            DailyParams(
-                audio_in_enabled=True,
-                audio_out_enabled=True,
-                video_out_enabled=True,
-                video_out_width=1024,
-                video_out_height=1024,
-                transcription_enabled=True,
-            ),
-        )
+    stt = DeepgramSTTService(api_key=os.getenv("DEEPGRAM_API_KEY"))
 
-        logger.debug("Transport created for room:" + room_url)
+    # Our creative writer. The image prompts are also generated with this
+    # service, out of band, in StoryImageProcessor.
+    llm = GoogleLLMService(
+        api_key=os.getenv("GOOGLE_API_KEY"),
+        settings=GoogleLLMService.Settings(system_instruction=LLM_BASE_PROMPT),
+    )
 
-        # -------------- Services --------------- #
+    tts = ElevenLabsTTSService(
+        api_key=os.getenv("ELEVENLABS_API_KEY"),
+        settings=ElevenLabsTTSService.Settings(voice=os.getenv("ELEVENLABS_VOICE_ID")),
+    )
 
-        llm_service = GoogleLLMService(api_key=os.getenv("GOOGLE_API_KEY"))
+    image_gen = GoogleImageGenService(api_key=os.getenv("GOOGLE_API_KEY"))
 
-        tts_service = ElevenLabsTTSService(
-            api_key=os.getenv("ELEVENLABS_API_KEY"),
-            settings=ElevenLabsTTSService.Settings(
-                voice=os.getenv("ELEVENLABS_VOICE_ID"),
-            ),
-        )
+    context = LLMContext()
+    user_aggregator, assistant_aggregator = LLMContextAggregatorPair(
+        context,
+        user_params=LLMUserAggregatorParams(vad_analyzer=SileroVADAnalyzer()),
+    )
 
-        image_gen = GoogleImageGenService(api_key=os.getenv("GOOGLE_API_KEY"))
+    # Splits the LLM output into story pages and turns each page into an
+    # illustration before it is narrated.
+    story_processor = StoryProcessor()
+    image_processor = StoryImageProcessor(llm, image_gen)
 
-        # --------------- Setup ----------------- #
+    pipeline = Pipeline(
+        [
+            transport.input(),
+            stt,
+            user_aggregator,
+            llm,
+            story_processor,
+            image_processor,
+            tts,
+            transport.output(),
+            assistant_aggregator,
+        ]
+    )
 
-        message_history = [LLM_BASE_PROMPT]
-        story_pages = []
+    worker = PipelineWorker(
+        pipeline,
+        params=PipelineParams(
+            enable_metrics=True,
+            enable_usage_metrics=True,
+        ),
+        idle_timeout_secs=runner_args.pipeline_idle_timeout_secs,
+    )
 
-        # We need aggregators to keep track of user and LLM responses
-        context = LLMContext(message_history)
-        user_aggregator, assistant_aggregator = LLMContextAggregatorPair(
-            context,
-            user_params=LLMUserAggregatorParams(
-                vad_analyzer=SileroVADAnalyzer(),
-            ),
-        )
+    runner = WorkerRunner(handle_sigint=runner_args.handle_sigint)
+    await runner.add_workers(worker)
 
-        # -------------- Processors ------------- #
+    session_timer: asyncio.Task | None = None
 
-        story_processor = StoryProcessor(message_history, story_pages)
-        image_processor = StoryImageProcessor(image_gen)
+    async def end_session_after(secs: int):
+        await asyncio.sleep(secs)
+        logger.info(f"Session limit of {secs}s reached, ending the story")
+        # EndFrame lets whatever is queued finish before the pipeline stops.
+        await worker.queue_frame(EndFrame())
 
-        # -------------- Story Loop ------------- #
-
-        logger.debug("Waiting for participant...")
-        main_pipeline = Pipeline(
+    @worker.rtvi.event_handler("on_client_ready")
+    async def on_client_ready(rtvi):
+        nonlocal session_timer
+        logger.debug("Client ready, storytime commence!")
+        await worker.queue_frames(
             [
-                transport.input(),
-                user_aggregator,
-                llm_service,
-                story_processor,
-                image_processor,
-                tts_service,
-                transport.output(),
-                assistant_aggregator,
+                images["book1"],
+                LLMRunFrame(),
+                RTVIServerMessageFrame(data=CUE_USER_TURN),
+                images["book2"],
             ]
         )
+        if MAX_SESSION_SECS > 0 and session_timer is None:
+            session_timer = asyncio.create_task(end_session_after(MAX_SESSION_SECS))
 
-        worker = PipelineWorker(
-            main_pipeline,
-            params=PipelineParams(
-                enable_metrics=True,
-                enable_usage_metrics=True,
-            ),
-        )
+    @transport.event_handler("on_client_connected")
+    async def on_client_connected(transport, client):
+        logger.info("Client connected")
 
-        runner = WorkerRunner()
+    @transport.event_handler("on_client_disconnected")
+    async def on_client_disconnected(transport, client):
+        logger.info("Client disconnected")
+        await runner.cancel()
 
-        await runner.add_workers(worker)
-
-        @transport.event_handler("on_first_participant_joined")
-        async def on_first_participant_joined(transport, participant):
-            logger.debug("Participant joined, storytime commence!")
-            await transport.capture_participant_transcription(participant["id"])
-            await worker.queue_frames(
-                [
-                    images["book1"],
-                    LLMRunFrame(),
-                    DailyTransportMessageFrame(CUE_USER_TURN),
-                    # sounds["listening"],
-                    images["book2"],
-                ]
-            )
-
-        @transport.event_handler("on_participant_left")
-        async def on_participant_left(transport, participant, reason):
-            await runner.cancel()
-
-        @transport.event_handler("on_call_state_updated")
-        async def on_call_state_updated(transport, state):
-            if state == "left":
-                # Here we don't want to cancel, we just want to finish sending
-                # whatever is queued, so we use an EndFrame().
-                await worker.queue_frame(EndFrame())
-
+    try:
         await runner.run()
+    finally:
+        if session_timer:
+            session_timer.cancel()
+
+
+async def bot(runner_args: RunnerArguments):
+    """Main bot entry point compatible with Pipecat Cloud."""
+    transport = await create_transport(runner_args, transport_params)
+    await run_bot(transport, runner_args)
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Daily Storyteller Bot")
-    parser.add_argument("-u", type=str, help="Room URL")
-    parser.add_argument("-t", type=str, help="Token")
-    config = parser.parse_args()
+    from pipecat.runner.run import main
 
-    asyncio.run(main(config.u, config.t))
+    main()

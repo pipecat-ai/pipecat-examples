@@ -1,3 +1,11 @@
+#
+# Copyright (c) 2025, Daily
+#
+# SPDX-License-Identifier: BSD 2-Clause License
+#
+
+"""Helpers that load the bundled images and sound effects as output frames."""
+
 import os
 import wave
 
@@ -7,35 +15,30 @@ from pipecat.frames.frames import OutputAudioRawFrame, OutputImageRawFrame
 script_dir = os.path.dirname(__file__)
 
 
-def load_images(image_files):
+def load_images(image_files: list[str]) -> dict[str, OutputImageRawFrame]:
+    """Load PNGs from the assets folder as RGB image frames keyed by file stem."""
     images = {}
     for file in image_files:
-        # Build the full path to the image file
         full_path = os.path.join(script_dir, "../assets", file)
-        # Get the filename without the extension to use as the dictionary key
         filename = os.path.splitext(os.path.basename(full_path))[0]
-        # Open the image and convert it to bytes
         with Image.open(full_path) as img:
+            rgb = img.convert("RGB")
             images[filename] = OutputImageRawFrame(
-                image=img.tobytes(), size=img.size, format=img.format
+                image=rgb.tobytes(), size=rgb.size, format=rgb.mode
             )
     return images
 
 
-def load_sounds(sound_files):
+def load_sounds(sound_files: list[str]) -> dict[str, OutputAudioRawFrame]:
+    """Load WAVs from the assets folder as audio frames keyed by file stem."""
     sounds = {}
-
     for file in sound_files:
-        # Build the full path to the sound file
         full_path = os.path.join(script_dir, "../assets", file)
-        # Get the filename without the extension to use as the dictionary key
         filename = os.path.splitext(os.path.basename(full_path))[0]
-        # Open the sound and convert it to bytes
         with wave.open(full_path) as audio_file:
             sounds[filename] = OutputAudioRawFrame(
                 audio=audio_file.readframes(-1),
                 sample_rate=audio_file.getframerate(),
                 num_channels=audio_file.getnchannels(),
             )
-
     return sounds

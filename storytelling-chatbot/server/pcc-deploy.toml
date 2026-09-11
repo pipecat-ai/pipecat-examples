@@ -1,0 +1,7 @@
+agent_name = "storytelling-chatbot"
+secret_set = "storytelling-chatbot-secrets"
+# Image generation plus a 1024x1024 video track is CPU heavy
+agent_profile = "agent-2x"
+
+[scaling]
+	min_agents = 1

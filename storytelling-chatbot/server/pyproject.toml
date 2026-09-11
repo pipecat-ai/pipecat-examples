@@ -1,20 +1,16 @@
 [project]
-name = "server"
+name = "storytelling-chatbot"
 version = "0.1.0"
-description = "Pipecat example - server"
+description = "Pipecat example - voice-driven interactive storytelling bot"
 requires-python = ">=3.11"
 dependencies = [
-    "async_timeout",
-    "fastapi",
-    "uvicorn",
-    "python-dotenv",
-    "pipecat-ai[daily,silero,openai,cartesia,google,webrtc]>=1.8.0",
+    "pipecat-ai[daily,deepgram,elevenlabs,google,runner,silero,webrtc]>=1.9.0",
+    "pipecatcloud>=1.2.0",
 ]
 
 [dependency-groups]
 dev = [
-    "pyright>=1.1.404,<2",
-    "ruff>=0.12.11,<1",
+    "ruff~=0.12.1",
 ]
 
 [tool.ruff]
