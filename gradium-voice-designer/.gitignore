@@ -1,0 +1,15 @@
+# Secrets
+.env
+
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+.ruff_cache/
+
+# Node (the client)
+node_modules/
+client/dist/
+
+# Voice design audition takes (session.json is kept as the record)
+voices/**/*.wav

@@ -1,0 +1,20 @@
+[project]
+name = "gradium-voice-bot"
+version = "0.1.0"
+description = "Pipecat voice bot with a Gradium designed voice"
+requires-python = ">=3.11"
+dependencies = [
+    "pipecat-ai[anthropic,google,gradium,openai,runner,silero,webrtc]>=1.8.1",
+    "pipecatcloud",
+]
+
+[dependency-groups]
+dev = [
+    "pyright>=1.1.404,<2",
+    "ruff>=0.12.11,<1",
+]
+
+[tool.ruff]
+line-length = 100
+[tool.ruff.lint]
+select = ["I", "UP"]
