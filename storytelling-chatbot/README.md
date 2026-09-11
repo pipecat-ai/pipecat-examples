@@ -1,5 +1,3 @@
-[![Try](https://img.shields.io/badge/try_it-here-blue)](https://gemini-storybot.vercel.app/)
-
 # Storytelling Chatbot
 
 <img src="image.png" width="420px">
@@ -7,7 +5,9 @@
 This example shows how to build a voice-driven interactive storytelling experience.
 It periodically prompts the user for input for a 'choose your own adventure' style experience.
 
-We use Gemini 2.0 for creating the story and image prompts, and we add visual elements to the story by generating images using Google's Imagen.
+Gemini writes the story a few sentences at a time and a Gemini image model illustrates each page. The illustrations are streamed to the browser as the bot's video track, so the client is a regular Pipecat web client that happens to show video.
+
+The bot runs locally with the Pipecat development runner over SmallWebRTC and deploys unchanged to [Pipecat Cloud](https://pipecat.daily.co).
 
 ---
 
@@ -15,96 +15,111 @@ We use Gemini 2.0 for creating the story and image prompts, and we add visual el
 
 **Deepgram - Speech-to-Text**
 
-Transcribes inbound participant voice media to text.
+Transcribes the user's voice to text.
 
-**Google Gemini 2.0 - LLM**
+**Google Gemini - LLM**
 
-Our creative writer LLM. You can see the context used to prompt it [here](server/prompts.py)
+Our creative writer LLM. You can see the prompt [here](server/prompts.py). The same service is used out of band (`run_inference`) to turn each story page into an image prompt.
 
 **ElevenLabs - Text-to-Speech**
 
-Converts and streams the LLM response from text to audio
+Narrates the story as it is written.
 
-**Google Imagen - Image Generation**
+**Google Gemini image model - Image Generation**
 
-Adds pictures to our story. Prompting is quite key for style consistency, so we task the LLM to turn each story page into a short image prompt.
+Adds pictures to our story. Prompting is quite key for style consistency, so we task the LLM to turn each story page into a short image prompt. See [gemini_image.py](server/gemini_image.py) for the small `ImageGenService` that wraps the model.
 
 ---
 
-## Setup
+## How it works
 
-### Client
+- `server/bot.py` builds the pipeline: `transport.input() → stt → user_aggregator → llm → story_processor → image_processor → tts → transport.output() → assistant_aggregator`.
+- `StoryProcessor` splits the streamed LLM text into story pages on the `[break]` markers the prompt asks for, and sends `user_turn` / `assistant_turn` cues to the client as RTVI server messages.
+- `StoryImageProcessor` queues each page to a background task that asks the LLM for an image prompt and generates the illustration, so narration is never held up by image generation.
+- The client (Next.js + [Pipecat React SDK](https://docs.pipecat.ai/client/react/introduction)) renders the bot's video track, shows transcripts from the RTVI `UserTranscript` and `BotTtsText` events, and unmutes the mic when it receives the `user_turn` cue.
 
-1. Navigate to the client directory:
+## Quick Start
 
-   ```shell
-   cd client
-   ```
+To run this demo, you'll need two terminal windows.
 
-2. Install dependencies:
+### Terminal 1: Server
 
-   ```shell
-   npm install
-   ```
-
-3. Build the client:
+1. Navigate to the server directory and install dependencies:
 
    ```shell
-   npm run build
-   ```
-
-### Server
-
-1. Navigate to the server directory
-
-   ```shell
-   cd ../server
-   ```
-
-2. Install dependencies
-
-   ```shell
+   cd server
    uv sync
    ```
 
-3. Create environment file and set variables
+2. Create the environment file and set your API keys:
 
    ```shell
    cp env.example .env
    ```
 
-   You'll need API keys for:
+   You'll need:
 
-   - DAILY_API_KEY
-   - ELEVENLABS_API_KEY
-   - ELEVENLABS_VOICE_ID
-   - GOOGLE_API_KEY
+   - `DEEPGRAM_API_KEY`
+   - `ELEVENLABS_API_KEY` and `ELEVENLABS_VOICE_ID`
+   - `GOOGLE_API_KEY`
 
-4. (Optional) Deployment:
-
-   When deploying to production, to ensure only this app can spawn new bot processes, set your `ENV` to `production`
-
-## Run it locally
-
-1. Navigate back to the demo's root directory:
+3. Run the bot:
 
    ```shell
-   cd ..
+   uv run bot.py
    ```
 
-2. Run the application:
+   The runner listens on http://localhost:7860 and, by default, keeps every transport enabled. The client uses SmallWebRTC; set `DAILY_API_KEY` if you want to try the Daily transport instead.
+
+### Terminal 2: Client
+
+1. Navigate to the client directory and install dependencies:
 
    ```shell
-   uv run server/bot_runner.py --host localhost
+   cd client
+   npm install
    ```
 
-   You can run with a custom domain or port using: `uv run server/bot_runner.py --host somehost --p someport`
+2. Create the environment file:
 
-3. ➡️ Open the host URL in your browser: http://localhost:7860
+   ```shell
+   cp env.example .env.local
+   ```
 
----
+   The defaults point at the local runner.
 
-## Improvements to make
+3. Start the client:
 
-- Wait for track_started event to avoid rushed intro
-- Show 5 minute timer on the UI
+   ```shell
+   npm run dev
+   ```
+
+4. Open http://localhost:3000, pick your microphone and click **Let's begin!**
+
+Each story ends after five minutes by default; change `MAX_SESSION_SECS` in `server/.env` to adjust (0 disables the limit).
+
+## Deploy to Pipecat Cloud
+
+1. Sign up for [Pipecat Cloud](https://pipecat.daily.co) and make sure Docker is running.
+
+2. From the `server` directory, upload your `.env` as a secret set and deploy. `pcc-deploy.toml` names the agent `storytelling-chatbot`, requests the `agent-2x` profile (image generation and a 1024x1024 video track are CPU heavy) and keeps one warm instance:
+
+   ```shell
+   cd server
+   uv run pcc auth login
+   uv run pcc secrets set storytelling-chatbot-secrets --file .env
+   uv run pcc deploy
+   ```
+
+   The Dockerfile installs from `uv.lock`, so run `uv sync` (or `uv lock`) before deploying.
+
+3. Point the client at your agent by editing `client/.env.local`:
+
+   ```shell
+   BOT_START_URL="https://api.pipecat.daily.co/v1/public/storytelling-chatbot/start"
+   BOT_START_PUBLIC_API_KEY="pk_..."
+   ```
+
+   The Next.js API routes under `client/app/api` forward the start request and the WebRTC offer to Pipecat Cloud, so the public key never reaches the browser. Deploy the client anywhere that runs Next.js (Vercel, for example) with those two environment variables set.
+
+See the [Pipecat Cloud quickstart](https://docs.pipecat.ai/getting-started/quickstart#step-2%3A-deploy-to-production) for more details.
