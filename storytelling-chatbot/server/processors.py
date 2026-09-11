@@ -8,12 +8,18 @@
 
 import asyncio
 import re
+from dataclasses import dataclass
+from typing import Any
 
 from loguru import logger
 from pipecat.frames.frames import (
+    AggregatedTextFrame,
+    CancelFrame,
+    EndFrame,
     Frame,
     LLMFullResponseEndFrame,
     OutputImageRawFrame,
+    StartFrame,
     TextFrame,
     UserStoppedSpeakingFrame,
 )
@@ -22,6 +28,7 @@ from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
 from pipecat.processors.frameworks.rtvi import RTVIServerMessageFrame
 from pipecat.services.image_service import ImageGenService
 from pipecat.services.llm_service import LLMService
+from pipecat.utils.text.base_text_aggregator import AggregationType
 
 from prompts import (
     CUE_ASSISTANT_TURN,
@@ -35,16 +42,21 @@ from utils.helpers import load_sounds
 
 sounds = load_sounds(["talking.wav", "listening.wav", "ding.wav"])
 
-# How long to wait for an illustration before narrating the page without one.
-IMAGE_GEN_TIMEOUT_SECS = 15
+# How long to wait for an illustration before giving up on it.
+IMAGE_GEN_TIMEOUT_SECS = 20
 
 # -------------- Frame Types ------------- #
 
 
-class StoryPageFrame(TextFrame):
-    """A sentence of the story, delimited by [break] in the LLM output."""
+@dataclass
+class StoryPageFrame(AggregatedTextFrame):
+    """A sentence of the story, delimited by [break] in the LLM output.
 
-    pass
+    It is an already-aggregated sentence so the TTS service speaks it as soon
+    as it arrives instead of buffering it with the next page.
+    """
+
+    aggregated_by: AggregationType | str = AggregationType.SENTENCE
 
 
 class StoryImageFrame(TextFrame):
@@ -63,31 +75,51 @@ class StoryPromptFrame(TextFrame):
 
 
 class StoryImageProcessor(FrameProcessor):
-    """Illustrates each story page before it is narrated.
+    """Illustrates each story page while it is being narrated.
 
-    For every `StoryPageFrame` the processor asks the LLM (out of band, via
+    Pages are queued to a background task so narration is never held up by
+    image generation. For each page the task asks the LLM (out of band, via
     `run_inference`) for a short image prompt that keeps characters consistent
-    with earlier pages, generates a picture from it, pushes the image frame to
-    the transport's video output and then passes the page on to TTS.
+    with earlier pages, generates a picture from it and pushes the image frame
+    to the transport's video output.
     """
 
-    def __init__(self, llm: LLMService, image_gen: ImageGenService):
+    def __init__(self, llm: LLMService[Any], image_gen: ImageGenService):
         super().__init__()
         self._llm = llm
         self._image_gen = image_gen
         self._pages: list[str] = []
         self._image_descriptions: list[str] = []
-
-    def can_generate_metrics(self) -> bool:
-        return True
+        self._queue: asyncio.Queue[str] = asyncio.Queue()
+        self._task: asyncio.Task | None = None
 
     async def process_frame(self, frame: Frame, direction: FrameDirection):
         await super().process_frame(frame, direction)
 
-        if isinstance(frame, StoryPageFrame):
-            await self._illustrate(frame.text)
+        if isinstance(frame, StartFrame):
+            self._task = self.create_task(self._illustrate_pages())
+        elif isinstance(frame, (EndFrame, CancelFrame)):
+            await self._stop()
+        elif isinstance(frame, StoryPageFrame):
+            await self._queue.put(frame.text)
 
         await self.push_frame(frame, direction)
+
+    async def _stop(self):
+        if self._task:
+            await self.cancel_task(self._task)
+            self._task = None
+
+    async def _illustrate_pages(self):
+        while True:
+            page = await self._queue.get()
+            try:
+                async with asyncio.timeout(IMAGE_GEN_TIMEOUT_SECS):
+                    await self._illustrate(page)
+            except TimeoutError:
+                logger.debug("Image generation timed out, skipping this illustration")
+            except Exception as e:
+                logger.warning(f"Image generation failed: {e}")
 
     async def _illustrate(self, page: str):
         if not self._pages:
@@ -99,29 +131,22 @@ class StoryImageProcessor(FrameProcessor):
                 page,
             )
 
-        await self.start_ttfb_metrics()
-        try:
-            description = await self._llm.run_inference(
-                LLMContext(messages=[{"role": "user", "content": prompt}]),
-                system_instruction=IMAGE_PROMPT_INSTRUCTIONS,
-            )
-            if not description:
-                logger.warning("No image description generated, skipping illustration")
-                return
+        description = await self._llm.run_inference(
+            LLMContext(messages=[{"role": "user", "content": prompt}]),
+            system_instruction=IMAGE_PROMPT_INSTRUCTIONS,
+        )
+        if not description:
+            logger.warning("No image description generated, skipping illustration")
+            return
 
-            self._pages.append(page)
-            self._image_descriptions.append(description)
+        self._pages.append(page)
+        self._image_descriptions.append(description)
 
-            async with asyncio.timeout(IMAGE_GEN_TIMEOUT_SECS):
-                async for image in self._image_gen.run_image_gen(IMAGE_GEN_PROMPT % description):
-                    if isinstance(image, OutputImageRawFrame):
-                        await self.push_frame(image)
-                    else:
-                        logger.warning(f"Image generation returned {image}")
-        except TimeoutError:
-            logger.debug("Image generation timed out, narrating without an illustration")
-        finally:
-            await self.stop_ttfb_metrics()
+        async for image in self._image_gen.run_image_gen(IMAGE_GEN_PROMPT % description):
+            if isinstance(image, OutputImageRawFrame):
+                await self.push_frame(image)
+            else:
+                logger.warning(f"Image generation returned {image}")
 
 
 class StoryProcessor(FrameProcessor):
@@ -196,7 +221,7 @@ class StoryProcessor(FrameProcessor):
                 before_break = parts[0].replace("\n", " ").strip()
 
                 if len(before_break) > 2:
-                    await self.push_frame(StoryPageFrame(before_break))
+                    await self.push_frame(StoryPageFrame(text=before_break))
                     await self.push_frame(RTVIServerMessageFrame(data=CUE_ASSISTANT_TURN))
 
                 # Keep the remainder (if any) in the buffer

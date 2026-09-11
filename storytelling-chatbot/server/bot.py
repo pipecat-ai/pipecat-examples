@@ -7,7 +7,7 @@
 """Storytelling chatbot.
 
 A voice-driven "choose your own adventure" storyteller. Gemini writes the story
-a few sentences at a time, Imagen illustrates each page, ElevenLabs narrates it,
+a few sentences at a time, a Gemini image model illustrates each page, ElevenLabs narrates it,
 and the bot pauses after every scene to ask the listener what should happen next.
 
 Run locally with ``uv run bot.py`` (SmallWebRTC by default) or deploy the same
@@ -28,19 +28,18 @@ from pipecat.processors.aggregators.llm_response_universal import (
     LLMContextAggregatorPair,
     LLMUserAggregatorParams,
 )
-from pipecat.processors.frameworks.rtvi import RTVIServerMessageFrame
 from pipecat.runner.types import RunnerArguments
 from pipecat.runner.utils import create_transport
 from pipecat.services.deepgram.stt import DeepgramSTTService
 from pipecat.services.elevenlabs.tts import ElevenLabsTTSService
-from pipecat.services.google.image import GoogleImageGenService
 from pipecat.services.google.llm import GoogleLLMService
 from pipecat.transports.base_transport import BaseTransport, TransportParams
 from pipecat.transports.daily.transport import DailyParams
 from pipecat.workers.runner import WorkerRunner
 
+from gemini_image import GeminiImageGenService
 from processors import StoryImageProcessor, StoryProcessor
-from prompts import CUE_USER_TURN, LLM_BASE_PROMPT
+from prompts import LLM_BASE_PROMPT
 from utils.helpers import load_images
 
 load_dotenv(override=True)
@@ -90,7 +89,8 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
         settings=ElevenLabsTTSService.Settings(voice=os.getenv("ELEVENLABS_VOICE_ID")),
     )
 
-    image_gen = GoogleImageGenService(api_key=os.getenv("GOOGLE_API_KEY"))
+    # Illustrations come from a Gemini image model (Imagen needs Vertex AI)
+    image_gen = GeminiImageGenService(api_key=os.getenv("GOOGLE_API_KEY"))
 
     context = LLMContext()
     user_aggregator, assistant_aggregator = LLMContextAggregatorPair(
@@ -98,8 +98,8 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
         user_params=LLMUserAggregatorParams(vad_analyzer=SileroVADAnalyzer()),
     )
 
-    # Splits the LLM output into story pages and turns each page into an
-    # illustration before it is narrated.
+    # Splits the LLM output into story pages and illustrates each page while
+    # it is being narrated.
     story_processor = StoryProcessor()
     image_processor = StoryImageProcessor(llm, image_gen)
 
@@ -141,14 +141,9 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     async def on_client_ready(rtvi):
         nonlocal session_timer
         logger.debug("Client ready, storytime commence!")
-        await worker.queue_frames(
-            [
-                images["book1"],
-                LLMRunFrame(),
-                RTVIServerMessageFrame(data=CUE_USER_TURN),
-                images["book2"],
-            ]
-        )
+        # Show the book, then let the LLM introduce itself. StoryProcessor
+        # hands the turn to the user once the introduction has been spoken.
+        await worker.queue_frames([images["book1"], LLMRunFrame(), images["book2"]])
         if MAX_SESSION_SECS > 0 and session_timer is None:
             session_timer = asyncio.create_task(end_session_after(MAX_SESSION_SECS))
 

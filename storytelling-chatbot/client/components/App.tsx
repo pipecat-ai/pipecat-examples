@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState } from "react";
-import { usePipecatClient } from "@pipecat-ai/client-react";
+import React, { useCallback, useState } from "react";
+import { RTVIEvent } from "@pipecat-ai/client-js";
+import { usePipecatClient, useRTVIClientEvent } from "@pipecat-ai/client-react";
 
 import Setup from "./Setup";
 import Story from "./Story";
@@ -18,6 +19,14 @@ export default function App() {
   const client = usePipecatClient();
 
   const [state, setState] = useState<State>("idle");
+
+  // The bot ends the session itself when the time limit is reached
+  useRTVIClientEvent(
+    RTVIEvent.Disconnected,
+    useCallback(() => {
+      setState((s) => (s === "started" ? "finished" : s));
+    }, [])
+  );
 
   async function start() {
     if (!client) return;

@@ -16,5 +16,6 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 COPY ./assets assets
 COPY ./utils utils
 COPY ./bot.py bot.py
+COPY ./gemini_image.py gemini_image.py
 COPY ./processors.py processors.py
 COPY ./prompts.py prompts.py
