@@ -1,20 +1,17 @@
-import {
-  useAudioLevel,
-  useAudioTrack,
-  useLocalSessionId,
-} from "@daily-co/daily-react";
+import { usePipecatClientMediaTrack } from "@pipecat-ai/client-react";
 import { useCallback, useRef } from "react";
 
+import { useAudioLevel } from "@/hooks/useAudioLevel";
+
 export const AudioIndicator: React.FC = () => {
-  const localSessionId = useLocalSessionId();
-  const audioTrack = useAudioTrack(localSessionId);
+  const audioTrack = usePipecatClientMediaTrack("audio", "local");
   const volRef = useRef<HTMLDivElement>(null);
 
   useAudioLevel(
-    audioTrack?.persistentTrack,
+    audioTrack,
     useCallback((volume) => {
       // this volume number will be between 0 and 1
-      // give it a minimum scale of 0.15 to not completely disappear 👻
+      // give it a minimum scale of 0.1 to not completely disappear 👻
       if (volRef.current) {
         const v = volume * 1.75;
         volRef.current.style.transform = `scale(${Math.max(0.1, v)})`;
@@ -43,13 +40,11 @@ export const AudioIndicator: React.FC = () => {
 };
 
 export const AudioIndicatorBar: React.FC = () => {
-  const localSessionId = useLocalSessionId();
-  const audioTrack = useAudioTrack(localSessionId);
-
+  const audioTrack = usePipecatClientMediaTrack("audio", "local");
   const volRef = useRef<HTMLDivElement>(null);
 
   useAudioLevel(
-    audioTrack?.persistentTrack,
+    audioTrack,
     useCallback((volume) => {
       if (volRef.current)
         volRef.current.style.width = Math.max(2, volume * 100) + "%";

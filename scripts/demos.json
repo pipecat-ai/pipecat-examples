@@ -215,7 +215,7 @@
   },
   {
     "path": "storytelling-chatbot/server",
-    "runCommand": "uv run bot_runner.py --host localhost",
+    "runCommand": "uv run bot.py",
     "skip": false
   },
   {

@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from "react";
+import React, { useCallback, useState } from "react";
+import { RTVIEvent } from "@pipecat-ai/client-js";
 import {
-  useDaily,
-  useParticipantIds,
-  useAppMessage,
-  DailyAudio,
-} from "@daily-co/daily-react";
+  usePipecatClientMediaTrack,
+  usePipecatClientMicControl,
+  useRTVIClientEvent,
+} from "@pipecat-ai/client-react";
 import { IconLogout, IconLoader2 } from "@tabler/icons-react";
 
 import VideoTile from "@/components/VideoTile";
@@ -16,30 +16,37 @@ interface StoryProps {
   handleLeave: () => void;
 }
 
+// Server messages sent by the bot to tell us whose turn it is
+type Cue = { cue?: "user_turn" | "assistant_turn" };
+
 const Story: React.FC<StoryProps> = ({ handleLeave }) => {
-  const daily = useDaily();
-  const participantIds = useParticipantIds({ filter: "remote" });
+  const { enableMic } = usePipecatClientMicControl();
+  const botVideoTrack = usePipecatClientMediaTrack("video", "bot");
   const [storyState, setStoryState] = useState<"user" | "assistant">(
     "assistant"
   );
 
-  useAppMessage({
-    onAppMessage: (e) => {
-      if (!daily || !e.data?.cue) return;
+  useRTVIClientEvent(
+    RTVIEvent.ServerMessage,
+    useCallback(
+      (data: Cue) => {
+        if (!data?.cue) return;
 
-      // Determine the UI state from the cue sent by the bot
-      if (e.data?.cue === "user_turn") {
-        // Delay enabling local mic input to avoid feedback from LLM
-        setTimeout(() => daily.setLocalAudio(true), 500);
-        setStoryState("user");
-      } else {
-        // Uncomment the next line to mute the mic while the 
-        // assistant it talking. Leave it commented to allow for interruptions
-        // daily.setLocalAudio(false);
-        setStoryState("assistant");
-      }
-    },
-  });
+        // Determine the UI state from the cue sent by the bot
+        if (data.cue === "user_turn") {
+          // Delay enabling local mic input to avoid feedback from LLM
+          setTimeout(() => enableMic(true), 500);
+          setStoryState("user");
+        } else {
+          // Uncomment the next line to mute the mic while the
+          // assistant is talking. Leave it commented to allow for interruptions
+          // enableMic(false);
+          setStoryState("assistant");
+        }
+      },
+      [enableMic]
+    )
+  );
 
   return (
     <div className="w-full flex flex-col flex-1 self-stretch">
@@ -57,11 +64,8 @@ const Story: React.FC<StoryProps> = ({ handleLeave }) => {
 
       {/* Static elements */}
       <div className="relative z-20 flex-1 flex items-center justify-center">
-        {participantIds.length >= 1 ? (
-          <VideoTile
-            sessionId={participantIds[0]}
-            inactive={false}
-          />
+        {botVideoTrack ? (
+          <VideoTile inactive={false} />
         ) : (
           <span className="p-3 rounded-full bg-gray-900/60 animate-pulse">
             <IconLoader2
@@ -71,7 +75,6 @@ const Story: React.FC<StoryProps> = ({ handleLeave }) => {
             />
           </span>
         )}
-        <DailyAudio />
       </div>
       <UserInputIndicator active={true} />
     </div>

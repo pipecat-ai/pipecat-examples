@@ -1,23 +1,25 @@
 import React from "react";
-import styles from "./VideoTile.module.css";
-import { DailyVideo } from "@daily-co/daily-react";
+import { PipecatClientVideo } from "@pipecat-ai/client-react";
+
 import StoryTranscript from "@/components/StoryTranscript";
 
+import styles from "./VideoTile.module.css";
+
 interface Props {
-  sessionId: string;
   inactive: boolean;
 }
 
-const VideoTile = ({ sessionId, inactive }: Props) => {
+// The bot's video track carries the current story illustration
+const VideoTile = ({ inactive }: Props) => {
   return (
     <div className={`${styles.container} ${inactive ? styles.inactive : ""} `}>
       <StoryTranscript />
 
       <div className={styles.videoTile}>
-        <DailyVideo
-          sessionId={sessionId}
-          type={"video"}
-          className="aspect-square"
+        <PipecatClientVideo
+          participant="bot"
+          fit="cover"
+          className="aspect-square w-full h-full"
         />
       </div>
     </div>

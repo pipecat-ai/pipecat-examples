@@ -1,31 +1,20 @@
-import {
-  useDaily,
-  useLocalSessionId,
-  useMediaTrack,
-} from "@daily-co/daily-react";
-import { useCallback } from "react";
+import { usePipecatClientMicControl } from "@pipecat-ai/client-react";
 import { IconMicrophone, IconMicrophoneOff } from "@tabler/icons-react";
 
 export const MicToggle: React.FC = () => {
-  const daily = useDaily();
-  const localSessionId = useLocalSessionId();
-  const audioTrack = useMediaTrack(localSessionId, "audio");
-  const isMicMuted =
-    audioTrack.state === "blocked" || audioTrack.state === "off";
+  const { enableMic, isMicEnabled } = usePipecatClientMicControl();
 
-  const handleClick = useCallback(() => {
-    if (!daily) return;
-    daily.setLocalAudio(isMicMuted);
-  }, [daily, isMicMuted]);
-
-  const text = isMicMuted ? (
-    <IconMicrophone size={21} />
-  ) : (
+  const text = isMicEnabled ? (
     <IconMicrophoneOff size={21} />
+  ) : (
+    <IconMicrophone size={21} />
   );
 
   return (
-    <button className="MicToggle UIButton" onClick={handleClick}>
+    <button
+      className="MicToggle UIButton"
+      onClick={() => enableMic(!isMicEnabled)}
+    >
       {text}
     </button>
   );

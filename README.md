@@ -56,7 +56,7 @@ Ready to explore more? These are two of the most useful examples for common use 
 
 ### **Multimodal & Creative**
 
-- **[storytelling-chatbot](storytelling-chatbot/)** - Interactive storytelling experiences
+- **[storytelling-chatbot](storytelling-chatbot/)** - Interactive, illustrated storytelling over SmallWebRTC with a Next.js client, deployable to Pipecat Cloud
 
 ### **Translation & Localization**
 
