@@ -101,7 +101,7 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     # Splits the LLM output into story pages and illustrates each page while
     # it is being narrated.
     story_processor = StoryProcessor()
-    image_processor = StoryImageProcessor(llm, image_gen)
+    image_processor = StoryImageProcessor(llm, image_gen, transport)
 
     pipeline = Pipeline(
         [

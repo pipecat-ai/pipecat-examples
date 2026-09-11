@@ -28,6 +28,7 @@ from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
 from pipecat.processors.frameworks.rtvi import RTVIServerMessageFrame
 from pipecat.services.image_service import ImageGenService
 from pipecat.services.llm_service import LLMService
+from pipecat.transports.base_transport import BaseTransport
 from pipecat.utils.text.base_text_aggregator import AggregationType
 
 from prompts import (
@@ -80,14 +81,20 @@ class StoryImageProcessor(FrameProcessor):
     Pages are queued to a background task so narration is never held up by
     image generation. For each page the task asks the LLM (out of band, via
     `run_inference`) for a short image prompt that keeps characters consistent
-    with earlier pages, generates a picture from it and pushes the image frame
+    with earlier pages, generates a picture from it and sends the image frame
     to the transport's video output.
+
+    The image is queued on the output transport directly rather than pushed
+    down the pipeline: downstream, the TTS service keeps non-system frames in
+    order behind the audio it has already queued, so an image pushed while a
+    page is being narrated would only show once all of that audio had played.
     """
 
-    def __init__(self, llm: LLMService[Any], image_gen: ImageGenService):
+    def __init__(self, llm: LLMService[Any], image_gen: ImageGenService, transport: BaseTransport):
         super().__init__()
         self._llm = llm
         self._image_gen = image_gen
+        self._transport = transport
         self._pages: list[str] = []
         self._image_descriptions: list[str] = []
         self._queue: asyncio.Queue[str] = asyncio.Queue()
@@ -144,7 +151,8 @@ class StoryImageProcessor(FrameProcessor):
 
         async for image in self._image_gen.run_image_gen(IMAGE_GEN_PROMPT % description):
             if isinstance(image, OutputImageRawFrame):
-                await self.push_frame(image)
+                # Show the illustration as soon as it is ready (see class docstring)
+                await self._transport.output().queue_frame(image, FrameDirection.DOWNSTREAM)
             else:
                 logger.warning(f"Image generation returned {image}")
 
