@@ -1,18 +1,17 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
-import { useAppMessage } from "@daily-co/daily-react";
-import { DailyEventObjectAppMessage } from "@daily-co/daily-js";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { BotTTSTextData, RTVIEvent } from "@pipecat-ai/client-js";
+import { useRTVIClientEvent } from "@pipecat-ai/client-react";
 
 import styles from "./StoryTranscript.module.css";
 
 export default function StoryTranscript() {
-  const [partialText, setPartialText] = useState<string>("");
   const [sentences, setSentences] = useState<string[]>([]);
-  const intervalRef = useRef<any | null>(null);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
-    clearInterval(intervalRef.current);
+    if (intervalRef.current) clearInterval(intervalRef.current);
 
     intervalRef.current = setInterval(() => {
       if (sentences.length > 2) {
@@ -20,23 +19,20 @@ export default function StoryTranscript() {
       }
     }, 2500);
 
-    return () => clearInterval(intervalRef.current);
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
   }, [sentences]);
 
-  useAppMessage({
-    onAppMessage: (e: DailyEventObjectAppMessage<any>) => {
-      if (e.fromId && e.fromId === "transcription") {
-        // Check for LLM transcripts only
-        if (e.data.user_id !== "") {
-          setPartialText(e.data.text);
-          if (e.data.is_final) {
-            setPartialText("");
-            setSentences((s) => [...s, e.data.text]);
-          }
-        }
-      }
-    },
-  });
+  // The text sent to TTS is the story as narrated, with the [break] markers
+  // already stripped by the server
+  useRTVIClientEvent(
+    RTVIEvent.BotTtsText,
+    useCallback((data: BotTTSTextData) => {
+      const text = data.text.trim();
+      if (text) setSentences((s) => [...s, text]);
+    }, [])
+  );
 
   return (
     <div className={styles.container}>
@@ -45,11 +41,6 @@ export default function StoryTranscript() {
           <span>{sentence}</span>
         </p>
       ))}
-      {partialText && (
-        <p className={`${styles.transcript}`}>
-          <span>{partialText}</span>
-        </p>
-      )}
     </div>
   );
 }

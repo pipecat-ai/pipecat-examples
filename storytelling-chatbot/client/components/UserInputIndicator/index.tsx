@@ -1,11 +1,12 @@
-import React, { useState, useEffect, useRef } from "react";
-
-import { useAppMessage } from "@daily-co/daily-react";
-import { DailyEventObjectAppMessage } from "@daily-co/daily-js";
-import styles from "./UserInputIndicator.module.css";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { RTVIEvent, TranscriptData } from "@pipecat-ai/client-js";
+import { useRTVIClientEvent } from "@pipecat-ai/client-react";
 import { IconMicrophone } from "@tabler/icons-react";
+
 import { TypewriterEffect } from "../ui/typewriter";
 import AudioIndicator from "../AudioIndicator";
+
+import styles from "./UserInputIndicator.module.css";
 
 interface Props {
   active: boolean;
@@ -13,7 +14,7 @@ interface Props {
 
 export default function UserInputIndicator({ active }: Props) {
   const [transcription, setTranscription] = useState<string[]>([]);
-  const timeoutRef = useRef<NodeJS.Timeout>();
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const resetTimeout = () => {
     if (timeoutRef.current) {
@@ -32,16 +33,15 @@ export default function UserInputIndicator({ active }: Props) {
     };
   }, []);
 
-  useAppMessage({
-    onAppMessage: (e: DailyEventObjectAppMessage<any>) => {
-      if (e.fromId && e.fromId === "transcription") {
-        if (e.data.user_id === "" && e.data.is_final) {
-          setTranscription((t) => [...t, ...e.data.text.split(" ")]);
-          resetTimeout();
-        }
+  useRTVIClientEvent(
+    RTVIEvent.UserTranscript,
+    useCallback((data: TranscriptData) => {
+      if (data.final) {
+        setTranscription((t) => [...t, ...data.text.split(" ")]);
+        resetTimeout();
       }
-    },
-  });
+    }, [])
+  );
 
   useEffect(() => {
     if (active) return;

@@ -1,8 +1,8 @@
 "use client";
 
 import React, { useState } from "react";
+import { usePipecatClient } from "@pipecat-ai/client-react";
 
-import { useDaily } from "@daily-co/daily-react";
 import Setup from "./Setup";
 import Story from "./Story";
 
@@ -14,52 +14,41 @@ type State =
   | "finished"
   | "error";
 
-export default function Call() {
-  const daily = useDaily();
+export default function App() {
+  const client = usePipecatClient();
 
   const [state, setState] = useState<State>("idle");
-  const [room, setRoom] = useState<string | null>(null);
 
   async function start() {
+    if (!client) return;
+
     setState("connecting");
 
-    if (!daily) return;
-
-    // Create a new room for the story session
     try {
-      const response = await fetch("/", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
+      // Mute the mic until the bot hands the user their turn; the bot says
+      // hello first and we don't want its intro echoing back into the story.
+      client.enableMic(false);
+
+      // Start a bot and join the WebRTC session. The Next.js API routes
+      // forward these requests to the bot server (local or Pipecat Cloud).
+      await client.startBotAndConnect({
+        endpoint: "/api/start",
+        requestData: {
+          transport: "webrtc",
+          createDailyRoom: false,
+          enableDefaultIceServers: true,
         },
       });
 
-      const { room_url, token } = await response.json();
-
-      // Keep a reference to the room url for later
-      setRoom(room_url);
-
-      // Join the WebRTC session
-      await daily.join({
-        url: room_url,
-        token,
-        videoSource: false,
-        startAudioOff: true,
-      });
-
-      setState("connected");
-
-      // Disable local audio, the bot will say hello first
-      daily.setLocalAudio(false);
-
       setState("started");
     } catch (error) {
+      console.error("Failed to start the story", error);
       setState("error");
     }
   }
 
   async function leave() {
-    await daily?.leave();
+    await client?.disconnect();
     setState("finished");
   }
 

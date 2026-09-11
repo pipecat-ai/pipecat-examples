@@ -1,8 +1,14 @@
 "use client";
 
-import { useEffect } from "react";
-import { DailyMeetingState } from "@daily-co/daily-js";
-import { useDaily, useDevices } from "@daily-co/daily-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { DeviceError, RTVIEvent } from "@pipecat-ai/client-js";
+import {
+  usePipecatClient,
+  usePipecatClientMediaDevices,
+  useRTVIClientEvent,
+} from "@pipecat-ai/client-react";
+import { IconMicrophone, IconDeviceSpeaker } from "@tabler/icons-react";
+
 import {
   Select,
   SelectContent,
@@ -10,44 +16,35 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { IconMicrophone, IconDeviceSpeaker } from "@tabler/icons-react";
+
 import { AudioIndicatorBar } from "../AudioIndicator";
 
-interface Props {}
-
-export default function DevicePicker({}: Props) {
-  const daily = useDaily();
+export default function DevicePicker() {
+  const client = usePipecatClient();
   const {
-    currentMic,
-    hasMicError,
-    micState,
-    microphones,
-    setMicrophone,
-    currentSpeaker,
-    speakers,
-    setSpeaker,
-  } = useDevices();
+    availableMics,
+    availableSpeakers,
+    selectedMic,
+    selectedSpeaker,
+    updateMic,
+    updateSpeaker,
+  } = usePipecatClientMediaDevices();
+  const [micError, setMicError] = useState<DeviceError | null>(null);
+  const initialized = useRef(false);
 
-  const handleMicrophoneChange = (value: string) => {
-    setMicrophone(value);
-  };
-
-  const handleSpeakerChange = (value: string) => {
-    setSpeaker(value);
-  };
-
+  // Ask for microphone access so we can list the devices and show levels
   useEffect(() => {
-    if (microphones.length > 0 || !daily || daily.isDestroyed()) return;
-    const meetingState = daily.meetingState();
-    const meetingStatesBeforeJoin: DailyMeetingState[] = [
-      "new",
-      "loading",
-      "loaded",
-    ];
-    if (meetingStatesBeforeJoin.includes(meetingState)) {
-      daily.startCamera({ startVideoOff: true, startAudioOff: false });
-    }
-  }, [daily, microphones]);
+    if (!client || initialized.current) return;
+    initialized.current = true;
+    client.initDevices().catch((e) => console.error("initDevices failed", e));
+  }, [client]);
+
+  useRTVIClientEvent(
+    RTVIEvent.DeviceError,
+    useCallback((error: DeviceError) => {
+      if (error.devices.includes("mic")) setMicError(error);
+    }, [])
+  );
 
   return (
     <div className="flex flex-col gap-5">
@@ -58,24 +55,19 @@ export default function DevicePicker({}: Props) {
         <div className="flex flex-row gap-4 items-center mt-2">
           <IconMicrophone size={24} />
           <div className="flex flex-col flex-1 gap-3">
-            <Select onValueChange={handleMicrophoneChange}>
+            <Select
+              value={selectedMic?.deviceId}
+              onValueChange={(id) => updateMic(id)}
+            >
               <SelectTrigger className="">
                 <SelectValue
-                  placeholder={
-                    hasMicError ? "error" : currentMic?.device?.label
-                  }
+                  placeholder={micError ? "No microphone access" : "Microphone"}
                 />
               </SelectTrigger>
               <SelectContent>
-                {hasMicError && (
-                  <option value="error" disabled>
-                    No microphone access.
-                  </option>
-                )}
-
-                {microphones.map((m) => (
-                  <SelectItem key={m.device.deviceId} value={m.device.deviceId}>
-                    {m.device.label}
+                {availableMics.map((m) => (
+                  <SelectItem key={m.deviceId} value={m.deviceId}>
+                    {m.label || "Microphone"}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -91,37 +83,40 @@ export default function DevicePicker({}: Props) {
         </label>
         <div className="flex flex-row gap-4 items-center mt-2">
           <IconDeviceSpeaker size={24} />
-          <Select onValueChange={handleSpeakerChange}>
+          <Select
+            value={selectedSpeaker?.deviceId}
+            onValueChange={(id) => updateSpeaker(id)}
+          >
             <SelectTrigger className="">
-              <SelectValue placeholder={currentSpeaker?.device?.label} />
+              <SelectValue placeholder="Speakers" />
             </SelectTrigger>
             <SelectContent>
-              {speakers.map((m) => (
-                <SelectItem key={m.device.deviceId} value={m.device.deviceId}>
-                  {m.device.label}
+              {availableSpeakers.map((s) => (
+                <SelectItem key={s.deviceId} value={s.deviceId}>
+                  {s.label || "Speakers"}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
         </div>
       </section>
-      {hasMicError && (
+      {micError && (
         <div className="error">
-          {micState === "blocked" ? (
+          {micError.type === "permissions" ? (
             <p className="text-red-500">
               Please check your browser and system permissions. Make sure that
               this app is allowed to access your microphone.
             </p>
-          ) : micState === "in-use" ? (
+          ) : micError.type === "in-use" ? (
             <p className="text-red-500">
               Your microphone is being used by another app. Please close any
               other apps using your microphone and restart this app.
             </p>
-          ) : micState === "not-found" ? (
+          ) : micError.type === "not-found" ? (
             <p className="text-red-500">
               No microphone seems to be connected. Please connect a microphone.
             </p>
-          ) : micState === "not-supported" ? (
+          ) : micError.type === "undefined-mediadevices" ? (
             <p className="text-red-500">
               This app is not supported on your device. Please update your
               software or use a different device.
