@@ -2,15 +2,14 @@
 
 import { useState } from "react";
 
-import { ThemeProvider } from "@pipecat-ai/voice-ui-kit";
-
-import type { PipecatBaseChildProps } from "@pipecat-ai/voice-ui-kit";
 import {
-  ErrorCard,
-  FullScreenContainer,
-  PipecatAppBase,
-  SpinLoader,
-} from "@pipecat-ai/voice-ui-kit";
+  PipecatClientAudio,
+  PipecatClientProvider,
+} from "@pipecat-ai/client-react";
+
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Spinner } from "@/components/ui/spinner";
+import { usePipecatApp } from "@/hooks/use-pipecat-app";
 
 import { App } from "./components/App";
 import {
@@ -24,38 +23,43 @@ export default function Home() {
   const [transportType, setTransportType] =
     useState<TransportType>(DEFAULT_TRANSPORT);
 
-  const connectParams = TRANSPORT_CONFIG[transportType];
+  // Changing transportType rebuilds the client with a fresh transport; the
+  // loaders are registered in config.ts. Devices are initialized by App once
+  // it is mounted inside the provider, so the provider observes the state.
+  const { client, connect, disconnect, error, clearError } = usePipecatApp({
+    transportType,
+    startBotParams: TRANSPORT_CONFIG[transportType],
+  });
+
+  if (!client) {
+    return (
+      <main className="flex h-dvh items-center justify-center p-4">
+        {error ? (
+          <Alert variant="destructive" className="max-w-md">
+            <AlertTitle>Failed to set up the client</AlertTitle>
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        ) : (
+          <Spinner className="size-8" />
+        )}
+      </main>
+    );
+  }
 
   return (
-    <ThemeProvider defaultTheme="terminal" disableStorage>
-      <FullScreenContainer>
-        <PipecatAppBase
-          connectParams={connectParams}
+    <PipecatClientProvider client={client}>
+      <main className="h-dvh overflow-hidden">
+        <App
+          onConnect={connect}
+          onDisconnect={disconnect}
+          error={error}
+          onDismissError={clearError}
           transportType={transportType}
-        >
-          {({
-            client,
-            handleConnect,
-            handleDisconnect,
-            error,
-          }: PipecatBaseChildProps) =>
-            !client ? (
-              <SpinLoader />
-            ) : error ? (
-              <ErrorCard>{error}</ErrorCard>
-            ) : (
-              <App
-                client={client}
-                handleConnect={handleConnect}
-                handleDisconnect={handleDisconnect}
-                transportType={transportType}
-                onTransportChange={setTransportType}
-                availableTransports={AVAILABLE_TRANSPORTS}
-              />
-            )
-          }
-        </PipecatAppBase>
-      </FullScreenContainer>
-    </ThemeProvider>
+          onTransportChange={setTransportType}
+          availableTransports={AVAILABLE_TRANSPORTS}
+        />
+      </main>
+      <PipecatClientAudio />
+    </PipecatClientProvider>
   );
 }
