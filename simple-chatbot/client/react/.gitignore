@@ -39,3 +39,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# The repo-root Python rule ignores lib/; this is a source directory here.
+!src/lib/
