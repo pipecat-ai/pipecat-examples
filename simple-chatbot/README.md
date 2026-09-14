@@ -30,12 +30,12 @@ This repository demonstrates a simple AI chatbot with real-time audio/video inte
 
 3. **React**
 
-   - Basic impelmentation using [Pipecat React SDK](https://docs.pipecat.ai/client/react/introduction)
+   - Basic implementation using [Pipecat React SDK](https://docs.pipecat.ai/client/react/introduction) and the [Pipecat UI](https://ui.pipecat.ai) shadcn registry
    - Demonstrates the basic client principles with Pipecat React
 
 4. **React Native**
 
-   - Basic impelmentation using [Pipecat React Native SDK](https://docs.pipecat.ai/client/react-native/introduction)
+   - Basic implementation using [Pipecat React Native SDK](https://docs.pipecat.ai/client/react-native/introduction)
    - Demonstrates the basic client principles with Pipecat React Native
 
 5. **Android**

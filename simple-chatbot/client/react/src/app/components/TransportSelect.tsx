@@ -1,11 +1,12 @@
+"use client";
+
 import {
   Select,
-  SelectTrigger,
-  SelectValue,
   SelectContent,
   SelectItem,
-  SelectGuide,
-} from "@pipecat-ai/voice-ui-kit";
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 import { TRANSPORT_LABELS, type TransportType } from "../../config";
 
@@ -20,16 +21,30 @@ export const TransportSelect = ({
   onTransportChange,
   availableTransports,
 }: TransportSelectProps) => {
+  const items = availableTransports.map((transport) => ({
+    value: transport,
+    label: TRANSPORT_LABELS[transport],
+  }));
+
   return (
-    <Select value={transportType} onValueChange={onTransportChange}>
-      <SelectTrigger size="lg">
-        <SelectGuide>Transport</SelectGuide>
+    <Select
+      items={items}
+      value={transportType}
+      onValueChange={(value) => {
+        if (value) onTransportChange(value);
+      }}
+    >
+      <SelectTrigger
+        aria-label="Transport"
+        className="h-10 gap-3 px-3 font-mono text-xs"
+      >
+        <span className="font-sans text-muted-foreground">Transport</span>
         <SelectValue />
       </SelectTrigger>
       <SelectContent>
-        {availableTransports.map((transport) => (
-          <SelectItem key={transport} value={transport}>
-            {TRANSPORT_LABELS[transport]}
+        {items.map((item) => (
+          <SelectItem key={item.value} value={item.value} className="font-mono text-xs">
+            {item.label}
           </SelectItem>
         ))}
       </SelectContent>
