@@ -15,9 +15,12 @@ export function BotVideoPanel({ className }: { className?: string }) {
   const transportState = usePipecatClientTransportState();
   const track = usePipecatClientMediaTrack("video", "bot");
   // Some transports expose a placeholder bot track before the session is
-  // live, so only show video once the client is actually connected.
+  // live, and the track hook keeps the previous session's ended track after
+  // a disconnect, so require a live track and a connected transport.
   const hasVideo =
-    !!track && (transportState === "connected" || transportState === "ready");
+    !!track &&
+    track.readyState === "live" &&
+    (transportState === "connected" || transportState === "ready");
 
   return (
     <Panel aria-label="Bot video" className={className}>
