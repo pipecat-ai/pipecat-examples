@@ -170,13 +170,3 @@
     @apply font-sans;
   }
 }
-
-/* Uppercase monospace label used for panel titles (matches the voice-ui-kit look). */
-@utility mono-upper {
-  font-family: var(--font-mono);
-  font-weight: 700;
-  font-size: var(--text-xs);
-  line-height: 1;
-  letter-spacing: var(--tracking-wider);
-  text-transform: uppercase;
-}
