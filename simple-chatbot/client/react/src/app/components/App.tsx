@@ -109,7 +109,7 @@ export const App = ({
         <BotVideoPanel className="flex-1" />
         <ConversationPanel className="flex-1" />
       </div>
-      <EventsPanel className="h-60" />
+      <EventsPanel className="h-60" resetKey={transportType} />
     </div>
   );
 };
