@@ -36,7 +36,7 @@ export const TransportSelect = ({
     >
       <SelectTrigger
         aria-label="Transport"
-        className="h-10 gap-3 px-3 font-mono text-xs"
+        className="gap-3 px-3 font-mono text-xs data-[size=default]:h-9"
       >
         <span className="font-sans text-muted-foreground">Transport</span>
         <SelectValue />

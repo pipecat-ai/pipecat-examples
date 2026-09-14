@@ -5,7 +5,22 @@
 
 import type { APIRequest } from "@pipecat-ai/client-js";
 
+import { registerTransport } from "@/lib/transports";
+
 export type TransportType = "daily" | "smallwebrtc";
+
+// usePipecatApp loads the transport for the selected type through these
+// loaders, so only the package that is actually used ends up in the bundle.
+registerTransport("daily", async () => {
+  const { DailyTransport } = await import("@pipecat-ai/daily-transport");
+  return DailyTransport;
+});
+registerTransport("smallwebrtc", async () => {
+  const { SmallWebRTCTransport } = await import(
+    "@pipecat-ai/small-webrtc-transport"
+  );
+  return SmallWebRTCTransport;
+});
 
 export const AVAILABLE_TRANSPORTS: TransportType[] = ["daily", "smallwebrtc"];
 

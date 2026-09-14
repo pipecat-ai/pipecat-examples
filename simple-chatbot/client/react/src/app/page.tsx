@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 
-import type { Transport } from "@pipecat-ai/client-js";
 import {
   PipecatClientAudio,
   PipecatClientProvider,
@@ -20,32 +19,16 @@ import {
 } from "../config";
 import type { TransportType } from "../config";
 
-/** Imports only the transport package the selected transport needs. */
-async function createTransport(type: TransportType): Promise<Transport> {
-  switch (type) {
-    case "daily": {
-      const { DailyTransport } = await import("@pipecat-ai/daily-transport");
-      return new DailyTransport();
-    }
-    case "smallwebrtc": {
-      const { SmallWebRTCTransport } = await import(
-        "@pipecat-ai/small-webrtc-transport"
-      );
-      return new SmallWebRTCTransport();
-    }
-  }
-}
-
 export default function Home() {
   const [transportType, setTransportType] =
     useState<TransportType>(DEFAULT_TRANSPORT);
 
-  // Changing transportType rebuilds the client with a fresh transport.
+  // Changing transportType rebuilds the client with a fresh transport; the
+  // loaders are registered in config.ts. Devices are initialized by App once
+  // it is mounted inside the provider, so the provider observes the state.
   const { client, connect, disconnect, error, clearError } = usePipecatApp({
     transportType,
-    transportFactory: () => createTransport(transportType),
     startBotParams: TRANSPORT_CONFIG[transportType],
-    initDevicesOnMount: true,
   });
 
   if (!client) {

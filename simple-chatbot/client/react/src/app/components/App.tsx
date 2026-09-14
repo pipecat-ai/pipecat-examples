@@ -1,6 +1,8 @@
 "use client";
 
+import { usePipecatClient } from "@pipecat-ai/client-react";
 import { XIcon } from "lucide-react";
+import { useEffect } from "react";
 
 import { ConnectButton } from "@/components/pipecat/connect-button";
 import { UserAudioControl } from "@/components/pipecat/user-audio-control";
@@ -17,6 +19,9 @@ import { BotVideoPanel } from "./BotVideoPanel";
 import { ConversationPanel } from "./ConversationPanel";
 import { EventsPanel } from "./EventsPanel";
 import { TransportSelect } from "./TransportSelect";
+
+const DISCONNECT_FILL =
+  "bg-inactive text-inactive-foreground hover:bg-inactive/90 hover:text-inactive-foreground dark:bg-inactive";
 
 interface AppProps {
   onConnect: () => void;
@@ -38,6 +43,23 @@ export const App = ({
   onTransportChange,
   availableTransports,
 }: AppProps) => {
+  const client = usePipecatClient();
+  useEffect(() => {
+    if (!client) return;
+    // PipecatClientProvider attaches its transport-state listener in its own
+    // effect, which runs after this child effect. Yield one microtask so the
+    // synchronous "initializing" transition is observed and the connect
+    // button disables itself while the permission prompt is up. Device
+    // errors surface through the mic control's own error states.
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (!cancelled) client.initDevices().catch(() => {});
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [client]);
+
   const showTransportSelector = availableTransports.length > 1;
 
   return (
@@ -58,10 +80,11 @@ export const App = ({
             size="lg"
             onConnect={onConnect}
             onDisconnect={onDisconnect}
+            // Solid fill for the disconnect states, still driven by the
+            // --inactive-* tokens so retheming reaches the button.
             stateProps={{
-              connected: { variant: "destructive" },
-              ready: { variant: "destructive" },
-              disconnecting: { variant: "destructive" },
+              connected: { className: DISCONNECT_FILL },
+              ready: { className: DISCONNECT_FILL },
             }}
           />
         </div>
