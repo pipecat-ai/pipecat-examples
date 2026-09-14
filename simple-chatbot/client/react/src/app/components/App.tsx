@@ -20,9 +20,6 @@ import { ConversationPanel } from "./ConversationPanel";
 import { EventsPanel } from "./EventsPanel";
 import { TransportSelect } from "./TransportSelect";
 
-const DISCONNECT_FILL =
-  "bg-inactive text-inactive-foreground hover:bg-inactive/90 hover:text-inactive-foreground dark:bg-inactive";
-
 interface AppProps {
   onConnect: () => void;
   onDisconnect: () => void;
@@ -80,12 +77,6 @@ export const App = ({
             size="lg"
             onConnect={onConnect}
             onDisconnect={onDisconnect}
-            // Solid fill for the disconnect states, still driven by the
-            // --inactive-* tokens so retheming reaches the button.
-            stateProps={{
-              connected: { className: DISCONNECT_FILL },
-              ready: { className: DISCONNECT_FILL },
-            }}
           />
         </div>
       </div>
