@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Voice UI Kit - Vanilla JS</title>
+</head>
+
+<body>
+  <div class="container">
+    <!-- Header with controls -->
+    <div class="header">
+      <div class="transport-selector">
+        <label for="transport-select">Transport:</label>
+        <select id="transport-select">
+          <option value="smallwebrtc">SmallWebRTC</option>
+          <option value="daily">Daily</option>
+        </select>
+      </div>
+      <div class="controls">
+        <button id="mic-btn" class="control-btn" disabled>
+          🎤 <span id="mic-status">Mic is Off</span>
+        </button>
+        <button id="upload-btn" class="control-btn">Upload File</button>
+        <button id="connect-btn" class="connect-btn">Connect</button>
+      </div>
+    </div>
+
+    <!-- Conversation area -->
+    <div class="conversation-panel">
+      <h3>Conversation</h3>
+      <div id="conversation-log"></div>
+    </div>
+
+    <!-- Events panel -->
+    <div class="events-panel">
+      <h3>Events</h3>
+      <div id="events-log"></div>
+    </div>
+  </div>
+
+  <div id="upload-modal" class="modal">
+    <div class="modal-content">
+      <span class="close-btn">&times;</span>
+      <h2>Upload Content</h2>
+      <div class="upload-tabs">
+        <button class="tab-link active" data-tab="file-tab">Upload File</button>
+        <button class="tab-link" data-tab="url-tab">From URL</button>
+      </div>
+
+      <div id="file-tab" class="tab-content active">
+        <p>Select a file from your computer.</p>
+        <input type="file" id="file-input" />
+      </div>
+
+      <div id="url-tab" class="tab-content">
+        <p>Enter the URL of an image or document.</p>
+        <input type="url" id="url-input" placeholder="https://example.com/image.png" />
+      </div>
+
+      <textarea
+        id="file-prompt"
+        rows="4"
+        placeholder="Enter a prompt or description for the content..."></textarea>
+      <button id="upload-confirm-btn">Upload</button>
+    </div>
+  </div>
+
+  <script type="module" src="/src/app.js"></script>
+  <link rel="stylesheet" href="/src/style.css" />
+</body>
+
+</html>
