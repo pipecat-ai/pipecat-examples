@@ -1,0 +1,46 @@
+# Transfer path: a gatekeeper answers and transfers Hailey to the IT director.
+# Hailey re-introduces herself, gets the director's direct contact info, saves
+# it, and ends the call.
+name: transfer_path
+
+judge:
+  modality: text
+  eval:
+    service: openai
+    model: gpt-4o-mini
+
+turns:
+  - user: "Acme Robotics, front desk."
+    expect:
+      - event: response
+        eval: "introduces herself as Hailey from Pipecat Labs"
+
+  - user: "Beau's not in today. What's this about?"
+    expect:
+      - event: response
+        eval: "briefly explains why she is calling and asks who handles IT decisions"
+
+  - user: "That would be our IT director. Hold on, I'll transfer you."
+    expect:
+      - event: response
+        eval: "thanks them and waits for the transfer; does not say goodbye or end the call"
+
+  - user: "Hi, this is Dana Smith, IT director. Who am I speaking with?"
+    expect:
+      - event: response
+        eval: "introduces herself again as Hailey from Pipecat Labs and explains why she is calling"
+
+# Once Hailey has Dana's contact info she saves it, thanks her, and hangs
+  # up, all in the same turn.
+  - user: "Sounds interesting. Send me the details at dana@acmerobotics.com. I'm the IT director here."
+    expect:
+      # Expectations match in order: Hailey saves the contact, speaks her
+      # thanks, then hangs up.
+      - event: function_call
+        calls:
+          - name: save_contact_info
+      - event: response
+        eval: "thanks Dana"
+      - event: function_call
+        calls:
+          - name: end_call

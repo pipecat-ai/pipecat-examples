@@ -1,0 +1,37 @@
+# Happy path: the lead answers, confirms their name, and hands over the IT
+# decision maker's contact info. Hailey saves it, says thanks, and hangs up.
+name: happy_path
+
+judge:
+  modality: text
+  eval:
+    service: openai
+    model: gpt-4o-mini
+
+turns:
+  # On a phone call the callee speaks first; Hailey then introduces herself.
+  - user: "Hello?"
+    expect:
+      - event: response
+        eval: "introduces herself as Hailey and asks if she is speaking with Beau"
+
+  - user: "Yeah, this is Beau."
+    expect:
+      - event: response
+        eval: "briefly explains why she is calling and asks who handles IT decisions"
+
+# Once Hailey has the contact info she saves it, thanks Beau, and hangs up,
+  # all in the same turn.
+  - user: "Oh sure, that'd be our IT director, Dana Smith. You can reach her at dana@acmerobotics.com or 555-0142."
+    expect:
+      # Expectations match in order: Hailey saves the contact, speaks her
+      # thanks, then hangs up.
+      - event: function_call
+        calls:
+          - name: save_contact_info
+      - event: response
+        eval: "thanks Beau"
+      - event: function_call
+        calls:
+          - name: end_call
+            args: { reason: contact_captured }
