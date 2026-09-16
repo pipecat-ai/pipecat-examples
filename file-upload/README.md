@@ -6,15 +6,28 @@ a local file from their computer or provide a URL pointing to an image or
 document. In both cases an optional text prompt can accompany the upload to
 guide the LLM's response.
 
-On the server, `RTVIProcessor` is configured with an `uploads_folder` so that
-uploaded content is received and made available to the LLM as part of the
-conversation context. The LLM can then reason about the uploaded content and
+On the server, the development runner's `POST /files` upload endpoint stores
+the file (in the `PIPECAT_UPLOADS_FOLDER` by default) and returns a URL the
+client passes back in its `send-file` message. The URL is resolved at
+completion time by the LLM service's `FileResolver`: URLs the provider can
+fetch itself are passed straight through, and anything else is downloaded by
+the bot and inlined. The LLM can then reason about the uploaded content and
 respond with audio as it would for any other user turn.
+
+Two variants swap the upload storage for a cloud bucket by implementing
+`FileStorage` and installing it with `set_runner_file_storage()`:
+- `bot_gcs.py` stores uploads in Google Cloud Storage and returns `gs://`
+  URLs, which Gemini on Vertex AI can read directly via its own IAM.
+- `bot_s3.py` stores uploads in Amazon S3 and returns `s3://` URLs, which
+  AWS Bedrock can read directly via its own IAM.
+With any other LLM provider, the bot downloads the file from the bucket with
+its own credentials and sends the provider the bytes instead.
 
 Concepts this example is meant to demonstrate:
 - Client → Server file upload via RTVI (`client.sendFile`)
 - Handling both local file uploads and URL-based content references
-- `RTVIProcessor` with `uploads_folder` for server-side file handling
+- `FileResolver` on the LLM service for resolving file URLs per provider
+- Custom `FileStorage` backends (local disk, GCS, S3) for the upload endpoint
 - `onBotOutput` with per-word spoken highlighting in the client UI
 
 ## Configuration
@@ -55,8 +68,16 @@ Concepts this example is meant to demonstrate:
    uv run bot.py
    ```
 
-   Uploaded files are saved to a temporary directory created automatically in
-   your system's temp folder. Pass `-u <path>` to choose a specific location.
+   Uploaded files are saved to the folder named by `PIPECAT_UPLOADS_FOLDER`
+   in `.env` (or pass `-u <path>`). To store uploads in a cloud bucket
+   instead, run one of the storage-backend variants (after setting
+   `GCS_UPLOADS_BUCKET` / `S3_UPLOADS_BUCKET` and credentials in `.env`):
+
+   ```bash
+   uv run bot_gcs.py -llm gemini   # uploads in Google Cloud Storage
+   uv run bot_s3.py -llm bedrock   # uploads in Amazon S3
+   ```
+
    The runner serves every transport; the caller selects which one (a web/mobile
    client picks its transport when it connects; a telephony provider connects to
    `/ws`).
