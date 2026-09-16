@@ -6,6 +6,9 @@ requires-python = ">=3.11"
 dependencies = [
     "pipecat-ai[anthropic,aws,cartesia,daily,deepgram,google,livekit,openai,runner,silero,websocket,webrtc]>=1.4.0",
     "pipecatcloud",
+    # For bot_gcs.py (GCS-backed uploads); S3-backed uploads (bot_s3.py) use
+    # aiobotocore, which pipecat-ai[aws] already provides.
+    "google-cloud-storage>=2.18.0,<4",
 ]
 
 [dependency-groups]
