@@ -19,7 +19,8 @@ uploads with a cloud bucket instead of local disk.
 
 Required AI services:
 - Deepgram (Speech-to-Text)
-- Anthropic, OpenAI, AWS Bedrock, or Google Gemini (LLM; select with -llm, defaults to anthropic)
+- Anthropic, OpenAI, AWS Bedrock, or Google Gemini via the developer API or
+  Vertex AI (LLM; select with -llm, defaults to anthropic)
 - Cartesia (Text-to-Speech)
 
 Run the bot using::
@@ -52,6 +53,7 @@ from pipecat.services.aws.llm import AWSBedrockLLMService
 from pipecat.services.cartesia.tts import CartesiaTTSService
 from pipecat.services.deepgram.stt import DeepgramSTTService
 from pipecat.services.google.llm import GoogleLLMService
+from pipecat.services.google.vertex.llm import GoogleVertexLLMService
 from pipecat.services.openai.llm import OpenAILLMService
 from pipecat.transports.base_transport import BaseTransport, TransportParams
 from pipecat.transports.daily.transport import DailyParams
@@ -71,12 +73,23 @@ SYSTEM_INSTRUCTION = (
 
 
 def create_llm_service(llm_name: str, file_resolver: FileResolver):
-    """Create the LLM service for `llm_name` (anthropic, openai, bedrock, or gemini).
+    """Create the LLM service for `llm_name` (anthropic, openai, bedrock, gemini, or vertex).
 
     Every service gets the `file_resolver` so it can resolve file URLs the
     provider can't fetch itself (uploaded files, private URLs) into bytes at
-    completion time.
+    completion time. Vertex Gemini reads gs:// URLs directly instead, so with
+    bot_gcs.py it exercises the pass-through path: the file never moves
+    through the bot.
     """
+    if llm_name == "vertex":
+        # Authenticates via Application Default Credentials
+        # (`gcloud auth application-default login`), which must be able to
+        # call Vertex AI and — for gs:// pass-through — read the bucket.
+        return GoogleVertexLLMService(
+            project_id=os.environ["GOOGLE_CLOUD_PROJECT_ID"],
+            settings=GoogleVertexLLMService.Settings(system_instruction=SYSTEM_INSTRUCTION),
+            file_resolver=file_resolver,
+        )
     if llm_name == "openai":
         return OpenAILLMService(
             api_key=os.getenv("OPENAI_API_KEY"),
@@ -130,7 +143,7 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments) -> Non
         ),
     )
 
-    # LLM service - defaults to anthropic; select another with `-llm openai|bedrock|gemini`
+    # LLM service - defaults to anthropic; select another with `-llm openai|bedrock|gemini|vertex`
     # The resolver shares the runner's storage backend, so URLs returned by the
     # POST /files upload endpoint resolve to the uploaded bytes.
     llm_name = getattr(runner_args.cli_args, "llm", None) or "anthropic"
@@ -229,7 +242,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "-llm",
         "--llm",
-        choices=["anthropic", "openai", "bedrock", "gemini"],
+        choices=["anthropic", "openai", "bedrock", "gemini", "vertex"],
         default="anthropic",
         help="LLM provider to use (default: anthropic)",
     )

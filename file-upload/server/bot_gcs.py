@@ -27,7 +27,7 @@ Requires:
 Run the bot using::
 
     uv run bot_gcs.py
-    uv run bot_gcs.py -llm gemini
+    uv run bot_gcs.py -llm vertex  # gs:// pass-through; needs GOOGLE_CLOUD_PROJECT_ID
 """
 
 import argparse
@@ -106,7 +106,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "-llm",
         "--llm",
-        choices=["anthropic", "openai", "bedrock", "gemini"],
+        choices=["anthropic", "openai", "bedrock", "gemini", "vertex"],
         default="anthropic",
         help="LLM provider to use (default: anthropic)",
     )

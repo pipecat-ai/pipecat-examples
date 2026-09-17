@@ -74,7 +74,7 @@ Concepts this example is meant to demonstrate:
    `GCS_UPLOADS_BUCKET` / `S3_UPLOADS_BUCKET` and credentials in `.env`):
 
    ```bash
-   uv run bot_gcs.py -llm gemini   # uploads in Google Cloud Storage
+   uv run bot_gcs.py -llm vertex   # uploads in GCS; Vertex Gemini reads gs:// directly
    uv run bot_s3.py -llm bedrock   # uploads in Amazon S3
    ```
 
