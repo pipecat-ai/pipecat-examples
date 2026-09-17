@@ -123,7 +123,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "-llm",
         "--llm",
-        choices=["anthropic", "openai", "bedrock", "gemini"],
+        choices=["anthropic", "openai", "bedrock", "gemini", "vertex"],
         default="anthropic",
         help="LLM provider to use (default: anthropic)",
     )
