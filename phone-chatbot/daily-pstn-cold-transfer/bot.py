@@ -6,13 +6,18 @@
 
 import os
 import sys
+from dataclasses import dataclass
+from typing import Any
 
 from dotenv import load_dotenv
 from loguru import logger
 from pipecat.audio.vad.silero import SileroVADAnalyzer
 from pipecat.frames.frames import (
+    BotStoppedSpeakingFrame,
+    ControlFrame,
     EndFrame,
     EndWorkerFrame,
+    Frame,
     LLMMessagesAppendFrame,
     LLMRunFrame,
 )
@@ -23,7 +28,7 @@ from pipecat.processors.aggregators.llm_response_universal import (
     LLMContextAggregatorPair,
     LLMUserAggregatorParams,
 )
-from pipecat.processors.frame_processor import FrameDirection
+from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
 from pipecat.runner.types import RunnerArguments
 from pipecat.services.cartesia.tts import CartesiaTTSService
 from pipecat.services.deepgram.stt import DeepgramSTTService
@@ -37,6 +42,36 @@ load_dotenv(override=True)
 
 logger.remove(0)
 logger.add(sys.stderr, level="DEBUG")
+
+
+@dataclass
+class StartTransferFrame(ControlFrame):
+    """Wait for the transfer announcement to finish before transferring."""
+
+    transfer_params: dict[str, Any]
+
+
+class TransferCoordinator(FrameProcessor):
+    """Starts a pending SIP transfer after the bot stops speaking."""
+
+    def __init__(self, transport: BaseTransport) -> None:
+        super().__init__()
+        self._transport = transport
+        self._pending_transfer: dict[str, Any] | None = None
+
+    async def process_frame(self, frame: Frame, direction: FrameDirection) -> None:
+        await super().process_frame(frame, direction)
+
+        if isinstance(frame, StartTransferFrame):
+            self._pending_transfer = frame.transfer_params
+            logger.debug("Waiting for transfer announcement to finish")
+        elif isinstance(frame, BotStoppedSpeakingFrame) and self._pending_transfer:
+            transfer_params = self._pending_transfer
+            self._pending_transfer = None
+            logger.debug(f"SIP call transfer parameters: {transfer_params}")
+            await self._transport.sip_call_transfer(transfer_params)
+
+        await self.push_frame(frame, direction)
 
 
 async def terminate_call(params: FunctionCallParams):
@@ -100,10 +135,9 @@ Available functions:
             # Queue the message to the context and let it speak
             await params.llm.push_frame(LLMMessagesAppendFrame([message], run_llm=True))
 
-            # Start the dialout to transfer the call
+            # Start the transfer after the announcement finishes playing.
             transfer_params = {"toEndPoint": operator_number}
-            logger.debug(f"SIP call transfer parameters: {transfer_params}")
-            await transport.sip_call_transfer(transfer_params)
+            await params.llm.push_frame(StartTransferFrame(transfer_params=transfer_params))
 
         else:
             # No operator number configured
@@ -125,6 +159,7 @@ Available functions:
             vad_analyzer=SileroVADAnalyzer(),
         ),
     )
+    transfer_coordinator = TransferCoordinator(transport)
 
     # ------------ PIPELINE SETUP ------------
 
@@ -136,6 +171,7 @@ Available functions:
             user_aggregator,  # User responses
             llm,
             tts,
+            transfer_coordinator,
             transport.output(),  # Transport bot output
             assistant_aggregator,  # Assistant spoken responses
         ]

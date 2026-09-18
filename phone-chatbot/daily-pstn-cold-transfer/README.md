@@ -12,7 +12,11 @@ A basic example of how to create a bot that handles the initial customer interac
 6. The bot joins the Daily room and signals readiness
 7. Daily forwards the call to the Daily room
 8. The caller and the bot are connected, and the bot handles the conversation
-9. When requested, the bot dials out to an operator and performs a cold transfer (bot leaves the call)
+9. When requested, the bot finishes its transfer announcement, dials out to an operator, and performs a cold transfer (bot leaves the call)
+
+The transfer coordinator waits for `BotStoppedSpeakingFrame` before calling Daily's SIP
+transfer API. If the caller interrupts the announcement, that frame is emitted when the
+interrupted audio stops, so the transfer continues without waiting for the full announcement.
 
 ## Architecture Overview
 
