@@ -1,6 +1,6 @@
 # Bot ready signaling Server
 
-A FastAPI server that manages bot instances and provide endpoint for Pipecat client connections.
+The Pipecat runner serves this bot and gives Pipecat clients an endpoint to connect to.
 
 ## Endpoints
 
@@ -17,9 +17,7 @@ CARTESIA_API_KEY=        # Your Cartesia API key
 
 # Optional Configuration
 DAILY_API_URL=           # Optional: Daily API URL (defaults to https://api.daily.co/v1)
-DAILY_SAMPLE_ROOM_URL=   # Optional: Fixed room URL for development
-HOST=                    # Optional: Host address (defaults to 0.0.0.0)
-FAST_API_PORT=           # Optional: Port number (defaults to 7860)
+DAILY_ROOM_URL=          # Optional: Fixed room URL, handy for local development
 ```
 
 ## Running the Server
@@ -35,3 +33,5 @@ Run the server:
 ```bash
 uv run bot.py -t daily
 ```
+
+The runner listens on `localhost:7860`. Pass `--host` or `--port` to change that.
