@@ -6,7 +6,7 @@ client is ready to play it, so the first words of the greeting are never
 clipped.
 
 The handshake uses the standard RTVI `client-ready` / `bot-ready` flow that
-ships with Pipecat: `RTVIProcessor` is auto-attached to every `PipelineTask`,
+ships with Pipecat: `RTVIProcessor` is auto-attached to every `PipelineWorker`,
 the Pipecat client SDK signals `client-ready` once the transport reaches the
 `ready` state, and the bot's `on_client_ready` handler calls `set_bot_ready()`
 and pushes the first `TTSSpeakFrame`. No custom `sendAppMessage` plumbing is

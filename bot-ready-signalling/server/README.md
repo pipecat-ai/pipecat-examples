@@ -4,7 +4,7 @@ A FastAPI server that manages bot instances and provide endpoint for Pipecat cli
 
 ## Endpoints
 
-- `POST /connect` - Pipecat client connection endpoint
+- `POST /start` - Pipecat client connection endpoint
 
 ## Environment Variables
 
@@ -33,5 +33,5 @@ uv sync
 Run the server:
 
 ```bash
-uv run server.py
+uv run bot.py -t daily
 ```
