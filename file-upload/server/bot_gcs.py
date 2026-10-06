@@ -6,10 +6,12 @@
 
 """file-upload with client uploads stored in Google Cloud Storage.
 
-The same bot as ``bot.py``, but the runner's ``POST /files`` upload endpoint
-is backed by a GCS bucket instead of the local uploads folder: an upload is
-written to the bucket and the endpoint returns a ``gs://`` URL, which the
-client passes back in its ``send-file`` message.
+The same bot as ``bot.py``, but uploads are backed by a GCS bucket instead of
+the local uploads folder: the ``create_file_storage()`` function below is
+discovered by whichever host runs the bot — the development runner here, the
+same way a cloud platform's base image would — and backs its upload endpoint,
+so an upload is written to the bucket and the endpoint returns a ``gs://``
+URL, which the client passes back in its ``send-file`` message.
 
 At completion time the URL is resolved per provider: Gemini on Vertex AI can
 read ``gs://`` URLs itself through its own IAM, so they pass straight through;
@@ -40,11 +42,10 @@ from pathlib import Path
 from dotenv import load_dotenv
 from google.api_core.exceptions import NotFound
 from google.cloud import storage
+from pipecat.utils.file_storage import FileStorage
 
 # The pipeline is identical to bot.py's; only the storage backend differs.
 from bot import bot  # noqa: F401  (re-exported for the runner to discover)
-from pipecat.runner.run import set_runner_file_storage
-from pipecat.utils.file_storage import FileStorage
 
 load_dotenv(override=True)
 
@@ -97,10 +98,18 @@ class GCSFileStorage(FileStorage):
         return self._bucket.blob(file_url.removeprefix(prefix))
 
 
+def create_file_storage() -> FileStorage:
+    """Storage backend for client uploads, discovered by the host alongside ``bot()``.
+
+    The host calls this at startup, serves its upload endpoint from the
+    returned backend, and injects it into the bot as
+    ``runner_args.file_storage``.
+    """
+    return GCSFileStorage(bucket=os.environ["GCS_UPLOADS_BUCKET"])
+
+
 if __name__ == "__main__":
     from pipecat.runner.run import main
-
-    set_runner_file_storage(GCSFileStorage(bucket=os.environ["GCS_UPLOADS_BUCKET"]))
 
     parser = argparse.ArgumentParser()
     parser.add_argument(

@@ -6,16 +6,20 @@ a local file from their computer or provide a URL pointing to an image or
 document. In both cases an optional text prompt can accompany the upload to
 guide the LLM's response.
 
-On the server, the development runner's `POST /files` upload endpoint stores
-the file (in the `PIPECAT_UPLOADS_FOLDER` by default) and returns a URL the
-client passes back in its `send-file` message. The URL is resolved at
-completion time by the LLM service's `FileResolver`: URLs the provider can
-fetch itself are passed straight through, and anything else is downloaded by
-the bot and inlined. The LLM can then reason about the uploaded content and
-respond with audio as it would for any other user turn.
+On the server, the development runner's upload endpoint (advertised as
+`fileUploadUrl` in the `/start` response) stores the file (in the
+`PIPECAT_UPLOADS_FOLDER` by default) and returns a URL the client passes back
+in its `send-file` message. The URL is resolved at completion time by the LLM
+service's `FileResolver`: URLs the provider can fetch itself are passed
+straight through, and anything else is downloaded by the bot and inlined. The
+LLM can then reason about the uploaded content and respond with audio as it
+would for any other user turn.
 
 Two variants swap the upload storage for a cloud bucket by implementing
-`FileStorage` and installing it with `set_runner_file_storage()`:
+`FileStorage` and declaring a `create_file_storage()` function alongside
+`bot()` — whichever host runs the bot discovers it there, backs its upload
+endpoint with the returned storage, and injects it into the bot as
+`runner_args.file_storage`:
 - `bot_gcs.py` stores uploads in Google Cloud Storage and returns `gs://`
   URLs, which Gemini on Vertex AI can read directly via its own IAM.
 - `bot_s3.py` stores uploads in Amazon S3 and returns `s3://` URLs, which
@@ -27,7 +31,8 @@ Concepts this example is meant to demonstrate:
 - Client → Server file upload via RTVI (`client.sendFile`)
 - Handling both local file uploads and URL-based content references
 - `FileResolver` on the LLM service for resolving file URLs per provider
-- Custom `FileStorage` backends (local disk, GCS, S3) for the upload endpoint
+- Custom `FileStorage` backends (local disk, GCS, S3) for the upload
+  endpoint, declared host-agnostically via `create_file_storage()`
 - `onBotOutput` with per-word spoken highlighting in the client UI
 
 ## Configuration
@@ -136,11 +141,13 @@ file-upload/
 
 ## Deploying to Pipecat Cloud
 
-Note that the `POST /files` upload endpoint is a development-runner feature, so
+Note that the upload endpoint is currently a development-runner feature, so
 files larger than the transport's message size limit can't be uploaded when the
 bot is deployed to Pipecat Cloud — production deployments need their own upload
-endpoint (see `PipecatClient.uploadFile(file, uploadFileParams)`). Sending
-small files, and referencing files by URL, work in both environments.
+endpoint (see `PipecatClient.uploadFile(file, uploadFileParams)`) until Pipecat
+Cloud serves one backed by the same `create_file_storage()` declaration this
+example uses. Sending small files, and referencing files by URL, work in both
+environments.
 
 This project is configured for deployment to Pipecat Cloud. You can learn how to deploy to Pipecat Cloud in the [Pipecat Quickstart Guide](https://docs.pipecat.ai/getting-started/quickstart#step-2-deploy-to-production).
 

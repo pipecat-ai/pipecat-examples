@@ -9,12 +9,13 @@
 This bot uses a cascade pipeline: Speech-to-Text → LLM → Text-to-Speech
 
 Clients can send files and images into the conversation with RTVI's
-``send-file`` message, either inline or by uploading to the runner's
-``POST /files`` endpoint first (enabled by ``PIPECAT_UPLOADS_FOLDER`` or
-``-u/--uploads-folder``). The upload endpoint stores the file and returns a
-URL the client passes back in ``send-file``; the LLM service resolves that
-URL at completion time through its ``FileResolver``, which is wired to the
-same storage backend here. See ``bot_gcs.py`` / ``bot_s3.py`` for backing
+``send-file`` message, either inline or by first uploading to the endpoint
+the runner advertises as ``fileUploadUrl`` in its ``/start`` response
+(enabled by ``PIPECAT_UPLOADS_FOLDER`` or ``-u/--uploads-folder``). The
+upload endpoint stores the file and returns a URL the client passes back in
+``send-file``; the LLM service resolves that URL at completion time through
+its ``FileResolver``, wired to the same storage backend via
+``runner_args.file_storage``. See ``bot_gcs.py`` / ``bot_s3.py`` for backing
 uploads with a cloud bucket instead of local disk.
 
 Required AI services:
@@ -44,7 +45,6 @@ from pipecat.processors.aggregators.llm_response_universal import (
     LLMUserAggregatorParams,
 )
 from pipecat.processors.frameworks.rtvi import RTVIProcessor
-from pipecat.runner.run import runner_file_storage
 from pipecat.runner.types import RunnerArguments
 from pipecat.runner.utils import create_transport
 from pipecat.serializers.protobuf import ProtobufFrameSerializer
@@ -144,10 +144,11 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments) -> Non
     )
 
     # LLM service - defaults to anthropic; select another with `-llm openai|bedrock|gemini|vertex`
-    # The resolver shares the runner's storage backend, so URLs returned by the
-    # POST /files upload endpoint resolve to the uploaded bytes.
+    # The resolver shares the host's storage backend, injected as
+    # runner_args.file_storage, so URLs returned by the upload endpoint
+    # resolve to the uploaded bytes.
     llm_name = getattr(runner_args.cli_args, "llm", None) or "anthropic"
-    file_resolver = FileResolver(file_storage=runner_file_storage())
+    file_resolver = FileResolver(file_storage=runner_args.file_storage)
     llm = create_llm_service(llm_name, file_resolver)
 
     context = LLMContext()

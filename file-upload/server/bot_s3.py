@@ -6,10 +6,12 @@
 
 """file-upload with client uploads stored in Amazon S3.
 
-The same bot as ``bot.py``, but the runner's ``POST /files`` upload endpoint
-is backed by an S3 bucket instead of the local uploads folder: an upload is
-written to the bucket and the endpoint returns an ``s3://`` URL, which the
-client passes back in its ``send-file`` message.
+The same bot as ``bot.py``, but uploads are backed by an S3 bucket instead of
+the local uploads folder: the ``create_file_storage()`` function below is
+discovered by whichever host runs the bot — the development runner here, the
+same way a cloud platform's base image would — and backs its upload endpoint,
+so an upload is written to the bucket and the endpoint returns an ``s3://``
+URL, which the client passes back in its ``send-file`` message.
 
 At completion time the URL is resolved per provider: AWS Bedrock can read
 ``s3://`` URLs itself through its own IAM (the bucket must be readable by the
@@ -40,11 +42,10 @@ from typing import Any
 import aiobotocore.session
 from botocore.exceptions import ClientError
 from dotenv import load_dotenv
+from pipecat.utils.file_storage import FileStorage
 
 # The pipeline is identical to bot.py's; only the storage backend differs.
 from bot import bot  # noqa: F401  (re-exported for the runner to discover)
-from pipecat.runner.run import set_runner_file_storage
-from pipecat.utils.file_storage import FileStorage
 
 load_dotenv(override=True)
 
@@ -112,12 +113,18 @@ class S3FileStorage(FileStorage):
         return file_url.removeprefix(prefix)
 
 
+def create_file_storage() -> FileStorage:
+    """Storage backend for client uploads, discovered by the host alongside ``bot()``.
+
+    The host calls this at startup, serves its upload endpoint from the
+    returned backend, and injects it into the bot as
+    ``runner_args.file_storage``.
+    """
+    return S3FileStorage(bucket=os.environ["S3_UPLOADS_BUCKET"], region=os.getenv("AWS_REGION"))
+
+
 if __name__ == "__main__":
     from pipecat.runner.run import main
-
-    set_runner_file_storage(
-        S3FileStorage(bucket=os.environ["S3_UPLOADS_BUCKET"], region=os.getenv("AWS_REGION"))
-    )
 
     parser = argparse.ArgumentParser()
     parser.add_argument(
