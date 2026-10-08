@@ -212,6 +212,7 @@ class VoiceChatClient {
             this.addEvent('transport-state', state);
           },
           onBotReady: () => {
+            this.uploadBtn.disabled = false;
             this.addEvent('bot-ready', 'Bot is ready to talk');
           },
           onUserTranscript: (data) => {
@@ -292,6 +293,7 @@ class VoiceChatClient {
     this.connectBtn.textContent = 'Connect';
     this.connectBtn.classList.remove('disconnect');
     this.micBtn.disabled = true;
+    this.uploadBtn.disabled = true;
     this.transportSelect.disabled = false;
     this.updateMicButton(false);
     this.addEvent('disconnected', 'Disconnected from bot');

@@ -6,31 +6,54 @@ a local file from their computer or provide a URL pointing to an image or
 document. In both cases an optional text prompt can accompany the upload to
 guide the LLM's response.
 
-On the server, the development runner's upload endpoint (advertised as
-`fileUploadUrl` in the `/start` response) stores the file (in the
-`PIPECAT_UPLOADS_FOLDER` by default) and returns a URL the client passes back
-in its `send-file` message. The URL is resolved at completion time by the LLM
-service's `FileResolver`: URLs the provider can fetch itself are passed
-straight through, and anything else is downloaded by the bot and inlined. The
-LLM can then reason about the uploaded content and respond with audio as it
-would for any other user turn.
+## How it works
 
-Two variants swap the upload storage for a cloud bucket by implementing
-`FileStorage` and declaring a `create_file_storage()` function alongside
-`bot()` — whichever host runs the bot discovers it there, backs its upload
-endpoint with the returned storage, and injects it into the bot as
-`runner_args.file_storage`:
-- `bot_gcs.py` stores uploads in Google Cloud Storage and returns `gs://`
-  URLs, which Gemini on Vertex AI can read directly via its own IAM.
-- `bot_s3.py` stores uploads in Amazon S3 and returns `s3://` URLs, which
-  AWS Bedrock can read directly via its own IAM.
-With any other LLM provider, the bot downloads the file from the bucket with
-its own credentials and sends the provider the bytes instead.
+1. **Upload.** The client POSTs the file to the upload endpoint the runner
+   advertised as `fileUploadUrl` in its `/start` response. The endpoint hands
+   the file to the bot's storage backend and returns a URL (`pipecat:<id>`
+   for local storage, `gs://`/`s3://` for the cloud-bucket bots).
+2. **Send.** The client passes that URL back in an RTVI `send-file` message
+   (`client.sendFile`). The bot stores only the URL in the LLM context —
+   small files can also be sent inline, skipping the upload.
+3. **Resolve.** At completion time the LLM service's `FileResolver` resolves
+   the URL per provider: a URL the provider can fetch itself is passed
+   straight through, and anything else is downloaded by the bot and inlined.
+   The LLM then reasons about the content and responds with audio as it would
+   for any other user turn.
+
+## The bots
+
+Three bots share one pipeline (defined in `bot.py`) and differ only in where
+uploads are stored:
+
+| Bot          | Storage              | Minted URL      | Read directly by                 |
+| ------------ | -------------------- | --------------- | -------------------------------- |
+| `bot.py`     | Local disk           | `pipecat:<id>`  | — (always inlined by the bot)    |
+| `bot_gcs.py` | Google Cloud Storage | `gs://...`      | Gemini on Vertex AI (`-llm vertex`) |
+| `bot_s3.py`  | Amazon S3            | `s3://...`      | AWS Bedrock (`-llm bedrock`)     |
+
+Every bot works with every LLM provider (`-llm anthropic|openai|bedrock|gemini|vertex`).
+The "read directly" column is the pass-through fast path: when the provider
+can reach the bucket through its own IAM, the bot never touches the bytes.
+With any other provider, the bot downloads the file from the bucket with its
+own credentials and sends the provider the bytes instead.
+
+The cloud-bucket bots show the host-agnostic way to plug in custom storage:
+implement `FileStorage` (`GCSFileStorage`/`S3FileStorage` here) and declare a
+`create_file_storage()` function alongside `bot()`. Whichever host runs the
+bot discovers the function there, backs its upload endpoint with the returned
+storage, and injects it into the bot as `runner_args.file_storage`, which the
+bot hands to its LLM service's `FileResolver` — so the same bot file runs
+unchanged under the development runner or a cloud platform's base image.
+`bot.py` declares no storage of its own and gets the runner's local-disk
+default (`-u/--uploads-folder` or `PIPECAT_UPLOADS_FOLDER`).
 
 Concepts this example is meant to demonstrate:
+
 - Client → Server file upload via RTVI (`client.sendFile`)
 - Handling both local file uploads and URL-based content references
-- `FileResolver` on the LLM service for resolving file URLs per provider
+- `FileResolver` on the LLM service for resolving file URLs per provider,
+  including `gs://`/`s3://` pass-through to providers with bucket access
 - Custom `FileStorage` backends (local disk, GCS, S3) for the upload
   endpoint, declared host-agnostically via `create_file_storage()`
 - `onBotOutput` with per-word spoken highlighting in the client UI
@@ -41,7 +64,8 @@ Concepts this example is meant to demonstrate:
 - **Transport(s)**: SmallWebRTC, Daily (WebRTC)
 - **Pipeline**: Cascade
   - **STT**: Deepgram
-  - **LLM**: Anthropic Claude
+  - **LLM**: Anthropic Claude (default), OpenAI, AWS Bedrock, or Google
+    Gemini via the developer API or Vertex AI — select with `-llm`
   - **TTS**: Cartesia
 
 ## Setup
@@ -125,7 +149,9 @@ Concepts this example is meant to demonstrate:
 ```
 file-upload/
 ├── server/              # Python bot server
-│   ├── bot.py           # Main bot implementation
+│   ├── bot.py           # Main bot (local-disk upload storage)
+│   ├── bot_gcs.py       # Same bot, uploads in Google Cloud Storage
+│   ├── bot_s3.py        # Same bot, uploads in Amazon S3
 │   ├── pyproject.toml   # Python dependencies
 │   ├── env.example      # Environment variables template
 │   ├── .env             # Your API keys (git-ignored)
