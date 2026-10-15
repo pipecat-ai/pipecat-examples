@@ -146,7 +146,7 @@ A cold transfer is when the bot transfers the call directly to another party (th
 
 1. **Customer** calls and speaks with the **bot**
 2. Customer requests to speak with a supervisor
-3. **Bot** dials the **operator** and says "I'm transferring you to a supervisor now"
+3. **Bot** tells the customer "I'm transferring you to a supervisor now", then transfers the call to the **operator**
 4. When the **operator** answers, the **bot immediately leaves the call**
 5. **Customer** and **operator** are now connected directly
 

@@ -13,8 +13,10 @@ from pipecat.audio.vad.silero import SileroVADAnalyzer
 from pipecat.frames.frames import (
     EndFrame,
     EndWorkerFrame,
+    FunctionCallResultProperties,
     LLMMessagesAppendFrame,
     LLMRunFrame,
+    TTSSpeakFrame,
 )
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.worker import PipelineParams, PipelineWorker
@@ -30,7 +32,12 @@ from pipecat.services.deepgram.stt import DeepgramSTTService
 from pipecat.services.llm_service import FunctionCallParams
 from pipecat.services.openai.llm import OpenAILLMService
 from pipecat.transports.base_transport import BaseTransport
-from pipecat.transports.daily.transport import DailyDialinSettings, DailyParams, DailyTransport
+from pipecat.transports.daily.transport import (
+    DailyDialinSettings,
+    DailyParams,
+    DailySIPTransferFrame,
+    DailyTransport,
+)
 from pipecat.workers.runner import WorkerRunner
 
 load_dotenv(override=True)
@@ -90,32 +97,35 @@ Available functions:
         if operator_number:
             logger.info(f"Transferring call to operator: {operator_number}")
 
-            # Inform the user about the transfer
-            content = "I'm transferring you to a supervisor now. Please hold while I connect you."
-            message = {
-                "role": "system",
-                "content": content,
-            }
+            # Tell the caller, then transfer. The transport holds the transfer
+            # frame until the announcement before it has played; calling
+            # transport.sip_call_transfer() here would transfer at once.
+            announcement = TTSSpeakFrame(
+                "I'm transferring you to a supervisor now. Please hold while I connect you."
+            )
+            transfer = DailySIPTransferFrame(settings={"toEndPoint": operator_number})
+            # The caller talking over the announcement must not cancel the transfer
+            announcement.interruptible = False
+            transfer.interruptible = False
 
-            # Queue the message to the context and let it speak
-            await params.llm.push_frame(LLMMessagesAppendFrame([message], run_llm=True))
+            await params.llm.push_frame(announcement)
+            await params.llm.push_frame(transfer)
 
-            # Start the dialout to transfer the call
-            transfer_params = {"toEndPoint": operator_number}
-            logger.debug(f"SIP call transfer parameters: {transfer_params}")
-            await transport.sip_call_transfer(transfer_params)
+            # The bot has nothing more to say
+            await params.result_callback(
+                {"status": "transferring"},
+                properties=FunctionCallResultProperties(run_llm=False),
+            )
 
         else:
-            # No operator number configured
-            content = "I'm sorry, but supervisor transfer is not available at this time. Is there anything else I can help you with?"
-            message = {
-                "role": "system",
-                "content": content,
-            }
-
-            # Queue the message to the context
-            await params.llm.push_frame(LLMMessagesAppendFrame([message], run_llm=True))
+            # No operator number configured: let the LLM tell the caller
             logger.warning("No operator dialout settings available")
+            await params.result_callback(
+                {
+                    "status": "unavailable",
+                    "reason": "Supervisor transfer is not available right now.",
+                }
+            )
 
     # Initialize LLM context and aggregator
     context = LLMContext(tools=[terminate_call, dial_operator])
