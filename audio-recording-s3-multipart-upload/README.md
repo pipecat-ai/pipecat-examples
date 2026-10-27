@@ -7,13 +7,13 @@ By default, `AudioBufferProcessor` keeps all user and bot audio in a buffer in m
 This example code illustrates how to implement `AudioBufferProcessor` with a 5mb buffer-size and event handlers to upload merged audio as well as bot audio and user audio files to an AWS s3 bucket.
 
 > [!NOTE]
-> You can record Pipecat audio via the [transport](https://docs.pipecat.ai/guides/fundamentals/recording-audio#option-1:-record-using-your-transport-service-provider) or by capturing frames in the Pipeline with the [`AudioBufferProcessor`](https://docs.pipecat.ai/guides/fundamentals/recording-audio#option-2:-create-your-own-recording-pipeline). This guide focuses on the latter.
+> You can record Pipecat audio via the [transport](https://docs.pipecat.ai/guides/fundamentals/recording-audio#option-1-record-using-your-transport-service-provider) or by capturing frames in the Pipeline with the [`AudioBufferProcessor`](https://docs.pipecat.ai/guides/fundamentals/recording-audio#option-2-create-your-own-recording-pipeline). This guide focuses on the latter.
 
 ## Prerequisites
 
-- [Pipecat basics (Quickstart)](https://github.com/pipecat-ai/pipecat/tree/main/examples/quickstart)
+- [Pipecat basics (Quickstart)](https://github.com/pipecat-ai/pipecat-quickstart)
 - [`AudioBufferProcessor` documentation](https://docs.pipecat.ai/guides/fundamentals/recording-audio#how-the-audiobufferprocessor-works)
-- [`AudioBufferProcessor` basics](https://github.com/pipecat-ai/pipecat/blob/main/examples/foundational/34-audio-recording.py)
+- [`AudioBufferProcessor` basics](https://github.com/pipecat-ai/pipecat/blob/main/examples/audio/audio-recording.py)
 - AWS account
 
 ## Create AWS resources
@@ -112,7 +112,7 @@ Amend this s3key in `AudioUploader` if desired.
 
 ## Deploy bot
 
-See [quickstart README](https://github.com/pipecat-ai/pipecat/blob/main/examples/quickstart/README.md#step-2-deploy-to-production-5-min).
+See [quickstart README](https://github.com/pipecat-ai/pipecat-quickstart#step-2-deploy-to-production-5-min).
 
 ## Pro Tip
 

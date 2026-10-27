@@ -145,6 +145,6 @@ Your Pipecat bot will automatically answer and start the conversation.
 - [Pipecat Documentation](https://docs.pipecat.ai)
 - [Deepgram API](https://developers.deepgram.com)
 - [OpenAI API](https://platform.openai.com/docs)
-- [Cartesia API](https://cartesia.ai/docs)
+- [Cartesia API](https://docs.cartesia.ai)
 
 ---
