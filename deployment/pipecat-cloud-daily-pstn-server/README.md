@@ -1,8 +1,7 @@
 # Handling PSTN/SIP Dial-in on Pipecat Cloud
 
 This repository contains two server implementations for handling
-the pinless dial-in workflow in Pipecat Cloud. This is the companion to the
-Pipecat Cloud [pstn_sip starter image](https://github.com/daily-co/pipecat-cloud-images/tree/cc95cfc7dfdac0d3d73bb794a36a50147b435be1/pipecat-starters/pstn_sip).
+the pinless dial-in workflow in Pipecat Cloud.
 In addition you can use `/api/dial` to trigger dial-out, and
 eventually, call-transfers.
 
