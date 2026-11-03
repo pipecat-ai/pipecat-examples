@@ -1,0 +1,9 @@
+agent_name = "genesys-chatbot"
+secret_set = "genesys-chatbot"
+agent_profile = "agent-1x"
+# Genesys connects directly and can't request a session token first; the bot
+# checks Genesys's X-API-KEY header instead.
+websocket_auth = "none"
+
+[scaling]
+	min_agents = 1

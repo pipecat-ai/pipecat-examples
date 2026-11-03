@@ -38,6 +38,7 @@ Ready to explore more? These are two of the most useful examples for common use 
 - **[telnyx-chatbot](telnyx-chatbot/)** - Production-ready phone bot with Telnyx integration
 - **[plivo-chatbot](plivo-chatbot/)** - Production-ready phone bot with Plivo integration
 - **[exotel-chatbot](exotel-chatbot/)** - Production-ready phone bot with Exotel integration
+- **[genesys-chatbot](genesys-chatbot/)** - Phone bot for Genesys Cloud using Audio Connector
 - **[ivr-navigation](ivr-navigation/)** - Dial-out and navigate an IVR call tree
 
 ### **Web & Client Applications**
