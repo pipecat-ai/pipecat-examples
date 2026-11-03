@@ -97,6 +97,11 @@
     "skip": false
   },
   {
+    "path": "genesys-chatbot/inbound",
+    "runCommand": "uv run bot.py -t websocket",
+    "skip": false
+  },
+  {
     "path": "instant-voice/server",
     "runCommand": "uv run src/server.py",
     "skip": false
