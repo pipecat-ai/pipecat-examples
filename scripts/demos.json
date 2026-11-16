@@ -92,6 +92,11 @@
     "skip": false
   },
   {
+    "path": "expressivity/server",
+    "runCommand": "uv run bot.py",
+    "skip": false
+  },
+  {
     "path": "freeze-test",
     "runCommand": "uv run freeze_test_bot.py",
     "skip": false

@@ -1,0 +1,11 @@
+# Once this file exists Pipecat Cloud's own default exclusions no longer apply, so they're listed here too.
+.venv
+.env
+.env.*
+env.example
+__pycache__
+*.pyc
+.pytest_cache
+.ruff_cache
+.python-version
+pcc-deploy.toml

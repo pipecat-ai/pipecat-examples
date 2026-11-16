@@ -1,0 +1,517 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+@import "@fontsource-variable/jetbrains-mono";
+@import "@fontsource-variable/doto/rond.css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --font-heading: var(--font-sans);
+  /* Everything that isn't a headline or a big number. */
+  --font-sans: "JetBrains Mono Variable", ui-monospace, monospace;
+  /* Headlines and big numbers: Doto, with fully round dots. */
+  --font-display: "Doto Variable", ui-monospace, monospace;
+  --font-display--font-variation-settings: "ROND" 100;
+  /* The page's widest: room for the pill and the readings side by side on a big screen. */
+  --container-page: 100rem;
+  /* How a voice sounds: one color a tone, the pill's own for that mood. */
+  --color-tone-positive: var(--tone-positive);
+  --color-tone-neutral: var(--tone-neutral);
+  --color-tone-sad: var(--tone-sad);
+  --color-tone-frustrated: var(--tone-frustrated);
+  /* The tone of the reading on show, which the page's glow, ring and gauges take. */
+  --color-tone-now: var(--tone-now);
+  /* A turn a model heard as sarcastic: the violet a turn in progress has, which no tone takes. */
+  --color-sarcastic: var(--tone-listening);
+  /*
+   * The page is one screen and never scrolls, so what is on it is sized in
+   * units of the screen's height (--frame-unit, set below), and capped by
+   * its width where a long word or number would run out of room.
+   */
+  /* A lane's figures are also capped by the lane's own width (cqw), as two share the page's. */
+  --text-lane-headline: min(calc(var(--frame-unit) * 6), 15cqw);
+  --text-overlay: min(calc(var(--frame-unit) * 4), 11cqw);
+  --text-latency: min(calc(var(--frame-unit) * 8), 26cqw);
+  --text-gauge: min(calc(var(--frame-unit) * 3), 7.5cqw);
+  --text-gauge-unit: clamp(0.5rem, 3.6cqw, 0.75rem);
+  --text-panel: min(calc(var(--frame-unit) * 2.5), 8cqw);
+  --text-conclusion: max(1.25rem, calc(var(--frame-unit) * 3.6));
+  /* The overall bar: its headline and room round it, whether or not it has one to show. */
+  --spacing-conclusion: calc(
+    var(--text-conclusion) + max(1rem, calc(var(--frame-unit) * 2.4))
+  );
+  --spacing-gauge: min(calc(var(--frame-unit) * 9), 22cqw);
+  --spacing-dotgrid: calc(var(--frame-unit) * 9);
+  --spacing-pill: min(
+    calc(var(--frame-unit) * var(--pill-units)),
+    var(--pill-widest)
+  );
+  /* Stacked, the pill grows into the height left over, up to this. */
+  --spacing-pill-max: calc(var(--frame-unit) * 84);
+  --spacing-control: max(2.75rem, calc(var(--frame-unit) * 7));
+  --spacing-wave: calc(var(--frame-unit) * 7);
+  --spacing-frame: calc(var(--frame-unit) * 3);
+  /* Inside a tone panel on a larger screen: round its edge, and between its name and its figure. */
+  --spacing-panel: calc(var(--frame-unit) * 1.7);
+  /* Between the parts of a lane, round the inside of its card, and above the cards for the orb's wisps. */
+  --spacing-lane: calc(var(--frame-unit) * 2.2);
+  --spacing-card: calc(var(--frame-unit) * 2.2);
+  --spacing-rail: calc(var(--frame-unit) * 3);
+  --spacing-frame-sm: calc(var(--frame-unit) * 1.5);
+  --spacing-frame-lg: calc(var(--frame-unit) * 5);
+  /* The panels while a turn is heard, and while the model reads it. */
+  /* A dot of the clip ring as the clip reaches it: a white head that settles into the tone. */
+  --animate-ring-dot: ring-dot 0.6s linear forwards;
+  @keyframes ring-dot {
+    0% {
+      background-color: var(--foreground);
+    }
+    100% {
+      background-color: var(--tone-now);
+    }
+  }
+  /* A lane's reading as it lands: there at once, far too bright, then settling. */
+  --animate-landed: landed 0.45s cubic-bezier(0.2, 0.8, 0.2, 1);
+  @keyframes landed {
+    0% {
+      filter: brightness(3) saturate(1.4);
+    }
+    100% {
+      filter: none;
+    }
+  }
+  /* The ring round a card as its reading lands, and the band of light that drops through it. */
+  @keyframes impact-ring {
+    0% {
+      opacity: 1;
+      box-shadow:
+        0 0 3.5rem color-mix(in oklab, var(--tone-now) 75%, transparent),
+        inset 0 0 2.5rem color-mix(in oklab, var(--tone-now) 45%, transparent);
+    }
+    100% {
+      opacity: 0;
+      box-shadow:
+        0 0 0 transparent,
+        inset 0 0 0 transparent;
+    }
+  }
+  @keyframes impact-band {
+    0% {
+      transform: translateY(-100%);
+      opacity: 1;
+    }
+    100% {
+      transform: translateY(420%);
+      opacity: 0;
+    }
+  }
+  /* The header's status dot while something is happening. */
+  --animate-status: status 1.4s ease-in-out infinite;
+  @keyframes status {
+    50% {
+      opacity: 0.2;
+    }
+  }
+  /* The word over a lane, in step with the reading under it. */
+  --animate-word-hearing: word 1.6s ease-in-out infinite;
+  --animate-word-assessing: word 0.6s ease-in-out infinite;
+  @keyframes word {
+    50% {
+      opacity: 0.45;
+    }
+  }
+  /* A lane's reading while a turn is heard, and while its model reads it. */
+  --animate-hearing: working 1.6s ease-in-out infinite;
+  --animate-assessing: working 0.6s ease-in-out infinite;
+  @keyframes working {
+    0%,
+    100% {
+      opacity: 0.3;
+    }
+    50% {
+      opacity: 0.14;
+    }
+  }
+  /* Dot meters: a lit dot and an unlit one. */
+  --color-meter: var(--meter);
+  --color-meter-track: var(--meter-track);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-foreground: var(--foreground);
+  --color-background: var(--background);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+  --color-active: var(--active-background);
+  --color-active-foreground: var(--active-foreground);
+  --color-inactive: var(--inactive-background);
+  --color-inactive-foreground: var(--inactive-foreground);
+  --animate-ptt-pulse: ptt-pulse 1.5s ease-in-out infinite;
+  --color-inactive-background: var(--inactive-background);
+  --color-active-background: var(--active-background);
+  @keyframes ptt-pulse {
+    50% {
+      outline-color: color-mix(
+        in oklab,
+        var(--active-background) 30%,
+        transparent
+      );
+    }
+  }
+}
+
+:root {
+  /* Side by side, the page is about 90 units tall; stacked on a narrow screen, about 195. */
+  --frame-unit: 0.5dvh;
+  /* How many units across the pill's place is: stacked, where it shares the height with the readings, this is the least it gets. */
+  --pill-units: 20;
+  /* The widest the pill's place gets, whatever the height: stacked, most of the screen; side by side, its column. */
+  --pill-widest: 80vw;
+  @media (width >= 64rem) {
+    --frame-unit: 1dvh;
+    --pill-units: 58;
+    --pill-widest: 35vw;
+  }
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.205 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --accent: oklch(0.97 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.708 0 0);
+  --chart-1: oklch(0.87 0 0);
+  --chart-2: oklch(0.556 0 0);
+  --chart-3: oklch(0.439 0 0);
+  --chart-4: oklch(0.371 0 0);
+  --chart-5: oklch(0.269 0 0);
+  --radius: 0.625rem;
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-primary: oklch(0.205 0 0);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.97 0 0);
+  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-border: oklch(0.922 0 0);
+  --sidebar-ring: oklch(0.708 0 0);
+  --active-background: oklch(0.696 0.17 162.48);
+  --active-foreground: oklch(0.979 0.021 166.113);
+  --inactive-background: oklch(0.702 0.189 22.23);
+  --inactive-foreground: oklch(0.971 0.013 17.38);
+  /* Checked for color-blind separation against this surface; neutral is gray on purpose. */
+  --tone-positive: #1baf7a;
+  --tone-neutral: #66655f;
+  --tone-sad: #2a78d6;
+  --tone-frustrated: #eb6834;
+  --meter: var(--foreground);
+  --meter-track: oklch(0.922 0 0);
+}
+
+.dark {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.205 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.922 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.556 0 0);
+  --chart-1: oklch(0.87 0 0);
+  --chart-2: oklch(0.556 0 0);
+  --chart-3: oklch(0.439 0 0);
+  --chart-4: oklch(0.371 0 0);
+  --chart-5: oklch(0.269 0 0);
+  --sidebar: oklch(0.205 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.556 0 0);
+  --active-background: oklch(0.702 0.158 160.44);
+  --active-foreground: oklch(0.979 0.021 166.11);
+  --inactive-background: oklch(0.702 0.189 22.23);
+  --inactive-foreground: oklch(0.971 0.013 17.38);
+  /* Each tone's colour, and a second one its glow drifts towards. */
+  --tone-positive: #4ade80;
+  --tone-positive-2: #d4ff5e;
+  --tone-neutral: #c4c4cc;
+  --tone-neutral-2: #8e8e99;
+  --tone-sad: #5b8cff;
+  --tone-sad-2: #a77bff;
+  --tone-frustrated: #ff5b2e;
+  --tone-frustrated-2: #ffb13b;
+  /* While a turn is heard and read: the pill's own violet. */
+  --tone-listening: #b867ff;
+  --tone-listening-2: #f3d4ff;
+  --meter: var(--foreground);
+  --meter-track: oklch(1 0 0 / 12%);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  html {
+    @apply font-sans;
+  }
+}
+/* Lights a row of dots one after another. Browsers without sibling-index() light them together. */
+@utility delay-stagger {
+  transition-delay: calc((sibling-index() - 1) * 14ms);
+}
+
+/*
+ * The tone of the reading on show, as two colours the page fades between.
+ * Registered as colours so a change of tone is a transition, not a cut.
+ */
+@property --tone-now {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #c4c4cc;
+}
+@property --tone-now-2 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #8e8e99;
+}
+/* How much of the tone's colour is in the bed behind the pill: none while the tone is neutral. */
+@property --bed-tint {
+  syntax: "<percentage>";
+  inherits: true;
+  initial-value: 0%;
+}
+@layer components {
+  .tone-scope {
+    --tone-now: var(--tone-neutral);
+    --tone-now-2: var(--tone-neutral-2);
+    --bed-tint: 0%;
+    transition:
+      --tone-now 1.2s ease,
+      --tone-now-2 1.6s ease,
+      --bed-tint 1.2s ease;
+  }
+  /* A lane takes its tone's colour at once: the page behind it is what fades. */
+  .tone-scope-instant {
+    transition: none;
+  }
+  .tone-scope:is(
+    [data-tone="listening"],
+    [data-tone="positive"],
+    [data-tone="sad"],
+    [data-tone="frustrated"]
+  ) {
+    --bed-tint: 24%;
+  }
+  .tone-scope[data-tone="listening"] {
+    --tone-now: var(--tone-listening);
+    --tone-now-2: var(--tone-listening-2);
+  }
+  .tone-scope[data-tone="positive"] {
+    --tone-now: var(--tone-positive);
+    --tone-now-2: var(--tone-positive-2);
+  }
+  .tone-scope[data-tone="sad"] {
+    --tone-now: var(--tone-sad);
+    --tone-now-2: var(--tone-sad-2);
+  }
+  .tone-scope[data-tone="frustrated"] {
+    --tone-now: var(--tone-frustrated);
+    --tone-now-2: var(--tone-frustrated-2);
+  }
+}
+/* The page's backdrop: a faint grid of dots, and two soft glows in the tone's colours. */
+@utility backdrop-dots {
+  background-image: radial-gradient(
+    circle,
+    color-mix(in oklab, var(--foreground) 6%, transparent) 1px,
+    transparent 1.4px
+  );
+  background-size: 14px 14px;
+  mask-image: linear-gradient(90deg, transparent 0%, #000 45%);
+}
+@utility backdrop-glow {
+  left: -10%;
+  top: -20%;
+  width: 90%;
+  height: 140%;
+  background: radial-gradient(
+    closest-side,
+    color-mix(in oklab, var(--tone-now) 14%, transparent),
+    transparent
+  );
+}
+/*
+ * The bed the pill sits in: a pool of dark that takes the backdrop's dots out
+ * from behind it, with the tone's colour rising through it once there is one.
+ */
+@utility pill-bed {
+  inset: -14%;
+  border-radius: 50%;
+  background:
+    radial-gradient(
+      closest-side,
+      color-mix(in oklab, var(--tone-now) var(--bed-tint), transparent) 35%,
+      transparent 100%
+    ),
+    radial-gradient(
+      closest-side,
+      color-mix(in oklab, var(--background) 85%, transparent) 55%,
+      transparent 100%
+    );
+}
+@utility backdrop-glow-2 {
+  right: -20%;
+  bottom: -40%;
+  width: 80%;
+  height: 110%;
+  background: radial-gradient(
+    closest-side,
+    color-mix(in oklab, var(--tone-now-2) 8%, transparent),
+    transparent
+  );
+}
+
+/* A model's card: a dark pane that takes the backdrop's dots out from behind it, with a little of its tone at its edge. */
+@utility lane-card {
+  position: relative;
+  border-color: color-mix(in oklab, var(--tone-now) 28%, var(--border));
+  background: color-mix(in oklab, var(--card) 55%, transparent);
+  backdrop-filter: blur(6px);
+  /*
+   * The card taking in what the orb's wisps bring it. The wisps' canvas sets, on the card, how much
+   * is landing (--receive, 0 to 1), where along its top edge (--receive-at) and in what colour
+   * (energy-wisps.tsx). A wash of that light falls into the card from there, and its top edge is lit.
+   */
+  &::before,
+  &::after {
+    content: "";
+    position: absolute;
+    pointer-events: none;
+    mix-blend-mode: screen;
+  }
+  &::before {
+    inset: 0;
+    border-radius: inherit;
+    background: radial-gradient(
+      70% 9rem at var(--receive-at, 40%) 0,
+      color-mix(
+        in oklab,
+        var(--receive-colour, transparent) calc(var(--receive, 0) * 30%),
+        transparent
+      ),
+      transparent 72%
+    );
+  }
+  &::after {
+    top: -1px;
+    left: 0;
+    right: 0;
+    height: 2px;
+    border-radius: 1px;
+    opacity: var(--receive, 0);
+    background: radial-gradient(
+      32% 100% at var(--receive-at, 40%) 50%,
+      var(--receive-colour, transparent),
+      transparent
+    );
+    filter: drop-shadow(0 0 6px var(--receive-colour, transparent));
+  }
+}
+
+/*
+ * With the effects off (effects-store.ts), for a device that struggles with them: the cards are
+ * plain panes rather than glass, and a reading lands without its burst of light.
+ */
+[data-effects="off"] {
+  .lane-card {
+    background: var(--card);
+    backdrop-filter: none;
+  }
+  .lane-impact {
+    display: none;
+  }
+}
+
+/* What a card does as its reading lands (model-lane.tsx). It sits over the card and takes no room in it. */
+@utility lane-impact {
+  position: absolute;
+  inset: -1px;
+  overflow: hidden;
+  border: 2px solid var(--tone-now);
+  border-radius: inherit;
+  pointer-events: none;
+  mix-blend-mode: screen;
+  animation: impact-ring 0.6s ease-out forwards;
+  &::before {
+    content: "";
+    position: absolute;
+    inset-inline: 0;
+    top: 0;
+    height: 28%;
+    background: linear-gradient(
+      to bottom,
+      transparent,
+      color-mix(in oklab, var(--tone-now) 38%, transparent) 60%,
+      color-mix(in oklab, var(--foreground) 55%, transparent) 96%,
+      transparent
+    );
+    animation: impact-band 0.42s cubic-bezier(0.3, 0, 0.3, 1) forwards;
+  }
+}

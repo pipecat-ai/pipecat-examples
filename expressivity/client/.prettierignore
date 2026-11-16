@@ -1,0 +1,7 @@
+dist
+node_modules
+package-lock.json
+# The house guidelines are installed verbatim and compared against their source.
+AGENTS.md
+# The glass pill's source is kept as it is in the webgl-pill project.
+src/components/pill/webgl-pill
