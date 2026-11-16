@@ -1,0 +1,11 @@
+agent_name = "expressivity"
+# Holds DEEPGRAM_API_KEY.
+secret_set = "expressivity-secrets"
+agent_profile = "agent-1x"
+
+# Krisp's voice isolation on the microphone (bot.py's microphone_filter). "tel" is its 16 kHz model.
+[krisp_viva]
+    audio_filter = "tel"
+
+[scaling]
+    min_agents = 1

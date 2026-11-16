@@ -73,6 +73,7 @@ Ready to explore more? These are two of the most useful examples for common use 
 - **[daily-custom-tracks](daily-custom-tracks/)** - Custom audio/video track handling
 - **[local-input-select-stt](local-input-select-stt/)** - Local audio input selection
 - **[bot-ready-signalling](bot-ready-signalling/)** - Bot connect management
+- **[expressivity](expressivity/)** - Read how each turn was said with Pipecat Voice Reader and Pipecat Tone
 
 ### **Deployment & Infrastructure**
 

@@ -1,0 +1,22 @@
+{
+  // The glass pill (src/components/pill/webgl-pill) is the source of the
+  // webgl-pill project, kept as it is there. It is checked under that
+  // project's own settings, and the app sees it through its declarations.
+  "compilerOptions": {
+    "composite": true,
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.pill.tsbuildinfo",
+    "target": "es2023",
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "types": ["vite/client"],
+    "jsx": "react-jsx",
+    "skipLibCheck": true,
+    "strict": true,
+    "declaration": true,
+    "emitDeclarationOnly": true,
+    "rootDir": "./src/components/pill/webgl-pill",
+    "outDir": "./node_modules/.tmp/pill-types"
+  },
+  "include": ["src/components/pill/webgl-pill"]
+}
