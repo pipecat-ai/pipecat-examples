@@ -1,0 +1,34 @@
+name: en_to_sw
+
+# English in, Swahili out. Kokoro speaks the English turn, the bot translates it
+# and speaks Swahili through Google Gemini TTS. Deepgram's Swahili model
+# transcribes the bot's speech for the judge.
+
+user:
+  modality: audio
+  speech:
+    service: kokoro
+    voice: af_heart
+    sample_rate: 16000
+
+judge:
+  modality: audio
+  eval:
+    factory: eval_services.judge
+    model: gpt-4.1
+  transcription:
+    factory: eval_services.transcriber
+    language: sw
+
+scenarios:
+  - name: greeting
+    turns:
+      - user: "Good morning. Welcome to our meeting today."
+        expect:
+          - event: user_transcription
+            text_contains: "meeting"
+          # The bot's speech reaches the judge one sentence at a time.
+          - event: response
+            eval: "is in Swahili (Kiswahili), not English, and says good morning (for example 'habari za asubuhi'). Small spelling errors from speech-to-text are fine."
+          - event: response
+            eval: "is in Swahili (Kiswahili), not English, and welcomes people to today's meeting (for example 'karibu' or 'karibuni' with 'mkutano'). Small spelling errors from speech-to-text are fine."

@@ -5,7 +5,14 @@ description = "Daily Multitranslation bot"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-  "pipecat-ai[daily,webrtc,websocket,cartesia,google,silero,deepgram,runner,soundfile]>=1.8.0",
+  "pipecat-ai[daily,webrtc,websocket,google,openai,silero,deepgram,runner,soundfile]>=1.8.0",
   "pipecatcloud>=1.2.0",
   "aiofiles"
+]
+
+[dependency-groups]
+dev = [
+  # `evals` brings the eval harness and its local user voice (Kokoro). The
+  # deployed bot never needs it.
+  "pipecat-ai[evals]>=1.8.0",
 ]

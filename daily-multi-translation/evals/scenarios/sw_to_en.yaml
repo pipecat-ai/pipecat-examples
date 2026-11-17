@@ -1,0 +1,39 @@
+name: sw_to_en
+
+# Swahili in, English out. The bot hears a Swahili recording, so its real
+# Deepgram Swahili STT runs. The judge hears the bot's English speech.
+#
+# Kokoro, the harness's built-in user voice, has no Swahili, so each turn plays a
+# recording. The clips are synthetic (Google Gemini TTS), which is cleaner than a
+# real speaker: a pass shows the path works, not how accurate Swahili STT is.
+
+user:
+  modality: audio
+
+judge:
+  modality: audio
+  eval:
+    factory: eval_services.judge
+    model: gpt-4.1
+  transcription:
+    factory: eval_services.transcriber
+    language: en
+
+scenarios:
+  - name: greeting
+    turns:
+      - user: "Habari za asubuhi."
+        audio: ../assets/sw_good_morning.wav
+        expect:
+          - event: user_transcription
+            text_contains: "asubuhi"
+          - event: response
+            eval: "is in English and says good morning. It only translates; it does not answer or add anything."
+
+      - user: "Karibuni kwenye mkutano wetu wa leo."
+        audio: ../assets/sw_welcome.wav
+        expect:
+          - event: user_transcription
+            text_contains: "mkutano"
+          - event: response
+            eval: "is in English and welcomes people to today's meeting. It only translates; it does not answer or add anything."

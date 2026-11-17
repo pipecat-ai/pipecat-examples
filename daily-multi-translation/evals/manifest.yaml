@@ -1,0 +1,28 @@
+# Runs both translation directions against bot.py as one command:
+#
+#   PYTHONPATH=evals uv run pipecat eval suite evals/manifest.yaml
+#
+# The suite starts a fresh bot per scenario. Each entry's runner_body picks the
+# direction, the same way a /start request body does in production. The eval
+# transport has one audio output, so each entry runs a single target track.
+#
+# Both scenarios are audio end to end: real STT in, real TTS out. Recordings
+# land in test-runs/<timestamp>/recordings/ so you can listen back.
+
+bots_dir: ../
+scenarios_dir: scenarios
+runs_dir: test-runs
+record: true
+concurrency: 2
+
+suite:
+  - bot: bot.py
+    name: sw-to-en
+    runner_body:
+      data: { source: sw, targets: [english] }
+    scenarios: [sw_to_en]
+  - bot: bot.py
+    name: en-to-sw
+    runner_body:
+      data: { source: en, targets: [swahili] }
+    scenarios: [en_to_sw]
