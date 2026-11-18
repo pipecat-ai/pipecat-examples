@@ -36,7 +36,7 @@ const CLIENT_TOOLS = {
   },
 };
 
-class ChatbotClient {
+class FunctionCallingApp {
   constructor() {
     this.pcClient = null;
     this.botAudio = null;
@@ -184,4 +184,4 @@ class ChatbotClient {
   }
 }
 
-window.addEventListener("DOMContentLoaded", () => new ChatbotClient());
+window.addEventListener("DOMContentLoaded", () => new FunctionCallingApp());
