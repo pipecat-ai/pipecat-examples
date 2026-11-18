@@ -75,3 +75,7 @@ button:disabled {
   color: #9c27b0;
   font-weight: bold;
 }
+
+.log-pending {
+  opacity: 0.4;
+}

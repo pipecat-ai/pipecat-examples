@@ -40,6 +40,7 @@ class ChatbotClient {
   constructor() {
     this.pcClient = null;
     this.botAudio = null;
+    this.botLines = new Map(); // segment_id -> the log line showing it
     this.connectBtn = document.getElementById("connect-btn");
     this.disconnectBtn = document.getElementById("disconnect-btn");
     this.statusSpan = document.getElementById("connection-status");
@@ -55,6 +56,42 @@ class ChatbotClient {
     this.debugLog.appendChild(entry);
     this.debugLog.scrollTop = this.debugLog.scrollHeight;
     console.log(message);
+    return entry;
+  }
+
+  /**
+   * Show the bot's output as one line per segment, updated as it is spoken.
+   *
+   * A spoken segment arrives as "new", then "in-progress" for each word, then
+   * "completed"; text that isn't spoken arrives once, as "new". The spoken
+   * part is shown solid and the part still to be spoken faded.
+   */
+  handleBotOutput(data) {
+    const key = data.segment_id ?? `${data.text}-${Date.now()}`;
+    let line = this.botLines.get(key);
+    if (!line) {
+      const entry = this.log("Bot: ", "log-bot");
+      line = {
+        spoken: entry.appendChild(document.createElement("span")),
+        pending: entry.appendChild(document.createElement("span")),
+      };
+      line.pending.className = "log-pending";
+      this.botLines.set(key, line);
+    }
+
+    const progress = data.spoken_progress;
+    if (data.spoken_status === "completed" || !data.will_be_spoken || !progress) {
+      line.spoken.textContent = data.text;
+      line.pending.textContent = "";
+    } else {
+      line.spoken.textContent = progress.accumulated_text;
+      line.pending.textContent = progress.remaining_text;
+    }
+
+    if (data.spoken_status === "completed" || !data.will_be_spoken) {
+      console.log(`Bot: ${data.text}`);
+      this.botLines.delete(key);
+    }
   }
 
   updateStatus(state) {
@@ -106,12 +143,11 @@ class ChatbotClient {
         onUserTranscript: (data) => {
           if (data.final) this.log(`User: ${data.text}`, "log-user");
         },
-        onBotOutput: (data) => {
-          if (data.aggregated_by === "sentence") this.log(`Bot: ${data.text}`, "log-bot");
-        },
+        onBotOutput: (data) => this.handleBotOutput(data),
         onTrackStarted: (track, participant) => this.handleBotAudio(track, participant),
         onDisconnected: () => {
           this.log("Disconnected.");
+          this.botLines.clear();
           this.removeBotAudio();
           this.pcClient = null;
           this.updateStatus("disconnected");
