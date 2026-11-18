@@ -1,0 +1,9 @@
+[project]
+name = "pipecat-example-sip-kamailio"
+version = "0.1.0"
+description = "SIP bot registered through a self-hosted Kamailio registrar"
+requires-python = ">=3.11"
+dependencies = [
+    "pipecat-ai[sip,kokoro]",
+    "python-dotenv",
+]
