@@ -37,7 +37,7 @@ from loguru import logger
 from pipecat.audio.vad.silero import SileroVADAnalyzer
 from pipecat.frames.frames import LLMRunFrame
 from pipecat.pipeline.pipeline import Pipeline
-from pipecat.pipeline.worker import PipelineParams, PipelineWorker
+from pipecat.pipeline.worker import PipelineParams, PipelineWorker, ProcessorUnusablePolicy
 from pipecat.processors.aggregators.llm_context import LLMContext
 from pipecat.processors.aggregators.llm_response_universal import (
     LLMContextAggregatorPair,
@@ -53,7 +53,7 @@ from pipecat.services.cartesia.tts import CartesiaTTSService
 from pipecat.services.deepgram.stt import DeepgramSTTService
 from pipecat.services.llm_service import FunctionCallParams
 from pipecat.services.openai.llm import OpenAILLMService
-from pipecat.transports.base_transport import BaseTransport, TransportParams
+from pipecat.transports.base_transport import BaseTransport
 from pipecat.transports.daily.transport import DailyParams
 from pipecat.workers.runner import WorkerRunner
 
@@ -89,13 +89,20 @@ async def set_background_color(params: FunctionCallParams, color: str):
 
 CLIENT_TOOLS = [get_local_time, set_background_color]
 
+# The client connects through Daily only (see client/javascript/src/app.js).
+transport_params = {
+    "daily": lambda: DailyParams(audio_in_enabled=True, audio_out_enabled=True),
+}
+
 
 async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     """Run the voice bot for this session."""
-    stt = DeepgramSTTService(api_key=os.getenv("DEEPGRAM_API_KEY"))
+    logger.info("Starting bot")
+
+    stt = DeepgramSTTService(api_key=os.environ["DEEPGRAM_API_KEY"])
 
     llm = OpenAILLMService(
-        api_key=os.getenv("OPENAI_API_KEY"),
+        api_key=os.environ["OPENAI_API_KEY"],
         settings=OpenAILLMService.Settings(
             model=os.getenv("OPENAI_MODEL", "gpt-4.1"),
             system_instruction=SYSTEM_INSTRUCTION,
@@ -103,7 +110,7 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     )
 
     tts = CartesiaTTSService(
-        api_key=os.getenv("CARTESIA_API_KEY"),
+        api_key=os.environ["CARTESIA_API_KEY"],
         settings=CartesiaTTSService.Settings(
             voice="71a7ad14-091c-4e8e-a314-022ece01c121",  # British Reading Lady
         ),
@@ -130,6 +137,8 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     worker = PipelineWorker(
         pipeline,
         params=PipelineParams(enable_metrics=True, enable_usage_metrics=True),
+        idle_timeout_secs=runner_args.pipeline_idle_timeout_secs,
+        processor_unusable_policy=ProcessorUnusablePolicy.END,
         # The client needs a call's name and arguments to pick and run its
         # handler; the default level ("none") reports neither.
         rtvi_observer_params=RTVIObserverParams(
@@ -164,10 +173,6 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
 
 async def bot(runner_args: RunnerArguments):
     """Main bot entry point compatible with Pipecat Cloud."""
-    transport_params = {
-        "daily": lambda: DailyParams(audio_in_enabled=True, audio_out_enabled=True),
-        "webrtc": lambda: TransportParams(audio_in_enabled=True, audio_out_enabled=True),
-    }
     transport = await create_transport(runner_args, transport_params)
     await run_bot(transport, runner_args)
 
