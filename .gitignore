@@ -26,8 +26,7 @@ share/python-wheels/
 *.egg
 MANIFEST
 .DS_Store
-.env
-.env.local
+.env*
 fly.toml
 
 # PyInstaller
