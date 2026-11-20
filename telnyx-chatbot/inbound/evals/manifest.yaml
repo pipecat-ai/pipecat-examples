@@ -1,0 +1,17 @@
+# Runs the audio eval against bot.py. From inbound/:
+#
+#   AB_VARIANT=deepgram   PYTHONPATH=evals uv run pipecat eval suite evals/manifest.yaml -n deepgram
+#   AB_VARIANT=elevenlabs PYTHONPATH=evals uv run pipecat eval suite evals/manifest.yaml -n elevenlabs
+#
+# The suite starts the bot itself. AB_VARIANT picks the arm under test, and
+# PYTHONPATH lets the scenarios find eval_services.py.
+
+bots_dir: ../
+scenarios_dir: scenarios
+runs_dir: test-runs # logs + recordings -> test-runs/<name>/
+record: true
+
+suite:
+  - bot: bot.py
+    scenarios:
+      - conversation

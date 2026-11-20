@@ -26,8 +26,8 @@ This project is a Pipecat-based chatbot that integrates with Telnyx to handle We
 ### AI Services
 
 - OpenAI API key for the LLM inference
-- Deepgram API key for speech-to-text
-- Cartesia API key for text-to-speech
+- Deepgram API key for speech-to-text and text-to-speech (the `deepgram` arm)
+- ElevenLabs API key for speech-to-text and text-to-speech (the `elevenlabs` arm)
 
 ### System
 
@@ -50,6 +50,30 @@ This project is a Pipecat-based chatbot that integrates with Telnyx to handle We
    ```sh
    cp env.example .env
    ```
+
+## A/B testing
+
+`bot.py` runs one of two speech stacks per call. The LLM and prompt are the same in both, so any difference comes from speech-to-text and text-to-speech.
+
+| Arm          | Speech-to-text                 | Text-to-speech                    |
+| ------------ | ------------------------------ | --------------------------------- |
+| `deepgram`   | Deepgram (Australian English)  | Deepgram Flux (Sharon voice)      |
+| `elevenlabs` | ElevenLabs Realtime (English)  | ElevenLabs (Australian voice)     |
+
+Each call picks an arm at random. To force one, set `AB_VARIANT=deepgram` or `AB_VARIANT=elevenlabs` in your `.env`.
+
+The bot logs `A/B variant: <arm>` at the start of each call. Metrics are on, so you can group the TTFB and usage logs by that line to compare the two arms.
+
+### Audio eval
+
+`evals/` holds an audio eval that talks to the bot and judges what it says back. The user's lines are spoken by a Deepgram voice and the judge is an OpenAI model, so it needs `DEEPGRAM_API_KEY` and `OPENAI_API_KEY`, plus the keys for the arm under test.
+
+```sh
+AB_VARIANT=deepgram   PYTHONPATH=evals uv run pipecat eval suite evals/manifest.yaml -n deepgram
+AB_VARIANT=elevenlabs PYTHONPATH=evals uv run pipecat eval suite evals/manifest.yaml -n elevenlabs
+```
+
+Each run writes its logs and a recording of the call to `evals/test-runs/<name>/`.
 
 ## Local development
 

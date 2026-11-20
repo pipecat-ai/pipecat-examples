@@ -1,0 +1,38 @@
+name: conversation
+
+# Audio end to end: the user's lines are spoken by a Deepgram voice, the bot
+# hears them through its own STT, and the judge reads a Deepgram transcript of
+# what the bot said out loud. So this covers the bot's STT, LLM and TTS.
+
+user:
+  modality: audio
+  speech:
+    factory: eval_services.voice
+    voice: aura-2-thalia-en
+
+judge:
+  modality: audio
+  transcription:
+    factory: eval_services.transcriber
+  eval:
+    factory: eval_services.judge
+    model: gpt-4.1
+
+scenarios:
+  - name: greeting_and_questions
+    turns:
+      # The bot speaks first on connect.
+      - expect:
+          - event: response
+            eval: introduces itself or greets the caller.
+
+      - user: "What is the capital of Australia?"
+        expect:
+          - event: response
+            eval: says the capital of Australia is Canberra.
+
+      # Only passes if the bot heard the first question and kept the context.
+      - user: "And what about New Zealand?"
+        expect:
+          - event: response
+            eval: says the capital of New Zealand is Wellington.
