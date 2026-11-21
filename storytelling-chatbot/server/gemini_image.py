@@ -27,7 +27,7 @@ from pipecat.utils.types import assert_given
 class GeminiImageGenService(ImageGenService):
     """Generates one image per prompt with a Gemini image model."""
 
-    def __init__(self, *, api_key: str, model: str = "gemini-2.5-flash-image", **kwargs):
+    def __init__(self, *, api_key: str, model: str = "gemini-3.1-flash-lite-image", **kwargs):
         super().__init__(settings=ImageGenSettings(model=model), **kwargs)
         self._client = genai.Client(api_key=api_key)
 
@@ -38,12 +38,16 @@ class GeminiImageGenService(ImageGenService):
         response = await self._client.aio.models.generate_content(
             model=model,
             contents=prompt,
-            config=types.GenerateContentConfig(response_modalities=["IMAGE"]),
+            config=types.GenerateContentConfig(
+                response_modalities=["IMAGE"],
+                image_config=types.ImageConfig(aspect_ratio="1:1"),
+            ),
         )
 
-        parts = response.candidates[0].content.parts if response.candidates else None
+        content = response.candidates[0].content if response.candidates else None
+        parts = content.parts if content else None
         for part in parts or []:
-            if part.inline_data and part.inline_data.data:
+            if not part.thought and part.inline_data and part.inline_data.data:
                 image = Image.open(io.BytesIO(part.inline_data.data)).convert("RGB")
                 yield OutputImageRawFrame(image=image.tobytes(), size=image.size, format=image.mode)
                 return
