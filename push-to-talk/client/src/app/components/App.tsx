@@ -14,6 +14,7 @@ import { usePipecatClient } from '@pipecat-ai/client-react';
 import { useCallback, useState } from 'react';
 import type { TransportType } from '../../config';
 import { TransportSelect } from './TransportSelect';
+import { useClientTools } from '../hooks/useClientTools';
 
 export interface AppProps {
   handleConnect?: () => void | Promise<void>;
@@ -76,6 +77,9 @@ export const App = ({
   availableTransports,
 }: AppProps) => {
   const { isConnected } = usePipecatConnectionState();
+
+  // Tools the LLM calls that run here in the browser, not on the server.
+  useClientTools();
 
   if (error) {
     return (
