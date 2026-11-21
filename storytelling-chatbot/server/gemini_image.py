@@ -38,7 +38,10 @@ class GeminiImageGenService(ImageGenService):
         response = await self._client.aio.models.generate_content(
             model=model,
             contents=prompt,
-            config=types.GenerateContentConfig(response_modalities=["IMAGE"]),
+            config=types.GenerateContentConfig(
+                response_modalities=["IMAGE"],
+                image_config=types.ImageConfig(aspect_ratio="1:1"),
+            ),
         )
 
         content = response.candidates[0].content if response.candidates else None
