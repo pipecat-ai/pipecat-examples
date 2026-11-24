@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Client Function Calling</title>
+  <link rel="stylesheet" href="/src/style.css">
+</head>
+
+<body>
+  <div class="container">
+    <div class="status-bar">
+      <div class="status">
+        Status: <span id="connection-status">Disconnected</span>
+      </div>
+      <div class="controls">
+        <button id="connect-btn">Connect</button>
+        <button id="disconnect-btn" disabled>Disconnect</button>
+      </div>
+    </div>
+
+    <div class="hint">
+      Try: <em>"What time is it?"</em> or <em>"Make the background light blue."</em>
+    </div>
+
+    <div class="debug-panel">
+      <h3>Log</h3>
+      <div id="debug-log"></div>
+    </div>
+  </div>
+
+  <script type="module" src="/src/app.js"></script>
+</body>
+
+</html>
