@@ -1,0 +1,67 @@
+   0.000  [ --]  run: script 'collections_call/english_caller' -> ws://localhost:7901/ws
+   0.000  [ --]  user  -> modality: audio | speech: factory:eval_services.caller_voice
+   0.000  [ --]  judge -> modality: audio | transcription: factory:eval_services.bot_transcriber | eval: factory:eval_services.judge
+   0.577  [ --]  connected
+   1.222  [ --]  handshake: ok (bot-ready)
+   1.222  [ t0]  --- turn 0: None
+   1.222  [ t0]  match: waiting for 'response'
+   1.226  [ t0]  event: metrics  'ttfb, processing'
+   1.226  [ t0]  event: flow_node  'verify'
+   1.252  [ t0]  event: llm_started
+   1.994  [ t0]  event: metrics  'ttfb'
+   1.995  [ t0]  event: metrics  'ttfat'
+   2.310  [ t0]  event: metrics  'ttfb'
+   2.311  [ t0]  event: bot_started_speaking
+   2.311  [ t0]  event: tts_response  'नमस्ते, मैं अंजलि बोल रही हूँ सनराइज़ फाइनेंस से.'
+   2.311  [ t0]  event: tts_response  'मैं आपके लोन के बारे में कॉल कर रही हूँ.'
+   2.370  [ t0]  event: metrics  'ttfa'
+   2.381  [ t0]  event: metrics  'tokens'
+   2.381  [ t0]  event: metrics  'processing'
+   2.381  [ t0]  event: llm_response  'नमस्ते, मैं अंजलि बोल रही हूँ सनराइज़ फाइनेंस से. मैं आपके लोन के बारे में कॉल कर रही हूँ. कृपया अपने लोन नंबर के आखिरी चार अंक बताइए.'
+   2.381  [ t0]  event: metrics  'characters'
+   2.412  [ t0]  event: tts_response  'कृपया अपने लोन नंबर के आखिरी चार अंक बताइए.'
+  12.932  [ t0]  event: bot_stopped_speaking
+  13.749  [ t0]  event: response  'नमस्ते, मैं अंजली बोल रही हूं सनराइज़ finance से.'
+  13.749  [ t1]  --- turn 1: 'Sure. The last four digits are four, three, two, one.'
+  13.749  [ t1]  send: waiting for the bot's speech to be transcribed
+  14.890  [ t1]  event: response  'मैं आपके loan के बारे में call कर रही हूं. कृपया अपने loan number के आखिरी चार अंक बताइए.'
+  14.891  [ t1]  discard: dropped 1 queued event(s) before send
+  14.891  [ t1]  send: 'Sure. The last four digits are four, three, two, one.' (audio)
+  14.891  [ t1]  match: waiting for 'function_call' (verify_customer(last_four='4321'))
+  15.345  [ t1]  event: user_started_speaking
+  15.345  [ t1]  event: bot_interrupted
+  18.822  [ t1]  event: metrics  'stt_usage'
+  18.822  [ t1]  event: user_transcription  'Sure. The last four digits are four three two one.'
+  18.823  [ t1]  event: user_stopped_speaking
+  18.823  [ t1]  event: llm_started
+  19.429  [ t1]  event: metrics  'ttfb'
+  19.430  [ t1]  event: metrics  'ttfat'
+  19.474  [ t1]  event: metrics  'tokens'
+  19.475  [ t1]  event: metrics  'processing'
+  19.475  [ t1]  event: llm_response
+  19.475  [ t1]  event: function_call  'verify_customer'
+  19.475  [ t1]  event: function_call_stopped  'verify_customer'
+  19.475  [ t1]  match: waiting for 'flow_node'
+  19.476  [ t1]  event: flow_node  'remind'
+  19.476  [ t1]  match: waiting for 'response' (text_contains)
+  19.479  [ t1]  event: llm_started
+  20.315  [ t1]  event: metrics  'ttfb'
+  20.322  [ t1]  event: metrics  'ttfat'
+  20.643  [ t1]  event: metrics  'ttfb'
+  20.645  [ t1]  event: bot_started_speaking
+  20.646  [ t1]  event: tts_response  'शुक्रिया अमित जी, आपने लोन नंबर के आखिरी चार अंक बता दिए.'
+  20.646  [ t1]  event: tts_response  'आपको आठ हजार पाँच सौ रुपये बीस नवम्बर को जमा करने थे, लेकिन अभी तक वह राशि हमको नहीं मिली है.'
+  20.646  [ t1]  event: tts_response  'अगर आप देर से भुगतान करेंगे तो लेट फीस जुड़ सकती है.'
+  20.669  [ t1]  event: tts_response  'जल्दी भुगतान करने से आपकी क्रेडिट हिस्ट्री साफ रहती है.'
+  20.701  [ t1]  event: metrics  'ttfa'
+  20.850  [ t1]  event: metrics  'tokens'
+  20.851  [ t1]  event: metrics  'processing'
+  20.851  [ t1]  event: llm_response  'शुक्रिया अमित जी, आपने लोन नंबर के आखिरी चार अंक बता दिए. आपको आठ हजार पाँच सौ रुपये बीस नवम्बर को जमा करने थे, लेकिन अभी तक वह राशि हमको नहीं मिली है. अगर आप देर से भुगतान करेंगे तो लेट फीस जुड़ सकती है. जल्दी भुगतान करने से आपकी क्रेडिट हिस्ट्री साफ रहती है.\n\nकृपया बताइए, आप किस तारीख को यह राशि जमा कर पाएँगे?'
+  20.851  [ t1]  event: metrics  'characters'
+  20.904  [ t1]  event: tts_response  'कृपया बताइए, आप किस तारीख को यह राशि जमा कर पाएँगे?'
+  46.945  [ t1]  event: bot_stopped_speaking
+  47.759  [ t1]  event: response  'शुक्रिया अमित जी.'
+  47.759  [ t1]  eval: continue (aggregate='शुक्रिया अमित जी.') does not contain 'रुप'
+  49.320  [ t1]  event: response  'आपने loan number के आखिरी चार अंक बता दिए. आपको आठ हज़ार पांच सौ रुपए बीस November को जमा करने थे, लेकिन अभी तक वह राशि हमको नहीं मिली है. अगर आप देर से भुगतान करेंगे तो late fees जुड़ सकती है. जल्दी भुगतान करने से आपकी credit history साफ़ रहती है. कृपया बताइए आप किस तारीख को यह राशि जमा कर पाएंगे?'
+  49.320  [ t1]  eval: pass (aggregate='शुक्रिया अमित जी. आपने loan number के आखिरी चार अंक बता दिए. आपको आठ हज़ार पांच सौ रुपए बीस November को जमा करने थे, लेकिन अभी तक वह राशि हमको नहीं मिली है. अगर आप देर से भुगतान करेंगे तो late fees जुड़ सकती है. जल्दी भुगतान करने से आपकी credit history साफ़ रहती है. कृपया बताइए आप किस तारीख को यह राशि जमा कर पाएंगे?') 
+  49.335  [ t1]  done: PASS (0 failure(s))

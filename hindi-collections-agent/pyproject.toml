@@ -1,0 +1,23 @@
+[project]
+name = "hindi-collections-agent"
+version = "0.1.0"
+description = "Loan payment reminder call with Deepgram Flux, Pipecat Flows, and an audio eval"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "pipecat-ai[daily,deepgram,openai,runner,webrtc,websocket]>=1.17.0",
+  "pipecatcloud>=1.2.0",
+]
+
+[dependency-groups]
+dev = [
+    # The eval harness. Not needed to run or deploy the bot.
+    "pipecat-ai[evals]>=1.17.0",
+    "pyright>=1.1.404,<2",
+    "ruff>=0.12.11,<1",
+]
+
+[tool.ruff]
+line-length = 100
+[tool.ruff.lint]
+select = ["I", "UP"]

@@ -1,0 +1,16 @@
+# Runs every scenario here against bot.py with one command, from the project folder:
+#
+#   uv run pipecat eval suite evals/manifest.yaml -v
+#
+# The suite starts the bot itself (a fresh one per scenario), so nothing needs
+# to be running first. Logs and the call recording land in evals/runs/<name>/.
+
+bots_dir: ../
+scenarios_dir: scenarios
+runs_dir: runs
+record: true
+
+suite:
+  - bot: bot.py
+    scenarios:
+      - collections_call

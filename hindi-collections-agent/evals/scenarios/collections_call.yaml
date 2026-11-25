@@ -1,0 +1,123 @@
+name: collections_call
+
+# Spoken test calls for the payment reminder bot. Every model is in the cloud.
+#
+# The harness speaks the caller's lines (Deepgram Flux TTS), so the bot's real
+# Deepgram Flux STT and turn detection run. The bot's Hindi speech is
+# transcribed (Deepgram Nova-3) and checked by an LLM judge (OpenAI) or an
+# exact text match. The Deepgram services are built in eval_services.py.
+#
+# Run it from the project folder:
+#
+#   uv run pipecat eval suite evals/manifest.yaml
+
+user:
+  modality: audio
+  speech:
+    factory: eval_services.caller_voice
+    voice: flux-arjun-hi
+
+judge:
+  modality: audio
+  transcription:
+    factory: eval_services.bot_transcriber
+    language: hi
+  eval:
+    factory: eval_services.judge
+    model: gpt-4.1
+
+scenarios:
+  # A full call in Hindi: all three steps, plus a barge-in.
+  - name: verify_remind_close
+    turns:
+      # Step 1 (verify): the bot speaks first and asks for the loan digits.
+      - expect:
+          - event: flow_node
+            text_matches: ['^verify$']
+          - event: response
+            eval: "the bot, speaking Hindi, says it is calling from a finance company and asks for the last four digits of the loan number, without stating any amount of money"
+
+      # "Yes, the last four digits of my loan number are four, three, two, one."
+      # The caller passes the check, and the call moves to step 2 (remind).
+      # This turn ends as soon as the bot starts reading the reminder.
+      - user: "जी हाँ, मेरे लोन नंबर के आखिरी चार अंक चार, तीन, दो, एक हैं।"
+        expect:
+          - event: function_call
+            name: verify_customer
+            args:
+              last_four: "4321"
+          - event: flow_node
+            text_matches: ['^remind$']
+          - event: bot_started_speaking
+
+      # "Wait a minute. How much is the late fee?"
+      # Barge-in: the caller cuts in two seconds into the reminder.
+      # The bot must stop talking and answer the question.
+      - user: "एक मिनट रुकिए। लेट फीस कितनी है?"
+        send_after: {event: bot_started_speaking, delay_ms: 2000}
+        expect:
+          - event: bot_interrupted
+          # Proof the bot went quiet: it must stop within 3 seconds of the
+          # caller starting to speak, long before its next reply could end.
+          - event: bot_stopped_speaking
+            within_ms: 3000
+          - event: response
+            eval: "the bot, speaking Hindi, talks about the late fee in answer to the caller's question (for example, says it does not have the exact amount)"
+
+      # "Okay. I will make the payment this Friday."
+      # The caller promises a date, and the call moves to step 3 (close).
+      - user: "ठीक है। मैं इस शुक्रवार को पेमेंट कर दूँगा।"
+        expect:
+          - event: function_call
+            name: record_promise_to_pay
+          - event: flow_node
+            text_matches: ['^close$']
+          # A plain text check for "Friday" in Hindi. The LLM judge misread
+          # this Hindi line in testing, so this check does not use it.
+          - event: response
+            text_contains: "शुक्रवार"
+
+  # The same first step with an English-speaking caller. The bot understands
+  # English too and keeps answering in Hindi.
+  - name: english_caller
+    user:
+      modality: audio
+      speech:
+        factory: eval_services.caller_voice
+        voice: flux-cole-en
+    turns:
+      - expect:
+          - event: response
+
+      - user: "Sure. The last four digits are four, three, two, one."
+        expect:
+          - event: function_call
+            name: verify_customer
+            args:
+              last_four: "4321"
+          - event: flow_node
+            text_matches: ['^remind$']
+          # The reminder states the amount: a plain text check for "rupees" in Hindi.
+          - event: response
+            text_contains: "रुप"
+
+  # The caller says they already paid. The bot must not record a promise;
+  # the call leaves early through wrap_up.
+  - name: already_paid
+    turns:
+      - expect:
+          - event: response
+
+      - user: "जी हाँ, मेरे लोन नंबर के आखिरी चार अंक चार, तीन, दो, एक हैं।"
+        expect:
+          - event: flow_node
+            text_matches: ['^remind$']
+          - event: response
+            text_contains: "रुप"
+
+      # "I already made the payment last week."
+      - user: "मैंने पिछले हफ्ते ही पेमेंट कर दिया है।"
+        expect:
+          - event: flow_node
+            text_matches: ['^wrap_up$']
+          - event: response

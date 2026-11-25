@@ -1,0 +1,127 @@
+   0.000  [ --]  run: script 'collections_call/verify_remind_close' -> ws://localhost:7900/ws
+   0.000  [ --]  user  -> modality: audio | speech: factory:eval_services.caller_voice
+   0.000  [ --]  judge -> modality: audio | transcription: factory:eval_services.bot_transcriber | eval: factory:eval_services.judge
+   0.579  [ --]  connected
+   1.196  [ --]  handshake: ok (bot-ready)
+   1.196  [ t0]  --- turn 0: None
+   1.196  [ t0]  match: waiting for 'flow_node'
+   1.199  [ t0]  event: metrics  'ttfb, processing'
+   1.199  [ t0]  event: flow_node  'verify'
+   1.199  [ t0]  match: waiting for 'response' (eval)
+   1.224  [ t0]  event: llm_started
+   1.982  [ t0]  event: metrics  'ttfb'
+   1.982  [ t0]  event: metrics  'ttfat'
+   2.276  [ t0]  event: metrics  'ttfb'
+   2.277  [ t0]  event: bot_started_speaking
+   2.277  [ t0]  event: tts_response  'नमस्ते, मैं अंजलि बोल रही हूँ सनराइज़ फाइनेंस से।'
+   2.278  [ t0]  event: tts_response  'मैं आपके लोन के बारे में बात कर रही हूँ।'
+   2.340  [ t0]  event: metrics  'ttfa'
+   2.355  [ t0]  event: metrics  'tokens'
+   2.355  [ t0]  event: metrics  'processing'
+   2.355  [ t0]  event: llm_response  'नमस्ते, मैं अंजलि बोल रही हूँ सनराइज़ फाइनेंस से। मैं आपके लोन के बारे में बात कर रही हूँ। कृपया अपने लोन नंबर के आख़िरी चार अंक बताइए।'
+   2.355  [ t0]  event: metrics  'characters'
+   2.381  [ t0]  event: tts_response  'कृपया अपने लोन नंबर के आख़िरी चार अंक बताइए।'
+  12.665  [ t0]  event: bot_stopped_speaking
+  15.882  [ t0]  event: response  'नमस्ते, मैं अंजली बोल रही हूं सनराइज़ Finance से. मैं आपके loan के बारे में बात कर रही हूं. कृपया अपने क्लोन number के आखिरी चार अंक बताइए.'
+  16.831  [ t0]  eval: pass (aggregate='नमस्ते, मैं अंजली बोल रही हूं सनराइज़ Finance से. मैं आपके loan के बारे में बात कर रही हूं. कृपया अपने क्लोन number के आखिरी चार अंक बताइए.') judge said yes: P(yes)=0.95, P(no)=0.03, P(continue)=0.02
+  16.831  [ t1]  --- turn 1: 'जी हाँ, मेरे लोन नंबर के आखिरी चार अंक चार, तीन, दो, एक हैं।'
+  16.831  [ t1]  send: 'जी हाँ, मेरे लोन नंबर के आखिरी चार अंक चार, तीन, दो, एक हैं।' (audio)
+  16.831  [ t1]  match: waiting for 'function_call' (verify_customer(last_four='4321'))
+  17.325  [ t1]  event: user_started_speaking
+  17.325  [ t1]  event: bot_interrupted
+  24.590  [ t1]  event: metrics  'stt_usage'
+  24.590  [ t1]  event: user_transcription  'जी हां, मेरे loan number के आखिरी चार अंक चार तीन दो एक हैं.'
+  24.590  [ t1]  event: user_stopped_speaking
+  24.591  [ t1]  event: llm_started
+  25.366  [ t1]  event: metrics  'ttfb'
+  25.366  [ t1]  event: metrics  'ttfat'
+  25.456  [ t1]  event: metrics  'tokens'
+  25.457  [ t1]  event: metrics  'processing'
+  25.457  [ t1]  event: llm_response
+  25.457  [ t1]  event: function_call  'verify_customer'
+  25.457  [ t1]  event: function_call_stopped  'verify_customer'
+  25.457  [ t1]  match: waiting for 'flow_node'
+  25.460  [ t1]  event: flow_node  'remind'
+  25.460  [ t1]  match: waiting for 'bot_started_speaking'
+  25.466  [ t1]  event: llm_started
+  26.042  [ t1]  event: metrics  'ttfb'
+  26.048  [ t1]  event: metrics  'ttfat'
+  26.310  [ t1]  event: metrics  'ttfb'
+  26.311  [ t1]  event: bot_started_speaking
+  26.312  [ t2]  --- turn 2: 'एक मिनट रुकिए। लेट फीस कितनी है?'
+  26.312  [ t2]  send_after: waiting for 'bot_started_speaking' + 2000ms
+  26.312  [ t2]  event: tts_response  'धन्यवाद अमित जी, पुष्टि करने के लिए।'
+  26.335  [ t2]  event: tts_response  'आपकी आठ हज़ार पाँच सौ रुपये की लोन किस्त बीस नवम्बर को देय थी, लेकिन अभी तक जमा नहीं हुई है।'
+  26.366  [ t2]  event: metrics  'ttfa'
+  26.490  [ t2]  event: tts_response  'देर से जमा करने पर लेट फीस लग सकती है और समय पर भुगतान करने से आपका क्रेडिट रिकॉर्ड भी सही रहता है।'
+  26.552  [ t2]  event: metrics  'tokens'
+  26.552  [ t2]  event: metrics  'processing'
+  26.552  [ t2]  event: llm_response  'धन्यवाद अमित जी, पुष्टि करने के लिए। आपकी आठ हज़ार पाँच सौ रुपये की लोन किस्त बीस नवम्बर को देय थी, लेकिन अभी तक जमा नहीं हुई है। देर से जमा करने पर लेट फीस लग सकती है और समय पर भुगतान करने से आपका क्रेडिट रिकॉर्ड भी सही रहता है। कृपया बताइए आप कौन सी तारीख़ को पेमेंट कर पाएंगे?'
+  26.553  [ t2]  event: metrics  'characters'
+  26.647  [ t2]  event: tts_response  'कृपया बताइए आप कौन सी तारीख़ को पेमेंट कर पाएंगे?'
+  28.313  [ t2]  discard: dropped 9 queued event(s) before send
+  28.313  [ t2]  send: 'एक मिनट रुकिए। लेट फीस कितनी है?' (audio)
+  28.313  [ t2]  discard: bot speech held in its open turn before the interrupting send
+  28.313  [ t2]  match: waiting for 'bot_interrupted'
+  28.686  [ t2]  event: user_started_speaking
+  28.686  [ t2]  event: bot_interrupted
+  28.686  [ t2]  match: waiting for 'bot_stopped_speaking'
+  28.686  [ t2]  event: bot_stopped_speaking
+  28.686  [ t2]  match: waiting for 'response' (eval)
+  30.596  [ t2]  discard: bot speech from before the turn's reply 'धन्यवाद अमित जी, पुष्टि करने के लिए.'
+  31.200  [ t2]  event: metrics  'stt_usage'
+  31.200  [ t2]  event: user_transcription  'Eight minute रुकिए. Late fees कितनी है?'
+  31.202  [ t2]  event: user_stopped_speaking
+  31.202  [ t2]  event: llm_started
+  31.783  [ t2]  event: metrics  'ttfb'
+  31.784  [ t2]  event: metrics  'ttfat'
+  32.088  [ t2]  event: metrics  'ttfb'
+  32.090  [ t2]  event: bot_started_speaking
+  32.090  [ t2]  event: tts_response  'अमित जी, इस कॉल पर मेरे पास लेट फीस की सही जानकारी नहीं है।'
+  32.090  [ t2]  event: tts_response  'आप तुरंत भुगतान करेंगे तो लेट फीस कम से कम लगेगी।'
+  32.143  [ t2]  event: metrics  'ttfa'
+  32.313  [ t2]  event: metrics  'tokens'
+  32.313  [ t2]  event: metrics  'processing'
+  32.313  [ t2]  event: llm_response  'अमित जी, इस कॉल पर मेरे पास लेट फीस की सही जानकारी नहीं है। आप तुरंत भुगतान करेंगे तो लेट फीस कम से कम लगेगी। कृपया बताइए आप किस तारीख़ तक पेमेंट कर पाएंगे?'
+  32.313  [ t2]  event: metrics  'characters'
+  32.347  [ t2]  event: tts_response  'कृपया बताइए आप किस तारीख़ तक पेमेंट कर पाएंगे?'
+  45.347  [ t2]  event: bot_stopped_speaking
+  47.072  [ t2]  event: response  'अमित जी, इस call पर मेरे पास late fees की सही जानकारी नहीं है. आप तुरंत भुगतान करेंगे तो late fees कम से कम लगेगी. कृपया बताइए आप किस तारीख तक payment कर पाएंगे?'
+  47.831  [ t2]  eval: pass (aggregate='अमित जी, इस call पर मेरे पास late fees की सही जानकारी नहीं है. आप तुरंत भुगतान करेंगे तो late fees कम से कम लगेगी. कृपया बताइए आप किस तारीख तक payment कर पाएंगे?') judge said yes: P(yes)=0.95, P(no)=0.03, P(continue)=0.02
+  47.831  [ t3]  --- turn 3: 'ठीक है। मैं इस शुक्रवार को पेमेंट कर दूँगा।'
+  47.831  [ t3]  send: 'ठीक है। मैं इस शुक्रवार को पेमेंट कर दूँगा।' (audio)
+  47.831  [ t3]  match: waiting for 'function_call' (record_promise_to_pay)
+  48.168  [ t3]  event: user_started_speaking
+  48.168  [ t3]  event: bot_interrupted
+  51.443  [ t3]  event: metrics  'stt_usage'
+  51.443  [ t3]  event: user_transcription  'ठीक है, मैं शुक्रवार को payment कर दूंगा.'
+  51.444  [ t3]  event: user_stopped_speaking
+  51.444  [ t3]  event: llm_started
+  52.051  [ t3]  event: metrics  'ttfb'
+  52.052  [ t3]  event: metrics  'ttfat'
+  52.112  [ t3]  event: metrics  'tokens'
+  52.113  [ t3]  event: metrics  'processing'
+  52.113  [ t3]  event: llm_response
+  52.114  [ t3]  event: function_call  'record_promise_to_pay'
+  52.114  [ t3]  event: function_call_stopped  'record_promise_to_pay'
+  52.114  [ t3]  match: waiting for 'flow_node'
+  52.119  [ t3]  event: flow_node  'close'
+  52.119  [ t3]  match: waiting for 'response' (text_contains)
+  52.125  [ t3]  event: metrics  'stt_usage'
+  52.126  [ t3]  event: llm_started
+  52.783  [ t3]  event: metrics  'ttfb'
+  52.784  [ t3]  event: metrics  'ttfat'
+  52.977  [ t3]  event: metrics  'tokens'
+  52.977  [ t3]  event: metrics  'processing'
+  52.977  [ t3]  event: llm_response  'अमित जी, आपने शुक्रवार को पेमेंट करने का वादा किया है, धन्यवाद। आपके समय के लिए शुक्रिया, नमस्ते।'
+  52.977  [ t3]  event: metrics  'characters'
+  53.082  [ t3]  event: metrics  'ttfb'
+  53.088  [ t3]  event: bot_started_speaking
+  53.088  [ t3]  event: tts_response  'अमित जी, आपने शुक्रवार को पेमेंट करने का वादा किया है, धन्यवाद।'
+  53.088  [ t3]  event: tts_response  'आपके समय के लिए शुक्रिया, नमस्ते।'
+  53.128  [ t3]  event: metrics  'ttfa'
+  61.211  [ t3]  event: bot_stopped_speaking
+  61.252  [ t3]  event: bot_ended
+  63.413  [ t3]  event: response  'अमित जी, आपने शुक्रवार को payment करने का वादा किया है, धन्यवाद. आपके समय के लिए शुक्रिया, नमस्ते.'
+  63.414  [ t3]  eval: pass (aggregate='अमित जी, आपने शुक्रवार को payment करने का वादा किया है, धन्यवाद. आपके समय के लिए शुक्रिया, नमस्ते.') 
+  63.434  [ t3]  done: PASS (0 failure(s))

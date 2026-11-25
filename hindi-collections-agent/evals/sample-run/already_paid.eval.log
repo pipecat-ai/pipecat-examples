@@ -1,0 +1,94 @@
+   0.000  [ --]  run: script 'collections_call/already_paid' -> ws://localhost:7902/ws
+   0.000  [ --]  user  -> modality: audio | speech: factory:eval_services.caller_voice
+   0.000  [ --]  judge -> modality: audio | transcription: factory:eval_services.bot_transcriber | eval: factory:eval_services.judge
+   0.572  [ --]  connected
+   1.205  [ --]  handshake: ok (bot-ready)
+   1.205  [ t0]  --- turn 0: None
+   1.205  [ t0]  match: waiting for 'response'
+   1.208  [ t0]  event: metrics  'ttfb, processing'
+   1.208  [ t0]  event: flow_node  'verify'
+   1.232  [ t0]  event: llm_started
+   2.187  [ t0]  event: metrics  'ttfb'
+   2.187  [ t0]  event: metrics  'ttfat'
+   2.604  [ t0]  event: metrics  'tokens'
+   2.605  [ t0]  event: metrics  'processing'
+   2.605  [ t0]  event: llm_response  'नमस्ते, मैं अंजलि बोल रही हूँ सनराइज़ फाइनेंस से। आपसे थोड़ा समय लूँगी। कृपया अपने लोन नम्बर के आखरी चार अंक बताइये।'
+   2.606  [ t0]  event: metrics  'characters'
+   2.606  [ t0]  event: metrics  'ttfb'
+   2.607  [ t0]  event: bot_started_speaking
+   2.607  [ t0]  event: tts_response  'नमस्ते, मैं अंजलि बोल रही हूँ सनराइज़ फाइनेंस से।'
+   2.607  [ t0]  event: tts_response  'आपसे थोड़ा समय लूँगी।'
+   2.608  [ t0]  event: tts_response  'कृपया अपने लोन नम्बर के आखरी चार अंक बताइये।'
+   2.664  [ t0]  event: metrics  'ttfa'
+  11.865  [ t0]  event: bot_stopped_speaking
+  14.303  [ t0]  event: response  'नमस्ते, मैं अंजली बोल रही हूं Sunrise Finance से. आपसे थोड़ा समय लूंगी. कृपया अपने loan number के आखिरी चार अंक बताइए.'
+  14.304  [ t1]  --- turn 1: 'जी हाँ, मेरे लोन नंबर के आखिरी चार अंक चार, तीन, दो, एक हैं।'
+  14.304  [ t1]  send: 'जी हाँ, मेरे लोन नंबर के आखिरी चार अंक चार, तीन, दो, एक हैं।' (audio)
+  14.304  [ t1]  match: waiting for 'flow_node'
+  14.858  [ t1]  event: user_started_speaking
+  14.858  [ t1]  event: bot_interrupted
+  21.422  [ t1]  event: metrics  'stt_usage'
+  21.422  [ t1]  event: user_transcription  'जी हां, मेरे loan number के आखिरी चार अंक चार तीन दो एक हैं.'
+  21.423  [ t1]  event: user_stopped_speaking
+  21.423  [ t1]  event: llm_started
+  22.186  [ t1]  event: metrics  'ttfb'
+  22.186  [ t1]  event: metrics  'ttfat'
+  22.262  [ t1]  event: metrics  'tokens'
+  22.262  [ t1]  event: metrics  'processing'
+  22.262  [ t1]  event: llm_response
+  22.263  [ t1]  event: function_call
+  22.263  [ t1]  event: function_call_stopped
+  22.264  [ t1]  event: flow_node  'remind'
+  22.264  [ t1]  match: waiting for 'response' (text_contains)
+  22.267  [ t1]  event: llm_started
+  22.957  [ t1]  event: metrics  'ttfb'
+  22.958  [ t1]  event: metrics  'ttfat'
+  23.215  [ t1]  event: metrics  'ttfb'
+  23.217  [ t1]  event: bot_started_speaking
+  23.217  [ t1]  event: tts_response  'धन्यवाद अमित जी, आपकी जानकारी के लिए।'
+  23.218  [ t1]  event: tts_response  'आपके लोन का भुगतान आठ हजार पांच सौ रुपये बीस नवम्बर तक करना था, जो अभी बाकी है।'
+  23.218  [ t1]  event: tts_response  'देर से भुगतान करने पर लेट फी जुड़ सकती है और समय पर भुगतान करने से आपका क्रेडिट रिकॉर्ड अच्छा रहता है।'
+  23.271  [ t1]  event: metrics  'ttfa'
+  23.356  [ t1]  event: metrics  'tokens'
+  23.356  [ t1]  event: metrics  'processing'
+  23.356  [ t1]  event: llm_response  'धन्यवाद अमित जी, आपकी जानकारी के लिए। आपके लोन का भुगतान आठ हजार पांच सौ रुपये बीस नवम्बर तक करना था, जो अभी बाकी है। देर से भुगतान करने पर लेट फी जुड़ सकती है और समय पर भुगतान करने से आपका क्रेडिट रिकॉर्ड अच्छा रहता है। कृपया बताइये, आप किस तारीख़ तक यह राशि जमा कर पाएँगे?'
+  23.356  [ t1]  event: metrics  'characters'
+  23.399  [ t1]  event: tts_response  'कृपया बताइये, आप किस तारीख़ तक यह राशि जमा कर पाएँगे?'
+  44.636  [ t1]  event: bot_stopped_speaking
+  50.763  [ t1]  event: response  'धन्यवाद अमित जी आपकी जानकारी के लिए. आपके loan का भुगतान आठ हज़ार पांच सौ रुपए बीस November तक करना था, जो अभी बाकी है. देर से भुगतान करने पर late fee जुड़ सकती है और समय पर भुगतान करने से आपका credit record अच्छा रहता है. कृपया बताइए आप किस तारीख तक यह राशि जमा कर पाएंगे?'
+  50.764  [ t1]  eval: pass (aggregate='धन्यवाद अमित जी आपकी जानकारी के लिए. आपके loan का भुगतान आठ हज़ार पांच सौ रुपए बीस November तक करना था, जो अभी बाकी है. देर से भुगतान करने पर late fee जुड़ सकती है और समय पर भुगतान करने से आपका credit record अच्छा रहता है. कृपया बताइए आप किस तारीख तक यह राशि जमा कर पाएंगे?') 
+  50.764  [ t2]  --- turn 2: 'मैंने पिछले हफ्ते ही पेमेंट कर दिया है।'
+  50.764  [ t2]  send: 'मैंने पिछले हफ्ते ही पेमेंट कर दिया है।' (audio)
+  50.764  [ t2]  match: waiting for 'flow_node'
+  51.186  [ t2]  event: user_started_speaking
+  51.186  [ t2]  event: bot_interrupted
+  53.840  [ t2]  event: metrics  'stt_usage'
+  53.840  [ t2]  event: user_transcription  'मैंने पिछले हफ्ते ही payment कर दिया है.'
+  53.840  [ t2]  event: user_stopped_speaking
+  53.841  [ t2]  event: llm_started
+  54.575  [ t2]  event: metrics  'ttfb'
+  54.575  [ t2]  event: metrics  'ttfat'
+  54.627  [ t2]  event: metrics  'tokens'
+  54.627  [ t2]  event: metrics  'processing'
+  54.627  [ t2]  event: llm_response
+  54.632  [ t2]  event: function_call
+  54.632  [ t2]  event: function_call_stopped
+  54.635  [ t2]  event: flow_node  'wrap_up'
+  54.635  [ t2]  match: waiting for 'response'
+  54.648  [ t2]  event: metrics  'stt_usage'
+  54.648  [ t2]  event: llm_started
+  55.303  [ t2]  event: metrics  'ttfb'
+  55.304  [ t2]  event: metrics  'ttfat'
+  55.584  [ t2]  event: metrics  'tokens'
+  55.584  [ t2]  event: metrics  'processing'
+  55.584  [ t2]  event: llm_response  'धन्यवाद अमित जी, हमारी टीम आपसे जरूरत पड़ने पर आगे सम्पर्क करेगी। आपका दिन शुभ हो, नमस्ते।'
+  55.585  [ t2]  event: metrics  'characters'
+  55.639  [ t2]  event: metrics  'ttfb'
+  55.641  [ t2]  event: bot_started_speaking
+  55.641  [ t2]  event: tts_response  'धन्यवाद अमित जी, हमारी टीम आपसे जरूरत पड़ने पर आगे सम्पर्क करेगी।'
+  55.642  [ t2]  event: tts_response  'आपका दिन शुभ हो, नमस्ते।'
+  55.710  [ t2]  event: metrics  'ttfa'
+  63.321  [ t2]  event: bot_stopped_speaking
+  63.359  [ t2]  event: bot_ended
+  64.615  [ t2]  event: response  'धन्यवाद अमित जी. हमारी team आपसे ज़रूरत पड़ने पर आगे संपर्क करेगी. आपका दिन शुभ हो. नमस्ते.'
+  64.635  [ t2]  done: PASS (0 failure(s))

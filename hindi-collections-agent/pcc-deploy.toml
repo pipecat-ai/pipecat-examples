@@ -1,0 +1,6 @@
+agent_name = "hindi-collections-agent"
+secret_set = "hindi-collections-agent"
+region = "ap-south"  # Mumbai
+
+[scaling]
+	min_agents = 1
